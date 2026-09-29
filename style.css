@@ -309,3 +309,8 @@ details > summary.h3{cursor:pointer;list-style-position:inside}
 a.btn{text-decoration:none;color:var(--ink);display:inline-block}
 #imPreview th,#imPreview td{text-align:left}
 #imPreview td.num,#imPreview th:nth-child(4),#imPreview th:nth-child(5){text-align:right}
+
+.banner-warn{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--warn);border-radius:12px;padding:10px 14px;font-size:14px;background:var(--sheet)}
+.file-btn{cursor:pointer}
+.bk-file{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--rule);border-radius:9px;padding:8px 12px;font-size:14px;background:var(--sheet);text-align:left;width:100%}
+.bk-file:hover{border-color:var(--accent)}

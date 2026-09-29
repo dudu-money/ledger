@@ -84,6 +84,7 @@
   </header>
   <main class="page">
     <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#settings" class="tab">設定</a></nav>
+    <div class="banner-warn" id="bkReminder" hidden><span id="bkReminderText"></span><a class="btn" href="#settings">去備份</a></div>
     <div class="home-head">
       <h2 class="h2">我的帳本</h2>
       <button class="btn primary" id="btnNewLedger" type="button">＋ 新增帳本</button>
@@ -204,11 +205,38 @@
       <p class="msg" id="gsListMsg" role="status"></p>
     </section>
 
-    <section class="panel">
-      <h3 class="h3">資料備份</h3>
-      <p class="small muted">把你看得到的所有帳本、貸款各匯出成一個 CSV 檔，可以用 Excel 或 Google 試算表打開。</p>
-      <div class="row wrap"><button class="btn" id="gsExportAll" type="button">匯出所有帳本</button><button class="btn" id="gsExportLoans" type="button">匯出貸款</button></div>
-      <p class="msg" id="gsExpMsg" role="status"></p>
+    <section class="panel" id="backupPanel">
+      <h3 class="h3">備份與還原</h3>
+      <p class="small muted">備份會包含你看得到的所有帳本和紀錄、你的貸款、你的設定。還原時會建立成<b>新的帳本</b>，不會覆蓋或刪除現有資料。</p>
+      <p class="small" id="bkLast">還沒有備份過</p>
+      <div class="row wrap">
+        <button class="btn primary" id="bkDrive" type="button">備份到 Google 雲端硬碟</button>
+        <button class="btn" id="bkDownload" type="button">下載備份檔</button>
+      </div>
+      <p class="msg" id="bkMsg" role="status"></p>
+      <details class="more" id="bkRestoreBox">
+        <summary>從備份還原</summary>
+        <div class="stack">
+          <div class="row wrap">
+            <button class="btn" id="bkDriveList" type="button">從 Google 雲端硬碟選擇</button>
+            <label class="btn file-btn">選擇備份檔<input type="file" id="bkFile" accept=".json,application/json" hidden></label>
+          </div>
+          <div id="bkDriveFiles" class="stack" hidden></div>
+          <div id="bkPreview" class="stack" hidden>
+            <p class="small" id="bkInfo"></p>
+            <div id="bkLedgers" class="stack"></div>
+            <label class="check"><input type="checkbox" id="bkLoans" checked> <span id="bkLoansText">貸款</span></label>
+            <label class="check"><input type="checkbox" id="bkPrefs"> 設定（預設值、常用清單）— 會取代目前的設定</label>
+            <button class="btn primary" id="bkRestore" type="button">開始還原</button>
+          </div>
+          <p class="msg" id="bkRMsg" role="status"></p>
+        </div>
+      </details>
+      <div class="list-edit">
+        <span class="label">匯出成 CSV（用 Excel 或 Google 試算表查看，不能用來還原）</span>
+        <div class="row wrap"><button class="btn" id="gsExportAll" type="button">匯出所有帳本</button><button class="btn" id="gsExportLoans" type="button">匯出貸款</button></div>
+        <p class="msg" id="gsExpMsg" role="status"></p>
+      </div>
     </section>
 
     <section class="panel" id="importPanel">

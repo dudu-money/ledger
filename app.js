@@ -78,7 +78,7 @@ const S = {
   prefs:null, unsubPrefs:null, startApplied:false
 };
 const DEFAULT_PAYS=["現金","信用卡","悠遊卡","行動支付","轉帳","其他"];
-const P = () => { const p=S.prefs||{}; return { defaultPay:p.defaultPay||"", defaultPayer:p.defaultPayer||"", defaultCard:p.defaultCard||"", startPage:p.startPage||"",
+const P = () => { const p=S.prefs||{}; return { defaultPay:p.defaultPay||"", defaultPayer:p.defaultPayer||"", defaultCard:p.defaultCard||"", startPage:p.startPage||"", lastBackup:p.lastBackup||0,
   payers:p.payers||[], cards:p.cards||[], pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS) }; };
 const L = () => S.ledgers.get(S.lid);
 const isOwner = l => l && S.user && l.ownerUid === S.user.uid;
@@ -184,7 +184,17 @@ function watchLedgers(){
 }
 function stopLedgers(){ if(S.unsubLedgers){ S.unsubLedgers(); S.unsubLedgers=null; } S.ledgers=new Map(); }
 
+function renderBackupReminder(){
+  const b=$("bkReminder"); if(!b) return;
+  if(!S.prefs || !S.ledgersReady || !S.ledgers.size){ b.hidden=true; return; }
+  const last=P().lastBackup, days=last ? Math.floor((Date.now()-last)/864e5) : null;
+  const oldest=Math.min(...[...S.ledgers.values()].map(l=>l.createdAt&&l.createdAt.toMillis ? l.createdAt.toMillis() : l.createdAt&&l.createdAt.seconds ? l.createdAt.seconds*1000 : Date.now()));
+  const show = last ? days>=30 : (Date.now()-oldest) > 3*864e5;
+  b.hidden=!show;
+  $("bkReminderText").textContent = last ? `已經 ${days} 天沒有備份了，建議備份一次到 Google 雲端硬碟。` : "還沒有備份過資料，建議備份一次到 Google 雲端硬碟。";
+}
 function renderHome(){
+  renderBackupReminder();
   const mine=[], shared=[];
   [...S.ledgers.values()].sort((a,b)=>a.name.localeCompare(b.name,"zh-Hant")).forEach(l => (isOwner(l)?mine:shared).push(l));
   const box=$("myLedgers"); box.textContent="";
@@ -1168,6 +1178,7 @@ function watchPrefs(){
     S.prefs = s.exists() ? s.data() : {};
     if(!S.startApplied){ S.startApplied=true; const sp=P().startPage; if(sp && !location.hash) location.hash=sp; }
     if(location.hash==="#settings") renderGlobalSettings(false);
+    if(!location.hash) renderBackupReminder();
   }, ()=>{ S.prefs={}; S.startApplied=true; });
 }
 function stopPrefs(){ if(S.unsubPrefs){ S.unsubPrefs(); S.unsubPrefs=null; } S.prefs=null; }
@@ -1178,6 +1189,8 @@ async function savePrefs(patch){
 
 function renderGlobalSettings(reset=true){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user?S.user.email:"");
+  const lb=P().lastBackup;
+  $("bkLast").textContent = lb ? `上次備份：${new Date(lb).toLocaleDateString("zh-TW")}（${Math.floor((Date.now()-lb)/864e5)} 天前）` : "還沒有備份過";
   renderLook();
   const p=P();
   if(reset){
@@ -1194,7 +1207,7 @@ function renderGlobalSettings(reset=true){
   }
   const fill=(id,arr)=>{ const d=$(id); d.textContent=""; arr.forEach(v=>{ const o=el("option"); o.value=v; d.appendChild(o); }); };
   fill("dlGsPayers",p.payers); fill("dlGsCards",p.cards);
-  document.querySelectorAll(".list-edit").forEach(box=>{
+  document.querySelectorAll(".list-edit[data-list]").forEach(box=>{
     const key=box.dataset.list, list=p[key], chips=box.querySelector(".chips"); chips.textContent="";
     if(!list.length) chips.appendChild(el("span","small muted","還沒有項目"));
     list.forEach(v=>{ const locked = key==="pays" && v==="信用卡";
@@ -1363,4 +1376,163 @@ $("imGo").onclick=async()=>{
     $("imFile").value=""; $("imStep2").hidden=true; IM.wb=null;
   }catch(e){ msg("imMsg","匯入失敗："+errText(e),"err"); }
   finally{ $("imGo").disabled=false; }
+};
+
+/* ================= 完整備份與還原 ================= */
+const tsOut = v => (v && typeof v.toMillis==="function") ? {__ts:v.toMillis()} : (v && typeof v==="object" && typeof v.seconds==="number" && Object.keys(v).length<=2) ? {__ts:Math.round(v.seconds*1000)} : v;
+const cleanOut = o => Object.fromEntries(Object.entries(o).map(([k,v])=>[k,tsOut(v)]));
+const tsIn = v => (v && typeof v==="object" && "__ts" in v) ? new Date(v.__ts) : v;
+async function buildBackup(){
+  const ledgers=[];
+  for(const l of S.ledgers.values()){
+    const snap=await getDocs(collection(db,"ledgers",l.id,"entries"));
+    const {id, ...data}=l;
+    ledgers.push({ id, data:cleanOut(data), entries:snap.docs.map(d=>({id:d.id, ...cleanOut(d.data())})) });
+  }
+  const {lastBackup, ...prefs}=P();
+  return { app:"記帳本", version:1, exportedAt:new Date().toISOString(), email:S.email,
+    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), prefs };
+}
+const bkName = () => { const d=new Date(); return `記帳本備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
+const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款`;
+async function markBackup(){ try{ await savePrefs({lastBackup:Date.now()}); }catch(e){} renderGlobalSettings(false); }
+
+$("bkDownload").onclick=async()=>{
+  msg("bkMsg","準備備份中…");
+  try{
+    const b=await buildBackup();
+    const a2=document.createElement("a"); a2.href=URL.createObjectURL(new Blob([JSON.stringify(b)],{type:"application/json"}));
+    a2.download=bkName(); document.body.appendChild(a2); a2.click(); setTimeout(()=>{ URL.revokeObjectURL(a2.href); a2.remove(); },500);
+    await markBackup(); msg("bkMsg",`已下載備份檔（${bkCount(b)}）。建議把檔案存到雲端硬碟或其他安全的地方。`,"ok");
+  }catch(e){ msg("bkMsg","備份失敗："+errText(e),"err"); }
+};
+
+/* Google 雲端硬碟：用另一個登入視窗取得「只能存取本網站建立的檔案」的權限，不影響目前的登入 */
+let driveToken=null, driveTokenAt=0, driveApp=null;
+async function driveAuth(){
+  if(driveToken && Date.now()-driveTokenAt < 50*60e3) return driveToken;
+  if(!driveApp) driveApp=initializeApp(firebaseConfig, "drive");
+  const a2=getAuth(driveApp);
+  const prov=new GoogleAuthProvider();
+  prov.addScope("https://www.googleapis.com/auth/drive.file");
+  if(/@gmail\.com$/.test(S.email)) prov.setCustomParameters({login_hint:S.email});
+  const res=await signInWithPopup(a2, prov);
+  const cred=GoogleAuthProvider.credentialFromResult(res);
+  signOut(a2).catch(()=>{});
+  if(!cred || !cred.accessToken) throw new Error("沒有取得 Google 雲端硬碟的權限。");
+  driveToken=cred.accessToken; driveTokenAt=Date.now(); return driveToken;
+}
+async function gfetch(url, opt={}){
+  const r=await fetch(url,{...opt, headers:{...(opt.headers||{}), Authorization:"Bearer "+driveToken}});
+  if(!r.ok){
+    const t=await r.text(); let m=t; try{ m=JSON.parse(t).error.message; }catch(e){}
+    if(r.status===401){ driveToken=null; throw new Error("Google 授權過期了，請再按一次。"); }
+    if(r.status===403 && /not been used|disabled|not enabled/i.test(m)) throw new Error("還沒有開啟 Google Drive API。請照說明到 Google Cloud 主控台開啟後再試。");
+    throw new Error(m || ("HTTP "+r.status));
+  }
+  return r;
+}
+const DRIVE="https://www.googleapis.com/drive/v3/files";
+async function driveFolder(){
+  const q=encodeURIComponent("name='記帳本備份' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const j=await (await gfetch(`${DRIVE}?q=${q}&fields=files(id,name)&spaces=drive`)).json();
+  if(j.files && j.files.length) return j.files[0].id;
+  const c=await (await gfetch(`${DRIVE}?fields=id`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({name:"記帳本備份", mimeType:"application/vnd.google-apps.folder"})})).json();
+  return c.id;
+}
+async function driveUpload(name, obj){
+  const folder=await driveFolder(), bd="bk"+rid()+rid();
+  const body=`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name, parents:[folder], mimeType:"application/json"})}\r\n--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(obj)}\r\n--${bd}--`;
+  return (await gfetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
+    {method:"POST", headers:{"Content-Type":`multipart/related; boundary=${bd}`}, body})).json();
+}
+async function driveList(){
+  const folder=await driveFolder(), q=encodeURIComponent(`'${folder}' in parents and trashed=false`);
+  return ((await (await gfetch(`${DRIVE}?q=${q}&orderBy=createdTime%20desc&pageSize=20&fields=files(id,name,createdTime,size)`)).json()).files) || [];
+}
+async function driveGet(id){ return (await gfetch(`${DRIVE}/${id}?alt=media`)).json(); }
+const driveErr = e => e && e.code==="auth/popup-closed-by-user" ? "Google 授權視窗被關掉了，請再按一次。" : errText(e);
+
+$("bkDrive").onclick=async()=>{
+  msg("bkMsg","請在跳出的 Google 視窗允許存取雲端硬碟…");
+  try{
+    await driveAuth();
+    msg("bkMsg","備份中…");
+    const b=await buildBackup(); const f=await driveUpload(bkName(), b);
+    await markBackup(); msg("bkMsg",`已備份到 Google 雲端硬碟的「記帳本備份」資料夾：${f.name}（${bkCount(b)}）`,"ok");
+  }catch(e){ msg("bkMsg","備份失敗："+driveErr(e),"err"); }
+};
+$("bkDriveList").onclick=async()=>{
+  const box=$("bkDriveFiles"); msg("bkRMsg","請在跳出的 Google 視窗允許存取雲端硬碟…");
+  try{
+    await driveAuth(); msg("bkRMsg","讀取中…");
+    const files=await driveList(); box.textContent=""; box.hidden=false; msg("bkRMsg","");
+    if(!files.length){ box.appendChild(el("p","small muted","Google 雲端硬碟裡還沒有備份。")); return; }
+    files.forEach(f=>{ const b=el("button","bk-file"); b.type="button";
+      b.append(el("span",null,f.name), el("span","small muted", new Date(f.createdTime).toLocaleString("zh-TW")));
+      b.onclick=async()=>{ msg("bkRMsg","下載中…"); try{ showRestore(await driveGet(f.id)); msg("bkRMsg",""); }catch(e){ msg("bkRMsg","讀取失敗："+driveErr(e),"err"); } };
+      box.appendChild(b); });
+  }catch(e){ msg("bkRMsg","讀取失敗："+driveErr(e),"err"); }
+};
+$("bkFile").addEventListener("change", async()=>{
+  const f=$("bkFile").files[0]; if(!f) return;
+  try{ showRestore(JSON.parse(await f.text())); msg("bkRMsg",""); }
+  catch(e){ msg("bkRMsg","這不是記帳本的備份檔，或檔案已損壞。","err"); }
+  $("bkFile").value="";
+});
+
+let BK=null;
+function showRestore(b){
+  if(!b || b.app!=="記帳本" || !Array.isArray(b.ledgers)) throw new Error("這不是記帳本的備份檔。");
+  BK=b; $("bkDriveFiles").hidden=true; $("bkPreview").hidden=false;
+  $("bkInfo").textContent=`備份時間：${new Date(b.exportedAt).toLocaleString("zh-TW")}・來自 ${b.email||"—"}・${bkCount(b)}`;
+  const d=new Date(), tag=`（還原 ${d.getMonth()+1}/${d.getDate()}）`, box=$("bkLedgers"); box.textContent="";
+  if(!b.ledgers.length) box.appendChild(el("p","small muted","這份備份裡沒有帳本。"));
+  b.ledgers.forEach((lg,i)=>{ const lab=el("label","check"); const c=el("input"); c.type="checkbox"; c.value=String(i); c.checked=false;
+    lab.append(c, document.createTextNode(`${lg.data.name}（${lg.entries.length} 筆）→ 建立新帳本「${(lg.data.name+tag).slice(0,40)}」`)); box.appendChild(lab); });
+  const have=new Set(S.loans.map(x=>x.id)), missing=(b.loans||[]).filter(x=>!have.has(x.id));
+  $("bkLoans").checked=missing.length>0; $("bkLoans").disabled=!missing.length;
+  $("bkLoansText").textContent = (b.loans||[]).length ? `貸款：還原目前沒有的 ${missing.length} 筆（已存在的 ${(b.loans||[]).length-missing.length} 筆會略過）` : "貸款：這份備份沒有貸款";
+  $("bkPrefs").checked=false; $("bkPrefs").disabled=!b.prefs;
+}
+const EF=["type","amount","categoryId","categoryName","date","note","pay","card","payer","status","budget","priority","inst"];
+$("bkRestore").onclick=async()=>{
+  if(!BK) return;
+  const picks=[...document.querySelectorAll("#bkLedgers input:checked")].map(i=>BK.ledgers[Number(i.value)]);
+  const doLoans=$("bkLoans").checked && !$("bkLoans").disabled, doPrefs=$("bkPrefs").checked;
+  if(!picks.length && !doLoans && !doPrefs){ msg("bkRMsg","請勾選要還原的項目。","err"); return; }
+  $("bkRestore").disabled=true; msg("bkRMsg","還原中…");
+  try{
+    const d=new Date(), tag=`（還原 ${d.getMonth()+1}/${d.getDate()}）`; let nE=0;
+    for(const lg of picks){
+      const x=lg.data;
+      const ref=await addDoc(collection(db,"ledgers"), { name:(x.name+tag).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20),
+        ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email],
+        categories:Array.isArray(x.categories)?x.categories.slice(0,200):[], budget:Number(x.budget)||0,
+        mode:x.mode==="project"?"project":"normal", projectBudget:Number(x.projectBudget)||0, weekStart:String(x.weekStart||"").slice(0,10),
+        createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+      const col=collection(db,"ledgers",ref.id,"entries");
+      for(let i=0;i<lg.entries.length;i+=400){
+        const b=writeBatch(db);
+        lg.entries.slice(i,i+400).forEach(e=>{ const o={}; EF.forEach(k=>{ if(e[k]!==undefined && e[k]!==null) o[k]=e[k]; });
+          o.amount=Number(o.amount)||0; o.note=String(o.note||"").slice(0,100); o.pay=String(o.pay||"現金").slice(0,20);
+          o.categoryId=String(o.categoryId||"x").slice(0,40); o.categoryName=String(o.categoryName||"其他").slice(0,40);
+          b.set(doc(col), {...o, createdBy:S.user.uid, createdByEmail:S.email, createdAt:tsIn(e.createdAt)||serverTimestamp(), updatedAt:serverTimestamp()}); nE++; });
+        await b.commit();
+      }
+    }
+    let nL=0;
+    if(doLoans){ const have=new Set(S.loans.map(x=>x.id));
+      for(const lo of BK.loans.filter(x=>!have.has(x.id))){
+        const keys=["type","name","bank","day","principal","monthly","totalPeriods","periodsBase","paidBase","note","ledgerId","categoryId","categoryName","payments"], o={};
+        keys.forEach(k=>{ if(lo[k]!==undefined) o[k]=lo[k]; });
+        await setDoc(doc(db,"loans",lo.id), {type:"貸款",name:"",bank:"",day:0,principal:0,monthly:0,totalPeriods:0,periodsBase:0,paidBase:0,note:"",ledgerId:"",categoryId:"",categoryName:"",payments:{},
+          ...o, ownerUid:S.user.uid, createdAt:serverTimestamp(), updatedAt:serverTimestamp()}); nL++; } }
+    if(doPrefs && BK.prefs){ const p=BK.prefs; await savePrefs({ defaultPay:String(p.defaultPay||""), defaultPayer:String(p.defaultPayer||""), defaultCard:String(p.defaultCard||""),
+      startPage:String(p.startPage||""), payers:(p.payers||[]).slice(0,50), cards:(p.cards||[]).slice(0,50), pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS).slice(0,30) }); }
+    msg("bkRMsg",`還原完成：${picks.length} 本帳（${nE} 筆紀錄）、${nL} 筆貸款${doPrefs?"、設定":""}。還原的帳本在「帳本」頁，分享設定需要重新設定。`,"ok");
+    toast("還原完成"); $("bkPreview").hidden=true; BK=null;
+  }catch(e){ msg("bkRMsg","還原失敗："+errText(e),"err"); }
+  finally{ $("bkRestore").disabled=false; }
 };
