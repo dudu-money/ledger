@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>記帳本</title>
+<meta name="description" content="和親友一起用的記帳本：自訂帳本與分類、月／年統計、可分享給指定的人。">
+<meta name="theme-color" content="#1d6b52" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101614" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="記帳本">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 尚未設定 Firebase -->
+<section class="view center" id="viewSetup" hidden>
+  <div class="panel narrow">
+    <h1 class="brand-title">記帳本</h1>
+    <p><b>還差一步：</b>請打開 <code>firebase-config.js</code>，把 Firebase 專案的設定貼進去，再重新整理這個頁面。</p>
+    <p class="muted">詳細步驟請看附上的「架設說明」。</p>
+  </div>
+</section>
+
+<!-- 載入中 -->
+<section class="view center" id="viewLoading">
+  <p class="muted">載入中…</p>
+</section>
+
+<!-- 登入 -->
+<section class="view center" id="viewLogin" hidden>
+  <div class="panel narrow">
+    <h1 class="brand-title">記帳本</h1>
+    <p class="muted">每本帳只有你看得到，除非你分享給指定的人。</p>
+    <button class="btn primary block" id="btnGoogle" type="button">用 Google 帳號登入</button>
+    <div class="or"><span>或用 Email</span></div>
+    <form id="formEmail" class="stack" autocomplete="on">
+      <label class="field"><span class="label">Email</span><input id="inEmail" type="email" autocomplete="email" required></label>
+      <label class="field"><span class="label">密碼（至少 6 個字元）</span><input id="inPass" type="password" autocomplete="current-password" minlength="6" required></label>
+      <div class="row">
+        <button class="btn primary grow" type="submit" id="btnLogin">登入</button>
+        <button class="btn grow" type="button" id="btnSignup">註冊新帳號</button>
+      </div>
+      <button class="link" type="button" id="btnForgot">忘記密碼</button>
+    </form>
+    <p class="msg" id="loginMsg" role="status"></p>
+  </div>
+</section>
+
+<!-- Email 驗證 -->
+<section class="view center" id="viewVerify" hidden>
+  <div class="panel narrow">
+    <h1 class="brand-title">驗證你的 Email</h1>
+    <p>我們寄了一封驗證信到 <b id="verifyEmail"></b>。請點信中的連結，再回來按下面的按鈕。</p>
+    <p class="muted">沒收到的話，看看垃圾郵件匣。</p>
+    <div class="row">
+      <button class="btn primary grow" id="btnVerified" type="button">我已經驗證了</button>
+      <button class="btn grow" id="btnResend" type="button">重寄驗證信</button>
+    </div>
+    <button class="link" id="btnLogout2" type="button">登出</button>
+    <p class="msg" id="verifyMsg" role="status"></p>
+  </div>
+</section>
+
+<!-- 首頁：帳本列表 -->
+<section class="view" id="viewHome" hidden>
+  <header class="topbar">
+    <h1 class="brand-title sm">記帳本</h1>
+    <div class="who"><span id="whoEmail" class="muted"></span><button class="link" id="btnLogout" type="button">登出</button></div>
+  </header>
+  <main class="page">
+    <div class="home-head">
+      <h2 class="h2">我的帳本</h2>
+      <button class="btn primary" id="btnNewLedger" type="button">＋ 新增帳本</button>
+    </div>
+    <div class="ledger-grid" id="myLedgers"></div>
+    <div id="sharedWrap" hidden>
+      <h2 class="h2">別人分享給我的</h2>
+      <div class="ledger-grid" id="sharedLedgers"></div>
+    </div>
+    <p class="msg" id="homeMsg" role="status"></p>
+  </main>
+</section>
+
+<!-- 帳本 -->
+<section class="view" id="viewLedger" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="btnBack" type="button" aria-label="回到帳本列表">‹</button>
+    <div class="ledger-title">
+      <span class="dot" id="lDot"></span>
+      <h1 id="lName">帳本</h1>
+      <span class="badge" id="lRole"></span>
+    </div>
+    <button class="btn" id="btnSettings" type="button">設定</button>
+  </header>
+  <main class="page">
+    <div class="period">
+      <div class="seg" role="group" aria-label="統計期間">
+        <button type="button" id="pMonth" aria-pressed="true">月</button>
+        <button type="button" id="pYear" aria-pressed="false">年</button>
+      </div>
+      <div class="period-nav">
+        <button class="icon-btn" id="pPrev" type="button" aria-label="上一期">‹</button>
+        <h2 id="pTitle">—</h2>
+        <button class="icon-btn" id="pNext" type="button" aria-label="下一期">›</button>
+      </div>
+      <button class="link" id="pNow" type="button">回到本月</button>
+    </div>
+
+    <div class="layout">
+      <section class="panel totals" aria-label="結算">
+        <div><div class="label" id="balLabel">本月結餘</div><div class="num big" id="tBal">NT$ 0</div></div>
+        <div class="pair">
+          <div><div class="label">支出</div><div class="num mid c-out" id="tOut">0</div></div>
+          <div><div class="label">收入</div><div class="num mid c-in" id="tIn">0</div></div>
+        </div>
+        <div class="budget" id="budgetBox">
+          <div class="between small muted"><span id="bLabel">每月預算</span><span class="num" id="bVal">未設定</span></div>
+          <div class="meter" id="bMeter"><i></i></div>
+          <div class="between small muted"><span id="bLeft"></span><span id="bExtra"></span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="between">
+          <h3 class="h3">分類統計</h3>
+          <div class="seg sm" role="group" aria-label="分類統計類型">
+            <button type="button" id="cOut" aria-pressed="true">支出</button>
+            <button type="button" id="cIn" aria-pressed="false">收入</button>
+          </div>
+        </div>
+        <div class="cat-list" id="catList"></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="between"><h3 class="h3" id="trendTitle">每日支出</h3><span class="small muted" id="trendNote"></span></div>
+        <div id="trend"></div>
+      </section>
+
+      <section class="panel wide" id="listPanel">
+        <div class="between wrap-gap">
+          <h3 class="h3">明細 <span class="small muted" id="countNote"></span></h3>
+          <div class="row">
+            <input id="search" type="search" placeholder="搜尋備註、分類" aria-label="搜尋">
+            <button class="btn" id="btnExport" type="button">匯出 CSV</button>
+          </div>
+        </div>
+        <div class="filter" id="filterBar" hidden><span id="filterText"></span><button class="link" id="filterClear" type="button">清除篩選</button></div>
+        <div id="list"></div>
+      </section>
+
+      <section class="panel wide" id="yearPanel" hidden>
+        <div class="between"><h3 class="h3">每月明細</h3><button class="btn" id="btnExportY" type="button">匯出 CSV</button></div>
+        <div class="table-wrap"><table class="ytable" id="ytable"></table></div>
+      </section>
+    </div>
+  </main>
+  <button class="fab" id="btnAdd" type="button">＋ 記一筆</button>
+</section>
+
+<!-- 記一筆 -->
+<dialog id="dlgEntry" aria-labelledby="eTitle">
+  <form method="dialog" id="formEntry" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="eTitle">記一筆</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="seg" role="group" aria-label="收支">
+      <button type="button" class="t-out" id="eOut" aria-pressed="true">支出</button>
+      <button type="button" class="t-in" id="eIn" aria-pressed="false">收入</button>
+    </div>
+    <label class="amount"><span>NT$</span><input id="eAmount" type="number" inputmode="numeric" min="1" step="1" placeholder="0" aria-label="金額"></label>
+    <div class="field"><span class="label">分類</span><div class="chips" id="eCats"></div></div>
+    <div class="grid2">
+      <label class="field"><span class="label">日期</span><input id="eDate" type="date" required></label>
+      <label class="field"><span class="label">付款方式</span>
+        <select id="ePay"><option>現金</option><option>信用卡</option><option>悠遊卡</option><option>行動支付</option><option>轉帳</option><option>其他</option></select>
+      </label>
+    </div>
+    <label class="field"><span class="label">備註</span><input id="eNote" type="text" maxlength="100" placeholder="例如：午餐便當"></label>
+    <p class="small muted" id="eBy" hidden></p>
+    <div class="row">
+      <button class="btn danger" type="button" id="eDelete" hidden>刪除</button>
+      <button class="btn primary grow" type="submit" id="eSave" value="save">儲存</button>
+    </div>
+    <p class="msg" id="eMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 新增帳本 -->
+<dialog id="dlgNew" aria-labelledby="nTitle">
+  <form method="dialog" id="formNew" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="nTitle">新增帳本</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="field"><span class="label">從範本開始</span><div class="chips" id="nTemplates"></div></div>
+    <p class="small muted" id="nTplNote"></p>
+    <label class="field"><span class="label">帳本名稱</span><input id="nName" type="text" maxlength="40" required placeholder="例如：寶寶開銷"></label>
+    <div class="field"><span class="label">顏色</span><div class="swatches" id="nColors"></div></div>
+    <button class="btn primary" type="submit" value="create" id="nCreate">建立帳本</button>
+    <p class="msg" id="nMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 帳本設定 -->
+<dialog id="dlgSettings" aria-labelledby="sTitle">
+  <div class="stack">
+    <div class="between"><h2 class="h2" id="sTitle">帳本設定</h2><button class="icon-btn" id="sClose" type="button" aria-label="關閉">✕</button></div>
+
+    <section class="stack s-block" id="sBasic">
+      <h3 class="h3">基本資料</h3>
+      <label class="field"><span class="label">帳本名稱</span><input id="sName" type="text" maxlength="40"></label>
+      <div class="field"><span class="label">顏色</span><div class="swatches" id="sColors"></div></div>
+      <label class="field"><span class="label">每月預算（0 表示不設定）</span><input id="sBudget" type="number" inputmode="numeric" min="0" step="1"></label>
+      <button class="btn primary" id="sSaveBasic" type="button">儲存</button>
+      <p class="msg" id="sBasicMsg" role="status"></p>
+    </section>
+
+    <section class="stack s-block" id="sCats">
+      <h3 class="h3">分類</h3>
+      <div class="seg sm" role="group" aria-label="分類類型">
+        <button type="button" id="scOut" aria-pressed="true">支出分類</button>
+        <button type="button" id="scIn" aria-pressed="false">收入分類</button>
+      </div>
+      <div class="cat-edit" id="sCatList"></div>
+      <div class="row">
+        <input id="sNewCat" type="text" maxlength="40" placeholder="新增分類名稱" aria-label="新增分類名稱">
+        <button class="btn" id="sAddCat" type="button">新增</button>
+      </div>
+      <p class="small muted">刪除分類不會刪除已記的帳，舊紀錄會保留原本的分類名稱。</p>
+      <p class="msg" id="sCatMsg" role="status"></p>
+    </section>
+
+    <section class="stack s-block" id="sShare">
+      <h3 class="h3">分享</h3>
+      <p class="small muted">輸入對方登入用的 Email。對方登入後，就會在「別人分享給我的」看到這本帳。</p>
+      <div class="row wrap">
+        <input id="sEmail" type="email" placeholder="對方的 Email" aria-label="對方的 Email" class="grow">
+        <select id="sRole" aria-label="權限"><option value="editor">可編輯</option><option value="viewer">僅檢視</option></select>
+        <button class="btn primary" id="sInvite" type="button">分享</button>
+      </div>
+      <div class="members" id="sMembers"></div>
+      <p class="msg" id="sShareMsg" role="status"></p>
+    </section>
+
+    <section class="stack s-block" id="sDanger">
+      <h3 class="h3">其他</h3>
+      <div id="sDeleteBox" class="stack">
+        <p class="small muted">刪除後，這本帳和裡面所有紀錄都會永久消失，共用的人也看不到了。請輸入帳本名稱確認。</p>
+        <div class="row"><input id="sDelConfirm" type="text" class="grow" aria-label="輸入帳本名稱確認"><button class="btn danger" id="sDelete" type="button">刪除帳本</button></div>
+      </div>
+      <div id="sLeaveBox" class="stack">
+        <p class="small muted">離開後你就看不到這本帳了，要再看需要擁有者重新分享。</p>
+        <button class="btn danger" id="sLeave" type="button">離開這本帳</button>
+      </div>
+      <p class="msg" id="sDangerMsg" role="status"></p>
+    </section>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
