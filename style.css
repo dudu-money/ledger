@@ -9,12 +9,52 @@
   --f-num:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+/* 深色：跟隨系統（沒有手動選淺色時），或手動選深色 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --paper:#101614; --sheet:#172019; --ink:#e5eee9; --muted:#9aaba3; --rule:#253029; --rule-strong:#35443c;
   --accent:#5cc49c; --accent-soft:#1b3027; --on-accent:#0a1510;
   --out:#f08a78; --out-soft:#3a211c; --in:#5cc49c; --warn:#e6b35a;
   --shadow:0 10px 30px rgba(0,0,0,.5);
   color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#101614; --sheet:#172019; --ink:#e5eee9; --muted:#9aaba3; --rule:#253029; --rule-strong:#35443c;
+  --accent:#5cc49c; --accent-soft:#1b3027; --on-accent:#0a1510;
+  --out:#f08a78; --out-soft:#3a211c; --in:#5cc49c; --warn:#e6b35a;
+  --shadow:0 10px 30px rgba(0,0,0,.5);
+  color-scheme:dark}
+
+/* 主色調（綠色為預設） */
+:root[data-accent="blue"]{--accent:#2f5fa8;--accent-soft:#e3ebf7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-accent="blue"]{--accent:#7aa7ea;--accent-soft:#1a2740}}
+:root[data-theme="dark"][data-accent="blue"]{--accent:#7aa7ea;--accent-soft:#1a2740}
+:root[data-accent="pink"]{--accent:#b0406a;--accent-soft:#f7e3eb}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-accent="pink"]{--accent:#f08fb3;--accent-soft:#3a1d2a}}
+:root[data-theme="dark"][data-accent="pink"]{--accent:#f08fb3;--accent-soft:#3a1d2a}
+:root[data-accent="purple"]{--accent:#6b4fa8;--accent-soft:#ece6f7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-accent="purple"]{--accent:#b39ae8;--accent-soft:#2a2140}}
+:root[data-theme="dark"][data-accent="purple"]{--accent:#b39ae8;--accent-soft:#2a2140}
+:root[data-accent="orange"]{--accent:#a55a12;--accent-soft:#f7eadc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-accent="orange"]{--accent:#f0a860;--accent-soft:#3a2a18}}
+:root[data-theme="dark"][data-accent="orange"]{--accent:#f0a860;--accent-soft:#3a2a18}
+:root[data-accent="ink"]{--accent:#33403b;--accent-soft:#e6eae8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-accent="ink"]{--accent:#c9d4cf;--accent-soft:#26302c}}
+:root[data-theme="dark"][data-accent="ink"]{--accent:#c9d4cf;--accent-soft:#26302c}
+
+/* 自訂主色：數值由程式算好放在 --cl-*（淺色）與 --cd-*（深色） */
+:root[data-accent="custom"]{--accent:var(--cl-accent);--accent-soft:var(--cl-soft)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-accent="custom"]{--accent:var(--cd-accent);--accent-soft:var(--cd-soft)}}
+:root[data-theme="dark"][data-accent="custom"]{--accent:var(--cd-accent);--accent-soft:var(--cd-soft)}
+
+/* 外觀設定視窗 */
+.accent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.accent-opt{display:flex;align-items:center;gap:8px;border:1px solid var(--rule-strong);background:var(--sheet);border-radius:10px;padding:9px 10px;font-size:14px}
+.accent-opt .swatch{width:20px;height:20px;outline:none;border:0;flex:none}
+.accent-opt[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+#dlgLook .seg{display:grid;grid-template-columns:repeat(3,1fr)}
+.custom-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.custom-row input[type=color]{width:52px;height:38px;padding:2px;border:1px solid var(--rule-strong);border-radius:9px;background:var(--sheet);cursor:pointer}
+.preview-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.preview-row .pv{border-radius:9px;padding:8px 14px;font-weight:700;font-size:14px}
 
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -72,6 +112,9 @@ input[type=text],input[type=email],input[type=password],input[type=number],input
 .seg.sm button{padding:4px 10px;font-size:13px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--rule-strong);background:transparent;border-radius:999px;padding:5px 12px;font-size:14px}
+.chip.rm{display:inline-flex;align-items:center;gap:6px;padding-right:8px}
+.chip.rm .x{font-size:13px;color:var(--muted);line-height:1}
+.chip.rm:hover{border-color:var(--out)} .chip.rm:hover .x{color:var(--out)}
 .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
 .swatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;outline:1px solid var(--rule-strong);outline-offset:-1px}

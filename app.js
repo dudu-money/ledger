@@ -69,7 +69,7 @@ const S = {
   catView:"out", catFilter:null,
   // 表單
   eType:"out", eCat:null, editing:null,
-  newTpl:"個人", newColor:COLORS[0],
+  newTpl:"個人", newColor:COLORS[0], newCats:{out:[],in:[]}, newCatType:"out",
   sColor:COLORS[0], sCatType:"out"
 };
 const L = () => S.ledgers.get(S.lid);
@@ -180,16 +180,35 @@ function ledgerCard(l){
 }
 
 /* ================= 新增帳本 ================= */
+function renderNewCats(){
+  $("ncOut").setAttribute("aria-pressed", S.newCatType==="out"); $("ncIn").setAttribute("aria-pressed", S.newCatType==="in");
+  const box=$("nCatList"); box.textContent="";
+  const list=S.newCats[S.newCatType];
+  if(!list.length) box.appendChild(el("span","small muted", S.newCatType==="out"?"還沒有支出分類，請在下面新增。":"還沒有收入分類，請在下面新增。"));
+  list.forEach((n,i)=>{ const b=el("button","chip rm"); b.type="button"; b.title="移除「"+n+"」";
+    b.append(document.createTextNode(n), el("span","x","✕"));
+    b.onclick=()=>{ list.splice(i,1); renderNewCats(); }; box.appendChild(b); });
+}
+function addNewCat(){
+  const n=$("nNewCat").value.trim(); if(!n) return;
+  const list=S.newCats[S.newCatType];
+  if(list.includes(n)){ msg("nMsg","已經有「"+n+"」了。","err"); return; }
+  if(S.newCats.out.length+S.newCats.in.length>=200){ msg("nMsg","分類最多 200 個。","err"); return; }
+  list.push(n); $("nNewCat").value=""; msg("nMsg",""); renderNewCats(); $("nNewCat").focus();
+}
+$("ncOut").onclick=()=>{ S.newCatType="out"; renderNewCats(); };
+$("ncIn").onclick=()=>{ S.newCatType="in"; renderNewCats(); };
+$("nAddCat").onclick=addNewCat;
+$("nNewCat").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addNewCat(); } });
 function renderNewDialog(){
   const t=$("nTemplates"); t.textContent="";
   Object.keys(TEMPLATES).forEach(k=>{
     const c=el("button","chip",k); c.type="button"; c.setAttribute("aria-pressed", k===S.newTpl);
     c.onclick=()=>{ const prevAuto = !$("nName").value || Object.keys(TEMPLATES).some(x=>$("nName").value===x+"開銷");
-      S.newTpl=k; if(prevAuto) $("nName").value = k==="空白" ? "" : k+"開銷"; renderNewDialog(); };
+      S.newTpl=k; S.newCats={ out:[...TEMPLATES[k].out], in:[...TEMPLATES[k].in] }; if(prevAuto) $("nName").value = k==="空白" ? "" : k+"開銷"; renderNewDialog(); };
     t.appendChild(c);
   });
-  const tp=TEMPLATES[S.newTpl];
-  $("nTplNote").textContent = S.newTpl==="空白" ? "只有「其他」分類，建立後可在設定裡自己新增。" : "預設分類：" + tp.out.join("、") + "（之後都可以改）";
+  renderNewCats();
   swatches("nColors", S.newColor, c=>{ S.newColor=c; renderNewDialog(); });
 }
 function swatches(boxId, current, onPick, disabled){
@@ -198,7 +217,7 @@ function swatches(boxId, current, onPick, disabled){
     s.setAttribute("aria-pressed", c===current); s.disabled=!!disabled; s.onclick=()=>onPick(c); box.appendChild(s); });
 }
 $("btnNewLedger").onclick = () => {
-  S.newTpl="個人"; S.newColor=COLORS[S.ledgers.size % COLORS.length]; $("nName").value="個人開銷"; msg("nMsg","");
+  S.newTpl="個人"; S.newCats={ out:[...TEMPLATES["個人"].out], in:[...TEMPLATES["個人"].in] }; S.newCatType="out"; $("nNewCat").value=""; S.newColor=COLORS[S.ledgers.size % COLORS.length]; $("nName").value="個人開銷"; msg("nMsg","");
   renderNewDialog(); $("dlgNew").showModal();
 };
 $("formNew").addEventListener("submit", async e => {
@@ -206,8 +225,8 @@ $("formNew").addEventListener("submit", async e => {
   e.preventDefault();
   const name=$("nName").value.trim();
   if(!name){ msg("nMsg","請輸入帳本名稱。","err"); return; }
-  const tp=TEMPLATES[S.newTpl];
-  const categories=[...tp.out.map(n=>({id:rid(),name:n,type:"out"})), ...tp.in.map(n=>({id:rid(),name:n,type:"in"}))];
+  if(!S.newCats.out.length && !S.newCats.in.length){ msg("nMsg","請至少保留一個分類。","err"); return; }
+  const categories=[...S.newCats.out.map(n=>({id:rid(),name:n,type:"out"})), ...S.newCats.in.map(n=>({id:rid(),name:n,type:"in"}))];
   $("nCreate").disabled=true;
   try{
     const ref=await addDoc(collection(db,"ledgers"), {
@@ -252,11 +271,13 @@ function watchEntries(){
   const [a,b]=periodRange();
   S.entriesReady=false; renderAll();
   const q=query(collection(db,"ledgers",S.lid,"entries"), where("date",">=",a), where("date","<=",b));
+  const token = S.entriesToken = {}; // 切換期間後，忽略舊的回呼
   S.unsubEntries=onSnapshot(q, snap=>{
+    if(token!==S.entriesToken) return;
     S.entries=snap.docs.map(d=>({id:d.id, ...d.data()})); S.entriesReady=true; renderAll();
-  }, e=>{ S.entriesReady=true; renderAll(); toast("讀取紀錄失敗："+errText(e)); });
+  }, e=>{ if(token!==S.entriesToken) return; S.entriesReady=true; renderAll(); toast("讀取紀錄失敗："+errText(e)); });
 }
-function stopEntries(){ if(S.unsubEntries){ S.unsubEntries(); S.unsubEntries=null; } S.entries=[]; }
+function stopEntries(){ S.entriesToken=null; if(S.unsubEntries){ S.unsubEntries(); S.unsubEntries=null; } S.entries=[]; }
 
 /* 期間切換 */
 function setMode(m){ S.period.mode=m; S.catFilter=null; watchEntries(); }
@@ -614,3 +635,55 @@ $("sLeave").onclick=async()=>{
 $("dlgSettings").addEventListener("close", ()=>{ $("sLeave").dataset.armed=""; $("sLeave").textContent="離開這本帳"; });
 
 let resizeT; window.addEventListener("resize", ()=>{ clearTimeout(resizeT); resizeT=setTimeout(()=>{ if(S.lid && L()) renderTrend(); }, 150); });
+
+/* ================= 外觀 ================= */
+const ACCENTS=[["green","綠","#1d6b52"],["blue","藍","#2f5fa8"],["pink","粉","#b0406a"],["purple","紫","#6b4fa8"],["orange","橘","#a55a12"],["ink","墨","#33403b"]];
+const store={ get:k=>{ try{return localStorage.getItem(k);}catch(e){return null;} }, set:(k,v)=>{ try{localStorage.setItem(k,v);}catch(e){} } };
+/* 自訂顏色：保留色相，自動調整亮度讓文字清楚（對比 ≥ 4.5:1） */
+const hex2rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const rgb2hex=c=>"#"+c.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,"0")).join("");
+const lum=c=>{ const f=v=>{ v/=255; return v<=.03928? v/12.92 : Math.pow((v+.055)/1.055,2.4); }; const [r,g,b]=c.map(f); return .2126*r+.7152*g+.0722*b; };
+const contrast=(a,b)=>{ const x=lum(a), y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+function customVars(hex){
+  const base=hex2rgb(hex), white=[255,255,255], black=[0,0,0], darkBg=[23,32,25], darkText=[10,21,16];
+  let light=base; for(let t=0;t<=1 && contrast(light,white)<4.5;t+=.04) light=mix(base,black,t);   // 淺色模式：白字要清楚
+  let dark=base;  for(let t=0;t<=1 && (contrast(dark,darkText)<4.5||contrast(dark,darkBg)<3);t+=.04) dark=mix(base,white,t); // 深色模式：夠亮
+  return { "--cl-accent":rgb2hex(light), "--cl-soft":rgb2hex(mix(light,white,.88)),
+           "--cd-accent":rgb2hex(dark),  "--cd-soft":rgb2hex(mix(darkBg,dark,.22)) };
+}
+function applyLook(){
+  const t=store.get("ledger.theme")||"system", a=store.get("ledger.accent")||"green", root=document.documentElement;
+  if(t==="system") delete root.dataset.theme; else root.dataset.theme=t;
+  if(a==="green") delete root.dataset.accent; else root.dataset.accent=a;
+  let vars={}; try{ vars=JSON.parse(store.get("ledger.accentVars")||"{}"); }catch(e){}
+  ["--cl-accent","--cl-soft","--cd-accent","--cd-soft"].forEach(k=>{ if(a==="custom"&&vars[k]) root.style.setProperty(k,vars[k]); else root.style.removeProperty(k); });
+  const bg=getComputedStyle(root).getPropertyValue("--sheet").trim();
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m=>m.setAttribute("content", bg||"#1d6b52"));
+  if(S.lid && L()) renderTrend();
+}
+function renderLook(){
+  const t=store.get("ledger.theme")||"system", a=store.get("ledger.accent")||"green";
+  document.querySelectorAll("#lkTheme button").forEach(b=>{ b.setAttribute("aria-pressed", b.dataset.v===t);
+    b.onclick=()=>{ store.set("ledger.theme",b.dataset.v); applyLook(); renderLook(); }; });
+  const box=$("lkAccent"); box.textContent="";
+  ACCENTS.forEach(([k,name,col])=>{ const b=el("button","accent-opt"); b.type="button"; b.setAttribute("aria-pressed",k===a);
+    const s=el("span","swatch"); s.style.background=col; b.append(s, document.createTextNode(name));
+    b.onclick=()=>{ store.set("ledger.accent",k); applyLook(); renderLook(); }; box.appendChild(b); });
+  const picked=store.get("ledger.accentCustom");
+  if(picked) $("lkPicker").value=picked;
+  const isCustom=a==="custom";
+  $("lkPickerNote").textContent = isCustom ? "目前使用自訂顏色" : "點色塊挑選任何顏色";
+  $("lkPreview").hidden=!isCustom;
+  if(isCustom){ let v={}; try{ v=JSON.parse(store.get("ledger.accentVars")||"{}"); }catch(e){}
+    const pl=$("pvLight"), pd=$("pvDark");
+    pl.textContent="淺色"; pl.style.cssText=`background:${v["--cl-accent"]};color:#fff`;
+    pd.textContent="深色"; pd.style.cssText=`background:${v["--cd-accent"]};color:#0a1510`; }
+}
+$("lkPicker").addEventListener("input", e=>{
+  const hex=e.target.value; store.set("ledger.accentCustom",hex); store.set("ledger.accentVars",JSON.stringify(customVars(hex)));
+  store.set("ledger.accent","custom"); applyLook(); renderLook();
+});
+document.querySelectorAll("[data-look]").forEach(b=>b.addEventListener("click",()=>{ renderLook(); $("dlgLook").showModal(); }));
+$("lkClose").onclick=()=>$("dlgLook").close();
+applyLook();

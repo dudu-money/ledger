@@ -16,6 +16,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="style.css">
+<script>
+  // 在畫面出現前先套用外觀設定，避免閃爍
+  try{ var t=localStorage.getItem("ledger.theme"), a=localStorage.getItem("ledger.accent");
+    if(t==="light"||t==="dark") document.documentElement.dataset.theme=t;
+    if(a && a!=="green") document.documentElement.dataset.accent=a;
+    if(a==="custom"){ var v=JSON.parse(localStorage.getItem("ledger.accentVars")||"{}");
+      for(var k in v) document.documentElement.style.setProperty(k,v[k]); } }catch(e){}
+</script>
 </head>
 <body>
 
@@ -47,7 +55,7 @@
         <button class="btn primary grow" type="submit" id="btnLogin">登入</button>
         <button class="btn grow" type="button" id="btnSignup">註冊新帳號</button>
       </div>
-      <button class="link" type="button" id="btnForgot">忘記密碼</button>
+      <div class="between"><button class="link" type="button" id="btnForgot">忘記密碼</button><button class="link" data-look type="button">外觀</button></div>
     </form>
     <p class="msg" id="loginMsg" role="status"></p>
   </div>
@@ -72,7 +80,7 @@
 <section class="view" id="viewHome" hidden>
   <header class="topbar">
     <h1 class="brand-title sm">記帳本</h1>
-    <div class="who"><span id="whoEmail" class="muted"></span><button class="link" id="btnLogout" type="button">登出</button></div>
+    <div class="who"><span id="whoEmail" class="muted"></span><button class="link" data-look type="button">外觀</button><button class="link" id="btnLogout" type="button">登出</button></div>
   </header>
   <main class="page">
     <div class="home-head">
@@ -97,7 +105,7 @@
       <h1 id="lName">帳本</h1>
       <span class="badge" id="lRole"></span>
     </div>
-    <button class="btn" id="btnSettings" type="button">設定</button>
+    <div class="row"><button class="btn" data-look type="button" aria-label="外觀設定">外觀</button><button class="btn" id="btnSettings" type="button">設定</button></div>
   </header>
   <main class="page">
     <div class="period">
@@ -195,7 +203,17 @@
   <form method="dialog" id="formNew" class="stack" autocomplete="off">
     <div class="between"><h2 class="h2" id="nTitle">新增帳本</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
     <div class="field"><span class="label">從範本開始</span><div class="chips" id="nTemplates"></div></div>
-    <p class="small muted" id="nTplNote"></p>
+    <div class="field"><span class="label">分類（可以直接增減，之後在設定裡也能改）</span>
+      <div class="seg sm" role="group" aria-label="分類類型">
+        <button type="button" id="ncOut" aria-pressed="true">支出分類</button>
+        <button type="button" id="ncIn" aria-pressed="false">收入分類</button>
+      </div>
+      <div class="chips" id="nCatList"></div>
+      <div class="row">
+        <input id="nNewCat" type="text" maxlength="40" placeholder="輸入新分類，按 Enter 或「新增」" aria-label="新增分類名稱" class="grow">
+        <button class="btn" type="button" id="nAddCat">新增</button>
+      </div>
+    </div>
     <label class="field"><span class="label">帳本名稱</span><input id="nName" type="text" maxlength="40" required placeholder="例如：寶寶開銷"></label>
     <div class="field"><span class="label">顏色</span><div class="swatches" id="nColors"></div></div>
     <button class="btn primary" type="submit" value="create" id="nCreate">建立帳本</button>
@@ -256,6 +274,32 @@
       </div>
       <p class="msg" id="sDangerMsg" role="status"></p>
     </section>
+  </div>
+</dialog>
+
+<!-- 外觀 -->
+<dialog id="dlgLook" aria-labelledby="lkTitle">
+  <div class="stack">
+    <div class="between"><h2 class="h2" id="lkTitle">外觀</h2><button class="icon-btn" id="lkClose" type="button" aria-label="關閉">✕</button></div>
+    <div class="field"><span class="label">顯示模式</span>
+      <div class="seg" role="group" aria-label="顯示模式" id="lkTheme">
+        <button type="button" data-v="system">跟隨系統</button>
+        <button type="button" data-v="light">淺色</button>
+        <button type="button" data-v="dark">深色</button>
+      </div>
+    </div>
+    <div class="field"><span class="label">主色調</span><div class="accent-grid" id="lkAccent"></div></div>
+    <div class="field"><span class="label">自訂顏色</span>
+      <div class="custom-row">
+        <input type="color" id="lkPicker" value="#1d6b52" aria-label="挑選自訂顏色">
+        <span class="small muted" id="lkPickerNote">點色塊挑選任何顏色</span>
+      </div>
+      <div class="preview-row" id="lkPreview" hidden>
+        <span class="small muted">實際效果：</span>
+        <span class="pv" id="pvLight"></span><span class="pv" id="pvDark"></span>
+      </div>
+    </div>
+    <p class="small muted">外觀只會改變你在這台裝置上看到的畫面，不影響其他人。</p>
   </div>
 </dialog>
 
