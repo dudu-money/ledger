@@ -83,7 +83,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#settings" class="tab">設定</a></nav>
     <div class="banner-warn" id="bkReminder" hidden><span id="bkReminderText"></span><a class="btn" href="#settings">去備份</a></div>
     <div class="home-head">
       <h2 class="h2">我的帳本</h2>
@@ -105,7 +105,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipRepay"></div>
     <div class="period">
       <div class="period-nav">
@@ -143,6 +143,53 @@
   </main>
 </section>
 
+<!-- 投資 -->
+<section class="view" id="viewInvest" hidden>
+  <header class="topbar">
+    <h1 class="brand-title sm">記帳本</h1>
+    <a class="btn" href="#settings">設定</a>
+  </header>
+  <main class="page">
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">投資</a><a href="#settings" class="tab">設定</a></nav>
+    <div class="tip-slot" id="tipInvest"></div>
+    <div class="layout">
+      <section class="panel totals" aria-label="投資總覽">
+        <div><div class="label">目前市值</div><div class="num big" id="ivMV">NT$ 0</div><div class="small" id="ivMVNote"></div></div>
+        <div class="pair">
+          <div><div class="label">持有成本</div><div class="num mid" id="ivCost">0</div></div>
+          <div><div class="label">未實現損益</div><div class="num mid" id="ivUnreal">0</div></div>
+        </div>
+        <div class="pair">
+          <div><div class="label">已實現損益</div><div class="num mid" id="ivReal">0</div></div>
+          <div><div class="label">累積領到股息</div><div class="num mid" id="ivDiv">0</div></div>
+        </div>
+        <div class="iv-total"><span class="label">總報酬（未實現＋已實現＋股息）</span><span class="num mid" id="ivTotal">0</span></div>
+      </section>
+      <section class="panel">
+        <div class="between"><h3 class="h3">持股占比</h3><span class="small muted" id="ivPriceAt"></span></div>
+        <div id="ivAlloc"></div>
+        <div class="row wrap">
+          <button class="btn" id="ivRefresh" type="button">更新台股收盤價</button>
+          <button class="btn" id="ivFeeBtn" type="button">手續費設定</button>
+        </div>
+        <p class="msg" id="ivPriceMsg" role="status"></p>
+      </section>
+      <section class="panel wide">
+        <div class="between wrap-gap"><h3 class="h3">我的持股</h3><button class="btn primary" id="ivAdd" type="button">＋ 記一筆交易</button></div>
+        <div id="ivList"></div>
+      </section>
+      <section class="panel wide" id="ivSoldWrap" hidden>
+        <details><summary class="h3">已全部賣出 <span class="small muted" id="ivSoldCount"></span></summary><div id="ivSold"></div></details>
+      </section>
+      <section class="panel wide">
+        <div class="between wrap-gap"><h3 class="h3">最近交易</h3><span class="small muted">點一筆可以修改或刪除</span></div>
+        <div id="ivRecent"></div>
+      </section>
+    </div>
+    <p class="msg" id="investMsg" role="status"></p>
+  </main>
+</section>
+
 <!-- 設定 -->
 <section class="view" id="viewSettings" hidden>
   <header class="topbar">
@@ -150,7 +197,7 @@
     <a class="btn" href="#">完成</a>
   </header>
   <main class="page narrow-page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
     <div class="tip-slot" id="tipSettings"></div>
 
     <section class="panel">
@@ -229,6 +276,7 @@
             <p class="small" id="bkInfo"></p>
             <div id="bkLedgers" class="stack"></div>
             <label class="check"><input type="checkbox" id="bkLoans" checked> <span id="bkLoansText">貸款</span></label>
+            <label class="check"><input type="checkbox" id="bkHolds" checked> <span id="bkHoldsText">投資持股</span></label>
             <label class="check"><input type="checkbox" id="bkPrefs"> 設定（預設值、常用清單）— 會取代目前的設定</label>
             <button class="btn primary" id="bkRestore" type="button">開始還原</button>
           </div>
@@ -330,6 +378,11 @@
         <div class="cat-list" id="catList"></div>
       </section>
 
+      <section class="panel wide" id="aaPanel" hidden>
+        <div class="between wrap-gap"><h3 class="h3">AA 結算</h3><span class="small muted">從開始記帳到現在，不受上方月份影響</span></div>
+        <div id="aaBody"></div>
+      </section>
+
       <section class="panel wide">
         <div class="between"><h3 class="h3" id="trendTitle">每日支出</h3><span class="small muted" id="trendNote"></span></div>
         <div id="trend"></div>
@@ -380,19 +433,42 @@
     <div class="field" id="eCardWrap" hidden>
       <div class="tip-slot" id="tipCard"></div>
       <span class="label">卡片</span>
-      <input id="eCard" type="text" maxlength="20" list="dlCards" placeholder="例如：玉山、永豐">
+      <div class="chips tag-pick" id="eCardChips"></div>
+      <input id="eCard" type="text" maxlength="20" placeholder="點上面的卡片，或輸入新卡片後按 Enter" autocomplete="off">
       <label class="check"><input type="checkbox" id="eInstOn"> 分期付款</label>
       <div class="grid2" id="eInstBox" hidden>
         <label class="field"><span class="label">期數</span><input id="eInstN" type="number" inputmode="numeric" min="2" max="60" step="1" value="12"></label>
         <label class="field"><span class="label">第一期帳單月份</span><input id="eInstStart" type="month"></label>
       </div>
+      <div class="field" id="eInstModeBox" hidden>
+        <span class="label">每期金額</span>
+        <div class="seg sm seg3" role="group" aria-label="每期金額" id="eInstMode">
+          <button type="button" data-m="last" aria-pressed="true">平均（零頭在最後一期）</button>
+          <button type="button" data-m="first" aria-pressed="false">平均（零頭在第一期）</button>
+          <button type="button" data-m="custom" aria-pressed="false">自己填</button>
+        </div>
+        <div class="inst-list" id="eInstList"></div>
+      </div>
       <p class="small muted" id="eInstNote" hidden></p>
+    </div>
+    <div class="field" id="eSplitBox" hidden>
+      <span class="label">這筆怎麼分攤</span>
+      <div class="seg sm seg3" role="group" aria-label="分攤方式" id="eSplitMode">
+        <button type="button" data-m="d" aria-pressed="true">照帳本比例</button>
+        <button type="button" data-m="s" aria-pressed="false">只算付款人</button>
+        <button type="button" data-m="c" aria-pressed="false">這筆自訂</button>
+      </div>
+      <div class="split-grid" id="eSplitCustom"></div>
+      <p class="small muted" id="eSplitNote"></p>
     </div>
     <label class="field"><span class="label">備註</span><input id="eNote" type="text" maxlength="100" placeholder="例如：午餐便當"></label>
     <details class="more" id="eMore">
       <summary>更多：付款人、狀態<span id="eMoreProj">、預算、優先度</span></summary>
       <div class="stack">
-        <label class="field"><span class="label">付款人（選填）</span><input id="ePayer" type="text" maxlength="20" list="dlPayers" placeholder="例如：世翔、阿云"></label>
+        <div class="field" id="ePayerField"><span class="label">付款人（選填）</span>
+          <div class="chips tag-pick" id="ePayerChips"></div>
+          <input id="ePayer" type="text" maxlength="20" placeholder="點上面的名字，或輸入新名字後按 Enter" autocomplete="off">
+        </div>
         <div class="field"><span class="label">狀態</span>
           <div class="seg" role="group" aria-label="狀態">
             <button type="button" id="eStPaid" aria-pressed="true">已付款</button>
@@ -456,6 +532,21 @@
       <label class="field"><span class="label">每月預算（0 表示不設定）</span><input id="sBudget" type="number" inputmode="numeric" min="0" step="1"></label>
       <button class="btn primary" id="sSaveBasic" type="button">儲存</button>
       <p class="msg" id="sBasicMsg" role="status"></p>
+    </section>
+
+    <section class="stack s-block" id="sAA">
+      <h3 class="h3">AA 分帳</h3>
+      <label class="check"><input type="checkbox" id="sAAOn"> 開啟 AA 結算 <span class="small muted">— 記帳時選付款人，系統會算出誰該給誰多少</span></label>
+      <div class="stack" id="sAABox">
+        <div class="field"><span class="label">一起分攤的人（2～4 人，點選或輸入新名字按 Enter）</span>
+          <div class="chips tag-pick" id="sAAPeople"></div>
+          <input id="sAANew" type="text" maxlength="20" placeholder="例如：世翔" autocomplete="off">
+        </div>
+        <div class="field"><span class="label">預設分攤比例（%）</span><div class="split-grid" id="sAARatio"></div></div>
+        <div class="row wrap"><button class="btn" id="sAAEven" type="button">平均分</button><span class="small muted" id="sAASum"></span></div>
+      </div>
+      <button class="btn primary" id="sAASave" type="button">儲存 AA 設定</button>
+      <p class="msg" id="sAAMsg" role="status"></p>
     </section>
 
     <section class="stack s-block" id="sCats">
@@ -543,6 +634,78 @@
     <p class="small muted" id="pyNote"></p>
     <button class="btn primary" type="submit" value="save" id="pySave">確定已繳</button>
     <p class="msg" id="pyMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 投資交易 -->
+<dialog id="dlgTrade" aria-labelledby="tdTitle">
+  <form method="dialog" id="formTrade" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="tdTitle">記一筆交易</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="seg seg4" role="group" aria-label="交易類型">
+      <button type="button" data-td="b" aria-pressed="true">買進</button><button type="button" data-td="s" aria-pressed="false">賣出</button><button type="button" data-td="d" aria-pressed="false">現金股息</button><button type="button" data-td="sd" aria-pressed="false">配股</button>
+    </div>
+    <div class="grid2">
+      <label class="field"><span class="label">代號</span><input id="tdSym" type="text" maxlength="12" required list="dlSyms" placeholder="例如 0050、00878、VOO" autocapitalize="characters"></label>
+      <label class="field"><span class="label">名稱</span><input id="tdName" type="text" maxlength="30" placeholder="例如 元大台灣50"></label>
+    </div>
+    <div class="grid2" id="tdNewBox">
+      <label class="field"><span class="label">類型（決定賣出時的交易稅）</span><select id="tdKind"><option value="etf">ETF（稅 0.1%）</option><option value="stock">股票（稅 0.3%）</option><option value="bond">債券 ETF（免稅）</option></select></label>
+      <label class="field"><span class="label">幣別</span><select id="tdCur"><option value="TWD">台幣（台股）</option><option value="USD">美元（美股）</option></select></label>
+    </div>
+    <label class="field"><span class="label">日期</span><input id="tdDate" type="date" required></label>
+    <div class="grid2" id="tdQP">
+      <label class="field"><span class="label" id="tdQLabel">股數</span><input id="tdQty" type="number" inputmode="decimal" min="0" step="any" placeholder="1 張 = 1000 股"></label>
+      <label class="field" id="tdPriceF"><span class="label">成交價（每股）</span><input id="tdPrice" type="number" inputmode="decimal" min="0" step="any"></label>
+    </div>
+    <label class="field" id="tdAmtF" hidden><span class="label">領到的股息（實際入帳金額）</span><input id="tdAmt" type="number" inputmode="decimal" min="0" step="any"></label>
+    <div class="grid2" id="tdFeeBox">
+      <label class="field"><span class="label">手續費</span><input id="tdFee" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="field" id="tdTaxF"><span class="label">交易稅</span><input id="tdTax" type="number" inputmode="decimal" min="0" step="any"></label>
+    </div>
+    <p class="small muted" id="tdCalc"></p>
+    <label class="field"><span class="label">備註</span><input id="tdNote" type="text" maxlength="40" placeholder="例如：定期定額、除息"></label>
+    <div class="row">
+      <button class="btn danger" type="button" id="tdDelete" hidden>刪除這筆</button>
+      <button class="btn primary grow" type="submit" value="save" id="tdSave">儲存</button>
+    </div>
+    <p class="msg" id="tdMsg" role="status"></p>
+    <datalist id="dlSyms"></datalist>
+  </form>
+</dialog>
+
+<!-- 持股明細 -->
+<dialog id="dlgHold" aria-labelledby="hdTitle">
+  <form method="dialog" id="formHold" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="hdTitle">持股</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="hd-stats" id="hdStats"></div>
+    <div class="grid2">
+      <label class="field"><span class="label">名稱</span><input id="hdName" type="text" maxlength="30"></label>
+      <label class="field"><span class="label" id="hdPriceLabel">目前股價</span><input id="hdPrice" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="field"><span class="label">類型</span><select id="hdKind"><option value="etf">ETF（稅 0.1%）</option><option value="stock">股票（稅 0.3%）</option><option value="bond">債券 ETF（免稅）</option></select></label>
+      <label class="field"><span class="label">備註</span><input id="hdNote" type="text" maxlength="100"></label>
+    </div>
+    <div class="row">
+      <button class="btn" type="button" id="hdAddTrade">＋ 記這檔的交易</button>
+      <button class="btn primary grow" type="submit" value="save" id="hdSave">儲存</button>
+    </div>
+    <p class="msg" id="hdMsg" role="status"></p>
+    <div><span class="label">交易紀錄</span><div id="hdTrades"></div></div>
+    <button class="btn danger" type="button" id="hdDelete">刪除這檔（含所有交易紀錄）</button>
+  </form>
+</dialog>
+
+<!-- 手續費設定 -->
+<dialog id="dlgFee" aria-labelledby="feTitle">
+  <form method="dialog" id="formFee" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="feTitle">手續費設定</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p class="small muted">記交易時會自動算手續費和交易稅，實際金額以券商對帳單為準，算出來的數字都可以手動改。</p>
+    <div class="grid2">
+      <label class="field"><span class="label">手續費折扣（例：6 折填 6，沒折扣填 10）</span><input id="feDisc" type="number" inputmode="decimal" min="0" max="10" step="any"></label>
+      <label class="field"><span class="label">最低手續費（整股通常 20，零股通常 1）</span><input id="feMin" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="field"><span class="label">美元匯率（美股換算台幣用）</span><input id="feFx" type="number" inputmode="decimal" min="0" step="any"></label>
+    </div>
+    <button class="btn primary" type="submit" value="save" id="feSave">儲存</button>
+    <p class="msg" id="feMsg" role="status"></p>
   </form>
 </dialog>
 

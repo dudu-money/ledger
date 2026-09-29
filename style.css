@@ -328,3 +328,68 @@ a.btn{text-decoration:none;color:var(--ink);display:inline-block}
 .tour-card{position:fixed;width:min(360px,calc(100vw - 32px));background:var(--sheet);color:var(--ink);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:top .25s ease,left .25s ease}
 .tour-card p{margin:0;line-height:1.6}
 @media (prefers-reduced-motion:reduce){.tour-hole,.tour-card{transition:none}}
+
+/* ---------- 標籤選擇、分期每期金額 ---------- */
+.tag-pick:empty{display:none}
+.tag-pick .chip::before{content:"#";opacity:.55;margin-right:1px}
+.inst-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;max-height:260px;overflow:auto;padding:2px}
+.inst-cell{display:flex;flex-direction:column;gap:2px;border:1px solid var(--rule);border-radius:8px;padding:5px 7px;font-size:12px;color:var(--muted)}
+.inst-cell input{font-family:var(--f-num);font-size:14px;padding:5px 7px;border-radius:6px}
+.inst-cell input[readonly]{background:transparent;border-color:transparent;padding-left:0;color:var(--ink)}
+#eInstMode button{white-space:normal;line-height:1.3}
+.warn-text{color:var(--warn)}
+
+/* ---------- AA 結算 ---------- */
+.split-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.split-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.split-grid .pct-in{display:flex;align-items:center;gap:4px}
+.split-grid .pct-in input{font-family:var(--f-num)}
+.aa-table{width:100%;border-collapse:collapse;font-size:14px}
+.aa-table th,.aa-table td{padding:8px 6px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+.aa-table th:first-child,.aa-table td:first-child{text-align:left}
+.aa-table th{font-size:12px;color:var(--muted);font-weight:500}
+.aa-result{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--accent-soft);border-radius:12px;padding:12px 14px;margin-top:12px}
+.aa-result .who{font-size:17px;font-weight:700}
+.aa-result .who .num{color:var(--accent)}
+.aa-even{margin-top:12px;padding:12px 14px;border:1px dashed var(--rule-strong);border-radius:12px;color:var(--muted)}
+.aa-hist{margin-top:10px;font-size:13px}
+.aa-hist summary{cursor:pointer;color:var(--accent)}
+.aa-hist .row{justify-content:space-between;border-bottom:1px solid var(--rule);padding:6px 0}
+.split-tag{font-size:11px;border:1px solid var(--rule-strong);border-radius:4px;padding:0 5px;margin-left:4px;color:var(--muted)}
+
+/* ---- 投資 ---- */
+.up{color:var(--out)} .down{color:var(--in)}
+.seg4{display:grid!important;grid-template-columns:repeat(4,1fr)}
+.seg4 button{padding:8px 4px}
+.iv-total{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-top:1px dashed var(--rule-strong);padding-top:12px;flex-wrap:wrap}
+.alloc-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--rule);margin:4px 0 10px}
+.alloc-bar span{display:block;height:100%}
+.alloc-bar span+span{border-left:2px solid var(--sheet)}
+.alloc-legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 14px;margin-bottom:10px}
+.alloc-item{display:flex;align-items:center;gap:8px;font-size:14px;min-width:0}
+.alloc-item i{width:10px;height:10px;border-radius:3px;flex:none}
+.alloc-item span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ivList,#ivSold{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.hcard{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;text-align:left;color:var(--ink);width:100%;min-width:0}
+.hcard:hover{border-color:var(--rule-strong)}
+.hc-left{min-width:0;display:flex;flex-direction:column;gap:2px}
+.hc-title{display:flex;gap:8px;align-items:baseline;min-width:0}
+.hc-title strong{font-size:17px}
+.hc-title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.hc-right{text-align:right;flex:none;display:flex;flex-direction:column;gap:2px}
+.hc-right .num:first-child{font-size:17px;font-weight:600}
+#ivRecent,#hdTrades{display:flex;flex-direction:column}
+.trow{display:flex;flex-direction:column;gap:2px;text-align:left;background:none;border:0;border-bottom:1px solid var(--rule);padding:10px 2px;color:var(--ink);width:100%}
+.trow:hover{background:var(--accent-soft)}
+.trow-main{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ttag{font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--rule-strong);color:var(--muted)}
+.ttag.t-b{color:var(--out);border-color:currentColor}
+.ttag.t-s{color:var(--in);border-color:currentColor}
+.ttag.t-d,.ttag.t-sd{color:var(--warn);border-color:currentColor}
+.hd-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;background:var(--paper);border-radius:12px;padding:12px}
+.hd-stats .num{font-size:16px;font-weight:600}
+@media (max-width:560px){
+  .hd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #ivList,#ivSold{grid-template-columns:minmax(0,1fr)}
+  .tab{padding:8px 10px}
+}
