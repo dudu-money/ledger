@@ -78,7 +78,7 @@ const S = {
   prefs:null, unsubPrefs:null, startApplied:false
 };
 const DEFAULT_PAYS=["現金","信用卡","悠遊卡","行動支付","轉帳","其他"];
-const P = () => { const p=S.prefs||{}; return { defaultPay:p.defaultPay||"", defaultPayer:p.defaultPayer||"", defaultCard:p.defaultCard||"", startPage:p.startPage||"", lastBackup:p.lastBackup||0,
+const P = () => { const p=S.prefs||{}; return { defaultPay:p.defaultPay||"", defaultPayer:p.defaultPayer||"", defaultCard:p.defaultCard||"", startPage:p.startPage||"", lastBackup:p.lastBackup||0, tourDone:!!p.tourDone, tips:Array.isArray(p.tips)?p.tips:[],
   payers:p.payers||[], cards:p.cards||[], pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS) }; };
 const L = () => S.ledgers.get(S.lid);
 const isOwner = l => l && S.user && l.ownerUid === S.user.uid;
@@ -194,7 +194,7 @@ function renderBackupReminder(){
   $("bkReminderText").textContent = last ? `已經 ${days} 天沒有備份了，建議備份一次到 Google 雲端硬碟。` : "還沒有備份過資料，建議備份一次到 Google 雲端硬碟。";
 }
 function renderHome(){
-  renderBackupReminder();
+  renderBackupReminder(); setTimeout(maybeStartTour, 50);
   const mine=[], shared=[];
   [...S.ledgers.values()].sort((a,b)=>a.name.localeCompare(b.name,"zh-Hant")).forEach(l => (isOwner(l)?mine:shared).push(l));
   const box=$("myLedgers"); box.textContent="";
@@ -315,6 +315,7 @@ function renderLedgerHead(){
   $("lName").textContent=l.name; $("lDot").style.background=l.color||COLORS[0];
   $("lRole").textContent=roleText(l); document.title=l.name+"｜記帳本";
   $("btnAdd").hidden=!canEdit(l);
+  renderLedgerTips(l);
   const lb=stLabels(l); $("stPendBtn").textContent=lb.pending; $("stDoneBtn").textContent=lb.paid;
   if(!S.unsubEntries) watchEntries();
 }
@@ -410,7 +411,7 @@ function renderTotals(l){
     $("pjNeed").textContent = fmt(need);
     $("pjDone").textContent = `${done} / ${items.length}`;
     const bar=$("pjMeter").firstElementChild; bar.style.width = items.length ? (done/items.length*100)+"%" : "0";
-    $("pjNote").textContent = pb ? `已用總預算 ${Math.round(o/pb*100)}%` + (mode!=="all"?"（目前只算這段期間，切到「全部」看整個專案）":"") : (canEdit(l)?"可在「設定」裡設定專案總預算":"");
+    $("pjNote").textContent = pb ? `已用總預算 ${Math.round(o/pb*100)}%` + (mode!=="all"?"（目前只算這段期間，切到「全部」看整個專案）":"") : (canEdit(l)?"可在「帳本設定」裡設定專案總預算":"");
   }
   // 每月預算（專案模式不顯示）
   $("budgetBox").hidden = proj || mode==="all";
@@ -430,7 +431,7 @@ function renderTotals(l){
     } else $("bExtra").textContent=`已用 ${Math.round(r*100)}%`;
   } else {
     bar.style.width="0"; meter.className="meter";
-    $("bLeft").textContent = canEdit(l) ? "可在「設定」裡設定每月預算" : ""; $("bExtra").textContent="";
+    $("bLeft").textContent = canEdit(l) ? "可在「帳本設定」裡設定每月預算" : ""; $("bExtra").textContent="";
   }
 }
 
@@ -647,6 +648,7 @@ $("eStPaid").onclick=()=>setEStatus("paid"); $("eStPend").onclick=()=>setEStatus
 function syncCardUI(){
   const isCard=$("ePay").value==="信用卡";
   $("eCardWrap").hidden=!isCard;
+  tipsFor("tipCard", isCard ? [["card","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月；「還款與分期」頁的信用卡帳單會顯示第幾期、還剩幾期。"]] : []);
   const on=isCard && $("eInstOn").checked;
   $("eInstBox").hidden=!on; $("eInstNote").hidden=!on;
   $("eAmtLabel").textContent = on ? "總金額" : "";
@@ -936,6 +938,7 @@ $("rNow").onclick=()=>{ S.rYM=thisYM(); renderRepay(); };
 let billToken=null;
 function renderRepay(reloadBill=true){
   const ym=S.rYM;
+  tipsFor("tipRepay", [["repay","新增貸款時填「開始用本系統前已還金額」和「已繳期數」，就能從現在的進度接著記。之後每個月按「標記已繳」，會自動在你指定的帳本記一筆支出。"]]);
   $("rTitle").textContent=ymLabel(ym); $("rNow").hidden = ym===thisYM();
   const active=[], done=[];
   S.loans.slice().sort((a,b)=>(a.type+a.name).localeCompare(b.type+b.name,"zh-Hant")).forEach(lo=>{
@@ -1178,7 +1181,8 @@ function watchPrefs(){
     S.prefs = s.exists() ? s.data() : {};
     if(!S.startApplied){ S.startApplied=true; const sp=P().startPage; if(sp && !location.hash) location.hash=sp; }
     if(location.hash==="#settings") renderGlobalSettings(false);
-    if(!location.hash) renderBackupReminder();
+    if(!location.hash){ renderBackupReminder(); maybeStartTour(); }
+    refreshTips();
   }, ()=>{ S.prefs={}; S.startApplied=true; });
 }
 function stopPrefs(){ if(S.unsubPrefs){ S.unsubPrefs(); S.unsubPrefs=null; } S.prefs=null; }
@@ -1189,6 +1193,7 @@ async function savePrefs(patch){
 
 function renderGlobalSettings(reset=true){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user?S.user.email:"");
+  tipsFor("tipSettings", [["settings","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
   const lb=P().lastBackup;
   $("bkLast").textContent = lb ? `上次備份：${new Date(lb).toLocaleDateString("zh-TW")}（${Math.floor((Date.now()-lb)/864e5)} 天前）` : "還沒有備份過";
   renderLook();
@@ -1535,4 +1540,87 @@ $("bkRestore").onclick=async()=>{
     toast("還原完成"); $("bkPreview").hidden=true; BK=null;
   }catch(e){ msg("bkRMsg","還原失敗："+errText(e),"err"); }
   finally{ $("bkRestore").disabled=false; }
+};
+
+/* ================= 新手教學 ================= */
+/* 情境小提示：每個提示只出現到按「知道了」為止，紀錄存在帳號裡 */
+function tipsFor(slotId, items){
+  const box=$(slotId); if(!box) return; box.textContent="";
+  if(!S.prefs) return;
+  const seen=new Set(P().tips);
+  items.filter(([id])=>!seen.has(id)).forEach(([id,text])=>{
+    const d=el("div","tip"); d.dataset.tip=id; d.appendChild(el("div",null,text));
+    const x=el("button","tip-x","知道了"); x.type="button"; x.onclick=()=>dismissTip(id, d);
+    d.appendChild(x); box.appendChild(d);
+  });
+}
+async function dismissTip(id, node){
+  node.remove();
+  try{ await savePrefs({ tips:[...P().tips.filter(t=>t!==id), id].slice(-50) }); }catch(e){}
+}
+function renderLedgerTips(l){
+  const items=[];
+  if(!isOwner(l)) items.push(["shared", `這本帳是 ${l.ownerEmail} 分享給你的，你的權限是「${roleText(l)}」。` +
+    (canEdit(l) ? "你可以記帳和修改紀錄；分享、改名和刪除帳本只有擁有者能做。" : "你可以查看所有紀錄和統計，但不能新增或修改。")]);
+  if(isProj(l)) items.push(["project","這是專案帳本：每筆可以先只填預算，之後再補實際金額。點每筆右邊的「完成／未完成」可以直接切換，上方會顯示完成率和還需要準備多少錢。"]);
+  else items.push(["ledger","點「分類統計」的長條，可以只看那個分類的明細；點任一筆紀錄可以修改或刪除。上方切換「月／年／全部」可以看不同期間。"]);
+  tipsFor("tipLedger", items);
+}
+function refreshTips(){
+  if(S.lid && L() && !$("viewLedger").hidden) renderLedgerTips(L());
+  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay","新增貸款時填「開始用本系統前已還金額」和「已繳期數」，就能從現在的進度接著記。之後每個月按「標記已繳」，會自動在你指定的帳本記一筆支出。"]]);
+  if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
+}
+
+/* 歡迎導覽 */
+const TOUR=[
+  { sel:null, title:"歡迎使用記帳本", text:"花 30 秒認識一下怎麼用。隨時可以按「略過教學」，之後也能在「設定」重新看一次。" },
+  { sel:"#btnNewLedger", title:"第一步：建立帳本", text:"可以從個人、家庭、孕期、寶寶、搬家範本開始，分類都能自己增減。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
+  { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳。只有金額和分類必填，付款人、信用卡分期都是選填。",
+    alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳。只有金額和分類必填，付款人、信用卡分期都是選填。" },
+  { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。" },
+  { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
+];
+let tourI=0;
+const tourTarget = () => { const s=TOUR[tourI].sel; const t=s && document.querySelector(s); return t && t.offsetParent!==null ? t : null; };
+function maybeStartTour(){
+  if(!S.prefs || P().tourDone || !$("tour").hidden) return;
+  if(location.hash || $("viewHome").hidden || !S.ledgersReady) return;
+  if(document.querySelector("dialog[open]")) return;
+  tourI=0; $("tour").hidden=false; showTourStep();
+}
+function showTourStep(){
+  const st=TOUR[tourI], t=tourTarget();
+  $("tourStep").textContent=`${tourI+1} / ${TOUR.length}`;
+  $("tourTitle").textContent=st.title; $("tourText").textContent = t||!st.alt ? st.text : st.alt;
+  $("tourPrev").hidden = tourI===0;
+  $("tourNext").textContent = tourI===TOUR.length-1 ? "開始使用" : "下一步";
+  placeTour(); $("tourNext").focus();
+}
+function placeTour(){
+  if($("tour").hidden) return;
+  const t=tourTarget(), hole=$("tourHole"), card=$("tourCard");
+  if(t){
+    t.scrollIntoView({block:"center"});
+    const r=t.getBoundingClientRect();
+    hole.classList.remove("none");
+    Object.assign(hole.style,{ left:(r.left-6)+"px", top:(r.top-6)+"px", width:(r.width+12)+"px", height:(r.height+12)+"px" });
+    const cw=card.offsetWidth, ch=card.offsetHeight, vw=innerWidth, vh=innerHeight;
+    const top = r.bottom+16+ch < vh ? r.bottom+16 : Math.max(12, r.top-16-ch);
+    const left = Math.min(Math.max(16, r.left+r.width/2-cw/2), vw-cw-16);
+    card.style.top=top+"px"; card.style.left=left+"px";
+  } else {
+    hole.classList.add("none");
+    card.style.left=Math.max(16,(innerWidth-card.offsetWidth)/2)+"px"; card.style.top=Math.max(20,(innerHeight-card.offsetHeight)/2.4)+"px";
+  }
+}
+async function endTour(){ $("tour").hidden=true; try{ await savePrefs({tourDone:true}); }catch(e){} }
+$("tourNext").onclick=()=>{ if(tourI>=TOUR.length-1) endTour(); else { tourI++; showTourStep(); } };
+$("tourPrev").onclick=()=>{ if(tourI>0){ tourI--; showTourStep(); } };
+$("tourSkip").onclick=endTour;
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !$("tour").hidden) endTour(); });
+window.addEventListener("resize", ()=>placeTour());
+$("gsReplay").onclick=async()=>{
+  try{ await savePrefs({ tourDone:false, tips:[] }); }catch(e){ toast("設定失敗："+errText(e)); return; }
+  location.hash=""; setTimeout(maybeStartTour, 250);
 };

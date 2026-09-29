@@ -106,6 +106,7 @@
   </header>
   <main class="page">
     <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#settings" class="tab">設定</a></nav>
+    <div class="tip-slot" id="tipRepay"></div>
     <div class="period">
       <div class="period-nav">
         <button class="icon-btn" id="rPrev" type="button" aria-label="上個月">‹</button>
@@ -150,10 +151,12 @@
   </header>
   <main class="page narrow-page">
     <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
+    <div class="tip-slot" id="tipSettings"></div>
 
     <section class="panel">
       <h3 class="h3">帳號</h3>
       <div class="between wrap-gap"><span id="gsEmail" class="who-email"></span><button class="btn" data-logout type="button">登出</button></div>
+      <div class="between wrap-gap"><span class="small muted">忘了怎麼用？可以重新看一次導覽，所有小提示也會重新出現。</span><button class="btn" id="gsReplay" type="button">重新看一次教學</button></div>
     </section>
 
     <section class="panel">
@@ -273,6 +276,7 @@
     <button class="btn" id="btnSettings" type="button">帳本設定</button>
   </header>
   <main class="page">
+    <div class="tip-slot" id="tipLedger"></div>
     <div class="period">
       <div class="seg" role="group" aria-label="統計期間">
         <button type="button" id="pMonth" aria-pressed="true">月</button>
@@ -374,6 +378,7 @@
       </label>
     </div>
     <div class="field" id="eCardWrap" hidden>
+      <div class="tip-slot" id="tipCard"></div>
       <span class="label">卡片</span>
       <input id="eCard" type="text" maxlength="20" list="dlCards" placeholder="例如：玉山、永豐">
       <label class="check"><input type="checkbox" id="eInstOn"> 分期付款</label>
@@ -540,6 +545,20 @@
     <p class="msg" id="pyMsg" role="status"></p>
   </form>
 </dialog>
+
+<!-- 歡迎導覽 -->
+<div class="tour" id="tour" hidden>
+  <div class="tour-hole" id="tourHole"></div>
+  <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
+    <div class="tour-step small muted" id="tourStep"></div>
+    <h2 class="h2" id="tourTitle"></h2>
+    <p id="tourText"></p>
+    <div class="between">
+      <button class="link" id="tourSkip" type="button">略過教學</button>
+      <div class="row"><button class="btn" id="tourPrev" type="button">上一步</button><button class="btn primary" id="tourNext" type="button">下一步</button></div>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast" role="status" hidden></div>
 

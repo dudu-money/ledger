@@ -314,3 +314,17 @@ a.btn{text-decoration:none;color:var(--ink);display:inline-block}
 .file-btn{cursor:pointer}
 .bk-file{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--rule);border-radius:9px;padding:8px 12px;font-size:14px;background:var(--sheet);text-align:left;width:100%}
 .bk-file:hover{border-color:var(--accent)}
+
+/* ---------- 新手教學 ---------- */
+.tip-slot:empty{display:none}
+.tip-slot{display:flex;flex-direction:column;gap:8px}
+.tip{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.5}
+.tip b{color:var(--accent)}
+.tip .tip-x{border:0;background:none;color:var(--accent);font-weight:700;white-space:nowrap;padding:2px 0;font-size:13px}
+#eCardWrap .tip{margin-bottom:6px}
+.tour{position:fixed;inset:0;z-index:60}
+.tour-hole{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(8,16,12,.62);transition:all .25s ease;pointer-events:none;outline:2px solid var(--accent);outline-offset:3px}
+.tour-hole.none{width:0!important;height:0!important;left:50%!important;top:40%!important;outline:none}
+.tour-card{position:fixed;width:min(360px,calc(100vw - 32px));background:var(--sheet);color:var(--ink);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:top .25s ease,left .25s ease}
+.tour-card p{margin:0;line-height:1.6}
+@media (prefers-reduced-motion:reduce){.tour-hole,.tour-card{transition:none}}
