@@ -50,7 +50,7 @@
 .accent-opt{display:flex;align-items:center;gap:8px;border:1px solid var(--rule-strong);background:var(--sheet);border-radius:10px;padding:9px 10px;font-size:14px}
 .accent-opt .swatch{width:20px;height:20px;outline:none;border:0;flex:none}
 .accent-opt[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
-#dlgLook .seg{display:grid;grid-template-columns:repeat(3,1fr)}
+.seg3{display:grid!important;grid-template-columns:repeat(3,1fr)}
 .custom-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .custom-row input[type=color]{width:52px;height:38px;padding:2px;border:1px solid var(--rule-strong);border-radius:9px;background:var(--sheet);cursor:pointer}
 .preview-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -232,3 +232,80 @@ dialog::backdrop{background:rgba(10,20,16,.45)}
   .topbar{padding:10px 12px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- 頁籤 ---------- */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule);margin-bottom:-4px}
+.tab{padding:8px 14px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--ink)}
+
+/* ---------- 表單小元件 ---------- */
+.check{display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.4}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.more{border:1px solid var(--rule);border-radius:10px;padding:10px 12px}
+.more summary{cursor:pointer;color:var(--accent);font-size:14px}
+.more[open] summary{margin-bottom:10px}
+.amount-label{font-family:var(--f-body)!important;font-size:12px;color:var(--muted);white-space:nowrap}
+.swatch-pick{width:30px;height:30px;padding:0;border:1px dashed var(--muted);border-radius:50%;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);cursor:pointer;overflow:hidden;position:relative}
+.swatch-pick input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.swatch-pick[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:1px}
+
+/* ---------- 明細列 ---------- */
+.entry{cursor:pointer}
+.entry.ro{cursor:default}
+.entry.ro:hover{background:none}
+.st{border:1px solid var(--rule-strong);background:var(--sheet);border-radius:999px;font-size:11px;padding:1px 8px;white-space:nowrap;cursor:pointer}
+.st.pending{border-color:var(--warn);color:var(--warn)}
+.st.done{border-color:var(--in);color:var(--in)}
+.st[disabled]{cursor:default}
+.prio{font-size:11px;border-radius:4px;padding:0 5px;margin-left:4px;background:var(--out-soft);color:var(--out)}
+.prio.m{background:var(--accent-soft);color:var(--accent)} .prio.l{background:var(--rule);color:var(--muted)}
+.entry .sub{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+.entry-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+#stFilter{margin:4px 0 6px}
+
+/* ---------- 專案 ---------- */
+.proj{display:flex;flex-direction:column;gap:10px;border-top:1px dashed var(--rule-strong);padding-top:12px}
+.ptable{width:100%;border-collapse:collapse;font-size:13px}
+.ptable th,.ptable td{padding:7px 6px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+.ptable th:first-child,.ptable td:first-child{text-align:left;white-space:normal}
+.ptable th{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.05em}
+.ptable tbody tr{cursor:pointer}
+.ptable tbody tr:hover,.ptable tbody tr[aria-selected="true"]{background:var(--accent-soft)}
+.mini-meter{height:5px;border-radius:3px;background:var(--rule);overflow:hidden;margin-top:3px;min-width:40px}
+.mini-meter i{display:block;height:100%;background:var(--accent)}
+
+/* ---------- 還款 ---------- */
+.loan-list{display:flex;flex-direction:column;gap:10px}
+.loan{border:1px solid var(--rule);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.loan-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.loan-name{font-weight:700;overflow-wrap:anywhere}
+.loan-name .t{font-weight:500;font-size:12px;color:var(--muted);margin-right:6px;border:1px solid var(--rule-strong);border-radius:4px;padding:0 5px}
+.loan-meta{font-size:12px;color:var(--muted)}
+.loan-nums{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:wrap}
+.loan .row{justify-content:space-between;flex-wrap:wrap}
+.paid-btn{border:1px solid var(--in);color:var(--in);background:var(--accent-soft);border-radius:9px;padding:7px 12px;font-weight:700}
+.pay-btn{border:0;background:var(--accent);color:var(--on-accent);border-radius:9px;padding:8px 12px;font-weight:700}
+.pay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px}
+.pay-cell{border:1px solid var(--rule);border-radius:8px;padding:5px 7px;font-size:12px}
+.pay-cell b{display:block;font-family:var(--f-num);font-size:13px}
+.pay-cell.empty{color:var(--muted);border-style:dashed}
+.bill-card{border-top:1px solid var(--rule-strong);padding-top:10px;margin-top:4px}
+.bill-card:first-child{border-top:0;margin-top:0;padding-top:0}
+.bill-head{display:flex;justify-content:space-between;gap:10px;font-weight:700;margin-bottom:4px}
+.btable{width:100%;border-collapse:collapse;font-size:13px}
+.btable td,.btable th{padding:6px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+.btable td:nth-child(2),.btable th:nth-child(2){text-align:left;white-space:normal}
+.btable td:first-child,.btable th:first-child{text-align:left}
+.btable th{font-size:11px;color:var(--muted);font-weight:500}
+details > summary.h3{cursor:pointer;list-style-position:inside}
+
+/* ---------- 設定頁 ---------- */
+.narrow-page{max-width:760px}
+.list-edit{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--rule);padding-top:10px}
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.map-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+#imPreview td{white-space:nowrap}
+a.btn{text-decoration:none;color:var(--ink);display:inline-block}
+#imPreview th,#imPreview td{text-align:left}
+#imPreview td.num,#imPreview th:nth-child(4),#imPreview th:nth-child(5){text-align:right}

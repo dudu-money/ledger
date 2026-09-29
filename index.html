@@ -55,7 +55,7 @@
         <button class="btn primary grow" type="submit" id="btnLogin">登入</button>
         <button class="btn grow" type="button" id="btnSignup">註冊新帳號</button>
       </div>
-      <div class="between"><button class="link" type="button" id="btnForgot">忘記密碼</button><button class="link" data-look type="button">外觀</button></div>
+      <button class="link" type="button" id="btnForgot">忘記密碼</button>
     </form>
     <p class="msg" id="loginMsg" role="status"></p>
   </div>
@@ -80,9 +80,10 @@
 <section class="view" id="viewHome" hidden>
   <header class="topbar">
     <h1 class="brand-title sm">記帳本</h1>
-    <div class="who"><span id="whoEmail" class="muted"></span><button class="link" data-look type="button">外觀</button><button class="link" id="btnLogout" type="button">登出</button></div>
+    <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#settings" class="tab">設定</a></nav>
     <div class="home-head">
       <h2 class="h2">我的帳本</h2>
       <button class="btn primary" id="btnNewLedger" type="button">＋ 新增帳本</button>
@@ -96,6 +97,142 @@
   </main>
 </section>
 
+<!-- 還款與分期 -->
+<section class="view" id="viewRepay" hidden>
+  <header class="topbar">
+    <h1 class="brand-title sm">記帳本</h1>
+    <a class="btn" href="#settings">設定</a>
+  </header>
+  <main class="page">
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#settings" class="tab">設定</a></nav>
+    <div class="period">
+      <div class="period-nav">
+        <button class="icon-btn" id="rPrev" type="button" aria-label="上個月">‹</button>
+        <h2 id="rTitle">—</h2>
+        <button class="icon-btn" id="rNext" type="button" aria-label="下個月">›</button>
+      </div>
+      <button class="link" id="rNow" type="button">回到本月</button>
+    </div>
+    <div class="layout">
+      <section class="panel totals" aria-label="本月還款總覽">
+        <div><div class="label">本月應繳（貸款＋信用卡）</div><div class="num big" id="rDue">NT$ 0</div></div>
+        <div class="pair">
+          <div><div class="label">貸款已繳</div><div class="num mid c-in" id="rPaid">0</div></div>
+          <div><div class="label">貸款未繳</div><div class="num mid c-out" id="rUnpaid">0</div></div>
+        </div>
+        <div class="pair">
+          <div><div class="label">信用卡本月</div><div class="num mid" id="rCard">0</div></div>
+          <div><div class="label">貸款剩餘總額</div><div class="num mid" id="rLeft">0</div></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="between"><h3 class="h3">貸款與分期還款</h3><button class="btn primary" id="btnNewLoan" type="button">＋ 新增</button></div>
+        <div id="loanList" class="loan-list"></div>
+      </section>
+      <section class="panel wide">
+        <div class="between wrap-gap"><h3 class="h3">信用卡帳單</h3><span class="small muted">來自各帳本中付款方式為「信用卡」的紀錄</span></div>
+        <div id="cardBill"></div>
+      </section>
+      <section class="panel wide" id="loanDoneWrap" hidden>
+        <details><summary class="h3">已繳清 <span class="small muted" id="loanDoneCount"></span></summary><div id="loanDone" class="loan-list"></div></details>
+      </section>
+    </div>
+    <p class="msg" id="repayMsg" role="status"></p>
+  </main>
+</section>
+
+<!-- 設定 -->
+<section class="view" id="viewSettings" hidden>
+  <header class="topbar">
+    <h1 class="brand-title sm">記帳本</h1>
+    <a class="btn" href="#">完成</a>
+  </header>
+  <main class="page narrow-page">
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
+
+    <section class="panel">
+      <h3 class="h3">帳號</h3>
+      <div class="between wrap-gap"><span id="gsEmail" class="who-email"></span><button class="btn" data-logout type="button">登出</button></div>
+    </section>
+
+    <section class="panel">
+      <h3 class="h3">外觀</h3>
+      <div class="field"><span class="label">顯示模式</span>
+        <div class="seg seg3" role="group" aria-label="顯示模式" id="lkTheme">
+          <button type="button" data-v="system">跟隨系統</button>
+          <button type="button" data-v="light">淺色</button>
+          <button type="button" data-v="dark">深色</button>
+        </div>
+      </div>
+      <div class="field"><span class="label">主色調</span><div class="accent-grid" id="lkAccent"></div></div>
+      <div class="field"><span class="label">自訂顏色</span>
+        <div class="custom-row">
+          <input type="color" id="lkPicker" value="#1d6b52" aria-label="挑選自訂顏色">
+          <span class="small muted" id="lkPickerNote">點色塊挑選任何顏色</span>
+        </div>
+        <div class="preview-row" id="lkPreview" hidden>
+          <span class="small muted">實際效果：</span>
+          <span class="pv" id="pvLight"></span><span class="pv" id="pvDark"></span>
+        </div>
+      </div>
+      <p class="small muted">外觀只會改變你在這台裝置上看到的畫面，不影響其他人。</p>
+    </section>
+
+    <section class="panel">
+      <h3 class="h3">記帳預設值</h3>
+      <p class="small muted">「記一筆」時會自動帶入，手機和電腦都通用。</p>
+      <div class="grid2">
+        <label class="field"><span class="label">預設付款方式</span><select id="gsPay"></select></label>
+        <label class="field"><span class="label">預設付款人</span><input id="gsPayer" type="text" maxlength="20" list="dlGsPayers" placeholder="不設定可留空"></label>
+        <label class="field"><span class="label">預設信用卡</span><input id="gsCard" type="text" maxlength="20" list="dlGsCards" placeholder="不設定可留空"></label>
+        <label class="field"><span class="label">打開網站時直接進入</span><select id="gsStart"></select></label>
+      </div>
+      <button class="btn primary" id="gsSaveDefaults" type="button">儲存預設值</button>
+      <p class="msg" id="gsDefMsg" role="status"></p>
+      <datalist id="dlGsPayers"></datalist><datalist id="dlGsCards"></datalist>
+    </section>
+
+    <section class="panel">
+      <h3 class="h3">常用清單</h3>
+      <p class="small muted">記帳時會出現在選單裡。記帳時輸入新的付款人或卡片，也會自動加進來。</p>
+      <div class="list-edit" data-list="payers"><span class="label">付款人</span><div class="chips"></div>
+        <div class="row"><input type="text" maxlength="20" placeholder="例如：世翔" aria-label="新增付款人" class="grow"><button class="btn" type="button">新增</button></div></div>
+      <div class="list-edit" data-list="cards"><span class="label">信用卡</span><div class="chips"></div>
+        <div class="row"><input type="text" maxlength="20" placeholder="例如：玉山、永豐" aria-label="新增信用卡" class="grow"><button class="btn" type="button">新增</button></div></div>
+      <div class="list-edit" data-list="pays"><span class="label">付款方式（「信用卡」固定保留，才能記分期）</span><div class="chips"></div>
+        <div class="row"><input type="text" maxlength="20" placeholder="例如：LINE Pay" aria-label="新增付款方式" class="grow"><button class="btn" type="button">新增</button></div></div>
+      <p class="msg" id="gsListMsg" role="status"></p>
+    </section>
+
+    <section class="panel">
+      <h3 class="h3">資料備份</h3>
+      <p class="small muted">把你看得到的所有帳本、貸款各匯出成一個 CSV 檔，可以用 Excel 或 Google 試算表打開。</p>
+      <div class="row wrap"><button class="btn" id="gsExportAll" type="button">匯出所有帳本</button><button class="btn" id="gsExportLoans" type="button">匯出貸款</button></div>
+      <p class="msg" id="gsExpMsg" role="status"></p>
+    </section>
+
+    <section class="panel" id="importPanel">
+      <h3 class="h3">從 Excel／CSV 匯入</h3>
+      <p class="small muted">可以直接選你原本的 Excel（.xlsx、.xlsm）或 CSV。系統會自動找標題列、對應欄位，匯入前可以先檢查。</p>
+      <div class="grid2">
+        <label class="field"><span class="label">匯入到哪本帳</span><select id="imLedger"></select></label>
+        <label class="field"><span class="label">選擇檔案</span><input id="imFile" type="file" accept=".xlsx,.xlsm,.xls,.csv"></label>
+      </div>
+      <div id="imStep2" class="stack" hidden>
+        <div class="grid2">
+          <label class="field"><span class="label">工作表</span><select id="imSheet"></select></label>
+          <label class="field"><span class="label">標題在第幾列</span><input id="imHeaderRow" type="number" min="1" inputmode="numeric"></label>
+        </div>
+        <div class="field"><span class="label">欄位對應（系統已自動判斷，不對可以改）</span><div class="map-grid" id="imMap"></div></div>
+        <div class="field"><span class="label">預覽</span><div class="table-wrap"><table class="btable" id="imPreview"></table></div></div>
+        <p class="small muted" id="imSummary"></p>
+        <button class="btn primary" id="imGo" type="button">匯入</button>
+      </div>
+      <p class="msg" id="imMsg" role="status"></p>
+    </section>
+  </main>
+</section>
+
 <!-- 帳本 -->
 <section class="view" id="viewLedger" hidden>
   <header class="topbar">
@@ -105,13 +242,14 @@
       <h1 id="lName">帳本</h1>
       <span class="badge" id="lRole"></span>
     </div>
-    <div class="row"><button class="btn" data-look type="button" aria-label="外觀設定">外觀</button><button class="btn" id="btnSettings" type="button">設定</button></div>
+    <button class="btn" id="btnSettings" type="button">帳本設定</button>
   </header>
   <main class="page">
     <div class="period">
       <div class="seg" role="group" aria-label="統計期間">
         <button type="button" id="pMonth" aria-pressed="true">月</button>
         <button type="button" id="pYear" aria-pressed="false">年</button>
+        <button type="button" id="pAll" aria-pressed="false">全部</button>
       </div>
       <div class="period-nav">
         <button class="icon-btn" id="pPrev" type="button" aria-label="上一期">‹</button>
@@ -128,6 +266,19 @@
           <div><div class="label">支出</div><div class="num mid c-out" id="tOut">0</div></div>
           <div><div class="label">收入</div><div class="num mid c-in" id="tIn">0</div></div>
         </div>
+        <p class="small muted" id="pendNote" hidden></p>
+        <div class="proj" id="projBox" hidden>
+          <div class="pair">
+            <div><div class="label">專案總預算</div><div class="num mid" id="pjBudget">未設定</div></div>
+            <div><div class="label">預算剩餘</div><div class="num mid" id="pjLeft">—</div></div>
+          </div>
+          <div class="pair">
+            <div><div class="label">尚需準備</div><div class="num mid" id="pjNeed">0</div></div>
+            <div><div class="label">完成</div><div class="num mid" id="pjDone">0 / 0</div></div>
+          </div>
+          <div class="meter" id="pjMeter"><i></i></div>
+          <p class="small muted" id="pjNote"></p>
+        </div>
         <div class="budget" id="budgetBox">
           <div class="between small muted"><span id="bLabel">每月預算</span><span class="num" id="bVal">未設定</span></div>
           <div class="meter" id="bMeter"><i></i></div>
@@ -137,10 +288,11 @@
 
       <section class="panel">
         <div class="between">
-          <h3 class="h3">分類統計</h3>
+          <h3 class="h3" id="catTitle">分類統計</h3>
           <div class="seg sm" role="group" aria-label="分類統計類型">
             <button type="button" id="cOut" aria-pressed="true">支出</button>
             <button type="button" id="cIn" aria-pressed="false">收入</button>
+            <button type="button" id="cPayer" aria-pressed="false">付款人</button>
           </div>
         </div>
         <div class="cat-list" id="catList"></div>
@@ -159,12 +311,17 @@
             <button class="btn" id="btnExport" type="button">匯出 CSV</button>
           </div>
         </div>
+        <div class="seg sm" role="group" aria-label="狀態篩選" id="stFilter">
+          <button type="button" data-st="all" aria-pressed="true">全部</button>
+          <button type="button" data-st="pending" aria-pressed="false" id="stPendBtn">未付款</button>
+          <button type="button" data-st="paid" aria-pressed="false" id="stDoneBtn">已付款</button>
+        </div>
         <div class="filter" id="filterBar" hidden><span id="filterText"></span><button class="link" id="filterClear" type="button">清除篩選</button></div>
         <div id="list"></div>
       </section>
 
       <section class="panel wide" id="yearPanel" hidden>
-        <div class="between"><h3 class="h3">每月明細</h3><button class="btn" id="btnExportY" type="button">匯出 CSV</button></div>
+        <div class="between"><h3 class="h3" id="ytTitle">每月明細</h3><button class="btn" id="btnExportY" type="button">匯出 CSV</button></div>
         <div class="table-wrap"><table class="ytable" id="ytable"></table></div>
       </section>
     </div>
@@ -180,15 +337,42 @@
       <button type="button" class="t-out" id="eOut" aria-pressed="true">支出</button>
       <button type="button" class="t-in" id="eIn" aria-pressed="false">收入</button>
     </div>
-    <label class="amount"><span>NT$</span><input id="eAmount" type="number" inputmode="numeric" min="1" step="1" placeholder="0" aria-label="金額"></label>
+    <label class="amount"><span>NT$</span><span class="amount-label" id="eAmtLabel"></span><input id="eAmount" type="number" inputmode="numeric" min="1" step="1" placeholder="0" aria-label="金額"></label>
     <div class="field"><span class="label">分類</span><div class="chips" id="eCats"></div></div>
     <div class="grid2">
-      <label class="field"><span class="label">日期</span><input id="eDate" type="date" required></label>
+      <label class="field"><span class="label">日期 <span id="eWeek" class="muted"></span></span><input id="eDate" type="date" required></label>
       <label class="field"><span class="label">付款方式</span>
-        <select id="ePay"><option>現金</option><option>信用卡</option><option>悠遊卡</option><option>行動支付</option><option>轉帳</option><option>其他</option></select>
+        <select id="ePay"></select>
       </label>
     </div>
+    <div class="field" id="eCardWrap" hidden>
+      <span class="label">卡片</span>
+      <input id="eCard" type="text" maxlength="20" list="dlCards" placeholder="例如：玉山、永豐">
+      <label class="check"><input type="checkbox" id="eInstOn"> 分期付款</label>
+      <div class="grid2" id="eInstBox" hidden>
+        <label class="field"><span class="label">期數</span><input id="eInstN" type="number" inputmode="numeric" min="2" max="60" step="1" value="12"></label>
+        <label class="field"><span class="label">第一期帳單月份</span><input id="eInstStart" type="month"></label>
+      </div>
+      <p class="small muted" id="eInstNote" hidden></p>
+    </div>
     <label class="field"><span class="label">備註</span><input id="eNote" type="text" maxlength="100" placeholder="例如：午餐便當"></label>
+    <details class="more" id="eMore">
+      <summary>更多：付款人、狀態<span id="eMoreProj">、預算、優先度</span></summary>
+      <div class="stack">
+        <label class="field"><span class="label">付款人（選填）</span><input id="ePayer" type="text" maxlength="20" list="dlPayers" placeholder="例如：世翔、阿云"></label>
+        <div class="field"><span class="label">狀態</span>
+          <div class="seg" role="group" aria-label="狀態">
+            <button type="button" id="eStPaid" aria-pressed="true">已付款</button>
+            <button type="button" id="eStPend" aria-pressed="false">未付款</button>
+          </div>
+        </div>
+        <div class="grid2" id="eProjBox">
+          <label class="field"><span class="label">預算（選填）</span><input id="eBudget" type="number" inputmode="numeric" min="0" step="1"></label>
+          <label class="field"><span class="label">優先度</span><select id="ePriority"><option value="">—</option><option>高</option><option>中</option><option>低</option></select></label>
+        </div>
+      </div>
+    </details>
+    <datalist id="dlPayers"></datalist><datalist id="dlCards"></datalist>
     <p class="small muted" id="eBy" hidden></p>
     <div class="row">
       <button class="btn danger" type="button" id="eDelete" hidden>刪除</button>
@@ -214,6 +398,7 @@
         <button class="btn" type="button" id="nAddCat">新增</button>
       </div>
     </div>
+    <label class="check"><input type="checkbox" id="nProject"> 專案模式 <span class="small muted">— 適合孕期、搬家這類有總預算的帳：每筆可填預算、完成狀態、優先度，並顯示完成率</span></label>
     <label class="field"><span class="label">帳本名稱</span><input id="nName" type="text" maxlength="40" required placeholder="例如：寶寶開銷"></label>
     <div class="field"><span class="label">顏色</span><div class="swatches" id="nColors"></div></div>
     <button class="btn primary" type="submit" value="create" id="nCreate">建立帳本</button>
@@ -230,6 +415,11 @@
       <h3 class="h3">基本資料</h3>
       <label class="field"><span class="label">帳本名稱</span><input id="sName" type="text" maxlength="40"></label>
       <div class="field"><span class="label">顏色</span><div class="swatches" id="sColors"></div></div>
+      <label class="check" id="sProjectWrap"><input type="checkbox" id="sProject"> 專案模式</label>
+      <div class="stack" id="sProjBox">
+        <label class="field"><span class="label">專案總預算（0 表示不設定）</span><input id="sPBudget" type="number" inputmode="numeric" min="0" step="1"></label>
+        <label class="field"><span class="label">孕週起算日（選填，最後一次月經第一天；填了會自動顯示孕週）</span><input id="sWeek" type="date"></label>
+      </div>
       <label class="field"><span class="label">每月預算（0 表示不設定）</span><input id="sBudget" type="number" inputmode="numeric" min="0" step="1"></label>
       <button class="btn primary" id="sSaveBasic" type="button">儲存</button>
       <p class="msg" id="sBasicMsg" role="status"></p>
@@ -277,30 +467,50 @@
   </div>
 </dialog>
 
-<!-- 外觀 -->
-<dialog id="dlgLook" aria-labelledby="lkTitle">
-  <div class="stack">
-    <div class="between"><h2 class="h2" id="lkTitle">外觀</h2><button class="icon-btn" id="lkClose" type="button" aria-label="關閉">✕</button></div>
-    <div class="field"><span class="label">顯示模式</span>
-      <div class="seg" role="group" aria-label="顯示模式" id="lkTheme">
-        <button type="button" data-v="system">跟隨系統</button>
-        <button type="button" data-v="light">淺色</button>
-        <button type="button" data-v="dark">深色</button>
+
+
+<!-- 貸款 -->
+<dialog id="dlgLoan" aria-labelledby="loTitle">
+  <form method="dialog" id="formLoan" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="loTitle">新增貸款</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="grid2">
+      <label class="field"><span class="label">品項</span><input id="loType" type="text" maxlength="20" list="dlLoanTypes" required placeholder="學貸、信貸、信用卡協商"></label>
+      <label class="field"><span class="label">名稱</span><input id="loName" type="text" maxlength="30" placeholder="例如：大樹速貸、Iphone"></label>
+      <label class="field"><span class="label">銀行</span><input id="loBank" type="text" maxlength="20" placeholder="例如：國泰"></label>
+      <label class="field"><span class="label">每月繳款日</span><input id="loDay" type="number" inputmode="numeric" min="1" max="31" placeholder="例如 12"></label>
+      <label class="field"><span class="label">原貸金額</span><input id="loPrincipal" type="number" inputmode="numeric" min="0" required></label>
+      <label class="field"><span class="label">月繳金額</span><input id="loMonthly" type="number" inputmode="numeric" min="0" placeholder="不固定可留空"></label>
+      <label class="field"><span class="label">總期數</span><input id="loTotal" type="number" inputmode="numeric" min="0" placeholder="例如 84"></label>
+      <label class="field"><span class="label">開始用本系統前已繳期數</span><input id="loPeriodsBase" type="number" inputmode="numeric" min="0" value="0"></label>
+    </div>
+    <label class="field"><span class="label">開始用本系統前已還金額</span><input id="loPaidBase" type="number" inputmode="numeric" min="0" value="0"></label>
+    <label class="field"><span class="label">備註</span><input id="loNote" type="text" maxlength="100" placeholder="例如：總期數84期，每月12號帳戶扣款"></label>
+    <div class="field"><span class="label">標記已繳時，自動記一筆支出到</span>
+      <div class="grid2">
+        <select id="loLedger" aria-label="記到哪本帳"></select>
+        <select id="loCat" aria-label="分類"></select>
       </div>
     </div>
-    <div class="field"><span class="label">主色調</span><div class="accent-grid" id="lkAccent"></div></div>
-    <div class="field"><span class="label">自訂顏色</span>
-      <div class="custom-row">
-        <input type="color" id="lkPicker" value="#1d6b52" aria-label="挑選自訂顏色">
-        <span class="small muted" id="lkPickerNote">點色塊挑選任何顏色</span>
-      </div>
-      <div class="preview-row" id="lkPreview" hidden>
-        <span class="small muted">實際效果：</span>
-        <span class="pv" id="pvLight"></span><span class="pv" id="pvDark"></span>
-      </div>
+    <div id="loHistory" class="field" hidden><span class="label">還款紀錄</span><div class="pay-grid" id="loGrid"></div></div>
+    <div class="row">
+      <button class="btn danger" type="button" id="loDelete" hidden>刪除</button>
+      <button class="btn primary grow" type="submit" value="save" id="loSave">儲存</button>
     </div>
-    <p class="small muted">外觀只會改變你在這台裝置上看到的畫面，不影響其他人。</p>
-  </div>
+    <p class="msg" id="loMsg" role="status"></p>
+    <datalist id="dlLoanTypes"><option>學貸</option><option>信貸</option><option>房貸</option><option>車貸</option><option>信用卡協商</option><option>信用卡分期</option><option>代書</option><option>家人借款</option></datalist>
+  </form>
+</dialog>
+
+<!-- 標記已繳 -->
+<dialog id="dlgPay" aria-labelledby="pyTitle">
+  <form method="dialog" id="formPay" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="pyTitle">標記已繳</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p id="pyWhat"></p>
+    <label class="amount"><span>NT$</span><input id="pyAmount" type="number" inputmode="numeric" min="1" step="1" aria-label="這期繳了多少"></label>
+    <p class="small muted" id="pyNote"></p>
+    <button class="btn primary" type="submit" value="save" id="pySave">確定已繳</button>
+    <p class="msg" id="pyMsg" role="status"></p>
+  </form>
 </dialog>
 
 <div class="toast" id="toast" role="status" hidden></div>
