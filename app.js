@@ -221,16 +221,19 @@ function ledgerCard(l){
 }
 
 /* ================= 顏色選擇（預設色＋自訂） ================= */
+/* 顏色按鈕：只更新選取狀態，不重畫調色盤（重畫會讓瀏覽器的調色盤視窗被關掉） */
 function swatches(boxId, current, onPick, disabled){
   const box=$(boxId); box.textContent="";
-  COLORS.forEach(c=>{ const s=el("button","swatch"); s.type="button"; s.style.background=c; s.setAttribute("aria-label","顏色 "+c);
-    s.setAttribute("aria-pressed", c===current); s.disabled=!!disabled; s.onclick=()=>onPick(c); box.appendChild(s); });
-  const custom = current && !COLORS.includes(current);
-  const w=el("label","swatch-pick"); w.title="自訂顏色"; w.setAttribute("aria-pressed", custom);
-  if(custom) w.style.background=current;
-  const inp=el("input"); inp.type="color"; inp.value=custom?current:"#888888"; inp.disabled=!!disabled; inp.setAttribute("aria-label","自訂顏色");
-  inp.addEventListener("input", ()=>onPick(inp.value));
+  const btns=[];
+  const mark=c=>{ btns.forEach(b=>b.setAttribute("aria-pressed", b.dataset.c===c)); const custom=!COLORS.includes(c);
+    w.setAttribute("aria-pressed", custom); w.style.background = custom ? c : ""; };
+  COLORS.forEach(c=>{ const s=el("button","swatch"); s.type="button"; s.style.background=c; s.dataset.c=c; s.setAttribute("aria-label","顏色 "+c);
+    s.disabled=!!disabled; s.onclick=()=>{ onPick(c); mark(c); }; btns.push(s); box.appendChild(s); });
+  const w=el("label","swatch-pick"); w.title="自訂顏色";
+  const inp=el("input"); inp.type="color"; inp.value=current && !COLORS.includes(current) ? current : "#888888"; inp.disabled=!!disabled; inp.setAttribute("aria-label","自訂顏色");
+  inp.addEventListener("input", ()=>{ onPick(inp.value); mark(inp.value); });
   w.appendChild(inp); box.appendChild(w);
+  mark(current||COLORS[0]);
 }
 
 /* ================= 新增帳本 ================= */
@@ -268,7 +271,7 @@ function renderNewDialog(){
     t.appendChild(c);
   });
   renderNewCats();
-  swatches("nColors", S.newColor, c=>{ S.newColor=c; renderNewDialog(); });
+  swatches("nColors", S.newColor, c=>{ S.newColor=c; });
 }
 $("btnNewLedger").onclick = () => {
   S.newCatType="out"; $("nNewCat").value=""; S.newColor=COLORS[S.ledgers.size % COLORS.length]; $("nName").value=""; msg("nMsg","");
@@ -814,7 +817,7 @@ function renderSettings(resetInputs){
   $("sName").disabled=!owner; $("sBudget").disabled=!editor; $("sSaveBasic").hidden=!editor;
   $("sProject").disabled=!owner; $("sWeek").disabled=!owner; $("sPBudget").disabled=!editor;
   $("sProjBox").hidden=!$("sProject").checked;
-  swatches("sColors", S.sColor, c=>{ S.sColor=c; renderSettings(false); }, !owner);
+  if(resetInputs || !$("sColors").childElementCount) swatches("sColors", S.sColor, c=>{ S.sColor=c; }, !owner);
   $("sCats").hidden=!editor;
   $("scOut").setAttribute("aria-pressed", S.sCatType==="out"); $("scIn").setAttribute("aria-pressed", S.sCatType==="in");
   const box=$("sCatList"); box.textContent="";
@@ -1159,7 +1162,7 @@ function renderLook(){
     const s=el("span","swatch"); s.style.background=col; b.append(s, document.createTextNode(name));
     b.onclick=()=>{ store.set("ledger.accent",k); applyLook(); renderLook(); }; box.appendChild(b); });
   const picked=store.get("ledger.accentCustom");
-  if(picked) $("lkPicker").value=picked;
+  if(picked && document.activeElement!==$("lkPicker")) $("lkPicker").value=picked;
   const isCustom=a==="custom";
   $("lkPickerNote").textContent = isCustom ? "目前使用自訂顏色" : "點色塊挑選任何顏色";
   $("lkPreview").hidden=!isCustom;
@@ -1168,9 +1171,21 @@ function renderLook(){
     pl.textContent="淺色"; pl.style.cssText=`background:${v["--cl-accent"]};color:#fff`;
     pd.textContent="深色"; pd.style.cssText=`background:${v["--cd-accent"]};color:#0a1510`; }
 }
+/* 拖動調色盤時：只套用顏色、更新預覽和按鈕狀態，不動調色盤本身（避免瀏覽器把調色盤關掉） */
+let lkRaf=0;
 $("lkPicker").addEventListener("input", e=>{
-  const hex=e.target.value; store.set("ledger.accentCustom",hex); store.set("ledger.accentVars",JSON.stringify(customVars(hex)));
-  store.set("ledger.accent","custom"); applyLook(); renderLook();
+  const hex=e.target.value;
+  cancelAnimationFrame(lkRaf);
+  lkRaf=requestAnimationFrame(()=>{
+    const v=customVars(hex);
+    store.set("ledger.accentCustom",hex); store.set("ledger.accentVars",JSON.stringify(v)); store.set("ledger.accent","custom");
+    applyLook();
+    document.querySelectorAll("#lkAccent .accent-opt").forEach(b=>b.setAttribute("aria-pressed","false"));
+    $("lkPickerNote").textContent="目前使用自訂顏色";
+    $("lkPreview").hidden=false;
+    $("pvLight").textContent="淺色"; $("pvLight").style.cssText=`background:${v["--cl-accent"]};color:#fff`;
+    $("pvDark").textContent="深色"; $("pvDark").style.cssText=`background:${v["--cd-accent"]};color:#0a1510`;
+  });
 });
 applyLook();
 
