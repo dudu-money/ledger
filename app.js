@@ -658,7 +658,7 @@ $("eStPaid").onclick=()=>setEStatus("paid"); $("eStPend").onclick=()=>setEStatus
 function syncCardUI(){
   const isCard=$("ePay").value==="信用卡";
   $("eCardWrap").hidden=!isCard;
-  tipsFor("tipCard", isCard ? [["card","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月；「還款與分期」頁的信用卡帳單會顯示第幾期、還剩幾期。"]] : []);
+  tipsFor("tipCard", isCard ? [["card2","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月。每期金額不一樣（例如第一期多幾塊、有利息）也可以在「每期金額」選「自己填」。「還款與分期」頁的信用卡帳單會顯示第幾期、還剩幾期。"]] : []);
   const on=isCard && $("eInstOn").checked;
   $("eInstBox").hidden=!on; $("eInstNote").hidden=!on; $("eInstModeBox").hidden=!on;
   $("eAmtLabel").textContent = on ? (S.instMode==="custom" ? "消費金額" : "總金額") : "";
@@ -1692,6 +1692,8 @@ function renderLedgerTips(l){
     (canEdit(l) ? "你可以記帳和修改紀錄；分享、改名和刪除帳本只有擁有者能做。" : "你可以查看所有紀錄和統計，但不能新增或修改。")]);
   if(isProj(l)) items.push(["project","這是專案帳本：每筆可以先只填預算，之後再補實際金額。點每筆右邊的「完成／未完成」可以直接切換，上方會顯示完成率和還需要準備多少錢。"]);
   else items.push(["ledger","點「分類統計」的長條，可以只看那個分類的明細；點任一筆紀錄可以修改或刪除。上方切換「月／年／全部」可以看不同期間。"]);
+  if(canEdit(l) && !aaOn(l)) items.push(["aa-intro","和家人一起出錢？到「帳本設定」→「AA 分帳」打開，填一起分攤的人和比例（不一定要各一半，例如 60／40），系統會算出誰要給誰多少。"]);
+  if(aaOn(l)) items.push(["aa-use","這本帳有開 AA：記帳時選「付款人」（誰出的錢）才會算進結算。某一筆不想照比例，可以選「只算付款人」或「這筆自訂」。轉帳給對方後，在「AA 結算」按「記錄已結清」就會歸零。"]);
   tipsFor("tipLedger", items);
 }
 function refreshTips(){
@@ -1708,6 +1710,7 @@ const TOUR=[
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳。只有金額和分類必填，付款人、信用卡分期都是選填。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳。只有金額和分類必填，付款人、信用卡分期都是選填。" },
   { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。" },
+  { sel:'#viewHome .tabs a[href="#invest"]', title:"投資", text:"股票、ETF 記在這裡：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。手續費依你的折扣自動算，現價可以一鍵更新台股收盤價。只有你自己看得到。" },
   { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
