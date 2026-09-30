@@ -607,7 +607,11 @@
       <label class="field"><span class="label">總期數</span><input id="loTotal" type="number" inputmode="numeric" min="0" placeholder="例如 84"></label>
       <label class="field"><span class="label">開始用本系統前已繳期數</span><input id="loPeriodsBase" type="number" inputmode="numeric" min="0" value="0"></label>
     </div>
-    <label class="field"><span class="label">開始用本系統前已還金額</span><input id="loPaidBase" type="number" inputmode="numeric" min="0" value="0"></label>
+    <div class="grid2">
+      <label class="field"><span class="label">開始用本系統前已還本金</span><input id="loPaidBase" type="number" inputmode="numeric" min="0" value="0"></label>
+      <label class="field"><span class="label">年利率 %（民間借款、無息填 0）</span><input id="loRate" type="number" inputmode="decimal" min="0" max="100" step="any" placeholder="例如 5.5"></label>
+    </div>
+    <p class="small muted" id="loRateHint">有填年利率的話，每期繳款會自動拆成「本金」和「利息」，剩餘金額只扣本金，和銀行 APP 的算法一樣。</p>
     <label class="field"><span class="label">備註</span><input id="loNote" type="text" maxlength="100" placeholder="例如：總期數84期，每月12號帳戶扣款"></label>
     <div class="field"><span class="label">標記已繳時，自動記一筆支出到</span>
       <div class="grid2">
@@ -615,7 +619,17 @@
         <select id="loCat" aria-label="分類"></select>
       </div>
     </div>
-    <div id="loHistory" class="field" hidden><span class="label">還款紀錄</span><div class="pay-grid" id="loGrid"></div></div>
+    <div id="loAdjBox" class="adj-box" hidden>
+      <div class="between wrap-gap"><span class="label">校正剩餘本金</span><span class="small muted" id="loAdjNow"></span></div>
+      <p class="small muted">跟銀行 APP 對不起來時，把 APP 上的「剩餘本金」填進來，系統會從這個數字接著算。</p>
+      <div class="grid2">
+        <label class="field"><span class="label">銀行 APP 上的剩餘本金</span><input id="loAdjBal" type="number" inputmode="numeric" min="0"></label>
+        <label class="field"><span class="label">這是繳完哪個月之後的餘額</span><input id="loAdjYm" type="month"></label>
+      </div>
+      <div class="row"><button class="btn" type="button" id="loAdjSave">校正</button><button class="link" type="button" id="loAdjClear" hidden>取消校正</button></div>
+      <p class="msg" id="loAdjMsg" role="status"></p>
+    </div>
+    <div id="loHistory" class="field" hidden><span class="label">還款紀錄（點一格可以修改本金和利息，或補記那個月）</span><div class="pay-grid" id="loGrid"></div></div>
     <div class="row">
       <button class="btn danger" type="button" id="loDelete" hidden>刪除</button>
       <button class="btn primary grow" type="submit" value="save" id="loSave">儲存</button>
@@ -631,8 +645,13 @@
     <div class="between"><h2 class="h2" id="pyTitle">標記已繳</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
     <p id="pyWhat"></p>
     <label class="amount"><span>NT$</span><input id="pyAmount" type="number" inputmode="numeric" min="1" step="1" aria-label="這期繳了多少"></label>
+    <div class="grid2">
+      <label class="field"><span class="label">其中本金</span><input id="pyPrin" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field"><span class="label">其中利息</span><input id="pyInt" type="number" inputmode="numeric" min="0" step="1"></label>
+    </div>
+    <p class="small muted" id="pySplitNote"></p>
     <p class="small muted" id="pyNote"></p>
-    <button class="btn primary" type="submit" value="save" id="pySave">確定已繳</button>
+    <div class="row"><button class="btn danger" type="button" id="pyUndo" hidden>取消這個月的已繳</button><button class="btn primary grow" type="submit" value="save" id="pySave">確定已繳</button></div>
     <p class="msg" id="pyMsg" role="status"></p>
   </form>
 </dialog>
