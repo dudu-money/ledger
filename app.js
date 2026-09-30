@@ -1031,6 +1031,8 @@ function stopLoans(){ if(S.unsubLoans){ S.unsubLoans(); S.unsubLoans=null; } S.l
 /* 每期紀錄 {a:繳款總額, p:其中本金, i:其中利息, l/e:自動記帳的帳本與紀錄}；舊紀錄沒有 p 時整筆算本金。
    adj = {bal, ym}：校正後「繳完 ym 那個月之後」的剩餘本金，之後的月份從這裡接著扣。 */
 const payP = p => typeof p.p==="number" ? p.p : (p.a||0);
+/* 這個月應繳：緩繳本金期間有填利率就用算出來的利息，否則用月繳金額 */
+const dueAmt = (lo, ym) => lo.io && lo.rate ? autoInt(lo, ym) : (lo.monthly||0);
 const payI = p => typeof p.i==="number" ? p.i : 0;
 const hasAdj = lo => !!(lo.adj && typeof lo.adj.bal==="number" && lo.adj.ym);
 function loanStats(lo, beforeYm){
@@ -1040,9 +1042,12 @@ function loanStats(lo, beforeYm){
   let remain = adj ? adj.bal : (lo.principal||0)-(lo.paidBase||0), interest=0, cash=0;
   months.forEach(m=>{ const p=pays[m]; interest+=payI(p); cash+=p.a||0; if(adj && m<=adj.ym) return; remain-=payP(p); });
   remain=Math.max(Math.round(remain),0);
-  const periods=(lo.periodsBase||0)+months.length;
+  // 校正時有填已繳期數：以銀行的期數為準，只加上校正月份之後的紀錄
+  // 緩繳本金（只繳利息，紀錄上有 x）的月份不算進還款期數
+  const counted=months.filter(m=>!pays[m].x), ioInt=months.filter(m=>pays[m].x).reduce((t,m)=>t+payI(pays[m]),0);
+  const periods = adj && typeof adj.n==="number" ? adj.n + counted.filter(m=>m>adj.ym).length : (lo.periodsBase||0)+counted.length;
   const leftPeriods = lo.totalPeriods ? Math.max(lo.totalPeriods-periods,0) : null;
-  return { repaid:Math.max((lo.principal||0)-remain,0), periods, remain, leftPeriods, interest, cash, done: remain<=0 };
+  return { repaid:Math.max((lo.principal||0)-remain,0), periods, remain, leftPeriods, interest, ioInt, cash, done: remain<=0 };
 }
 $("rPrev").onclick=()=>{ S.rYM=addMonths(S.rYM,-1); renderRepay(); };
 $("rNext").onclick=()=>{ S.rYM=addMonths(S.rYM,1); renderRepay(); };
@@ -1058,7 +1063,7 @@ function renderRepay(reloadBill=true){
     const st=loanStats(lo); const paidThis=(lo.payments||{})[ym];
     (st.done && !paidThis ? done : active).push(lo); });
   let paid=0, unpaid=0, left=0;
-  active.forEach(lo=>{ const p=(lo.payments||{})[ym]; if(p) paid+=p.a||0; else if(!loanStats(lo).done) unpaid+=lo.monthly||0; });
+  active.forEach(lo=>{ const p=(lo.payments||{})[ym]; if(p) paid+=p.a||0; else if(!loanStats(lo).done) unpaid+=dueAmt(lo, ym); });
   S.loans.forEach(lo=>left+=loanStats(lo).remain);
   $("rPaid").textContent=fmt(paid); $("rUnpaid").textContent=fmt(unpaid); $("rLeft").textContent=fmt(left);
   const lb=$("loanList"); lb.textContent="";
@@ -1082,12 +1087,14 @@ function loanCard(lo, ym){
   const nums=el("div","loan-nums");
   nums.append(el("span",null,`剩餘本金 ${money(st.remain)}`), el("span","muted",`原貸 ${fmt(lo.principal||0)}・已還本金 ${fmt(st.repaid)}`));
   c.appendChild(nums);
-  if(lo.totalPeriods && lo.monthly && st.leftPeriods>0)
+  if(lo.io){ const b=el("div","io-note");
+    b.append(el("strong",null,"緩繳本金中"), document.createTextNode(`：每月只繳利息${lo.rate?`（這個月約 ${fmt(autoInt(lo, ym))} 元）`:""}，本金不會減少，也不算還款期數。`)); c.appendChild(b); }
+  else if(lo.totalPeriods && lo.monthly && st.leftPeriods>0)
     c.appendChild(el("div","loan-left",`還要繳 ${money(st.leftPeriods*lo.monthly)}（剩 ${st.leftPeriods} 期 × ${fmt(lo.monthly)}）`));
-  const meta=[]; if(lo.monthly) meta.push(`月繳 ${fmt(lo.monthly)}`); if(lo.day) meta.push(`每月 ${lo.day} 號`);
+  const meta=[]; if(lo.monthly && !lo.io) meta.push(`月繳 ${fmt(lo.monthly)}`); if(lo.monthly && lo.io) meta.push(`恢復還本後月繳 ${fmt(lo.monthly)}`); if(lo.day) meta.push(`每月 ${lo.day} 號`);
   meta.push(lo.totalPeriods ? `已繳 ${st.periods}/${lo.totalPeriods} 期・剩 ${st.leftPeriods} 期` : `已繳 ${st.periods} 期`);
   if(lo.rate) meta.push(`年利率 ${lo.rate}%`);
-  if(st.interest>0) meta.push(`已付利息 ${fmt(st.interest)}`);
+  if(st.interest>0) meta.push(`已付利息 ${fmt(st.interest)}` + (st.ioInt>0?`（其中緩繳期間 ${fmt(st.ioInt)}）`:""));
   if(hasAdj(lo)) meta.push(`已依銀行校正（${lo.adj.ym.slice(2).replace("-","/")}）`);
   if(lo.note) meta.push(lo.note);
   c.appendChild(el("div","loan-meta",meta.join("・")));
@@ -1096,7 +1103,7 @@ function loanCard(lo, ym){
   row.appendChild(el("span","small muted", ld ? `已繳會記到「${ld.name}」` : "不會自動記帳"));
   if(p){ const b=el("button","paid-btn",`✓ ${Number(ym.slice(5))} 月已繳 ${fmt(p.a)}`); b.type="button"; b.title="點一下可以修改或取消";
     b.onclick=()=>openPay(lo, ym); row.appendChild(b); }
-  else if(!st.done){ const b=el("button","pay-btn", lo.monthly ? `標記已繳 ${fmt(lo.monthly)}` : "標記已繳"); b.type="button"; b.onclick=()=>openPay(lo, ym); row.appendChild(b); }
+  else if(!st.done){ const due=dueAmt(lo, ym); const b=el("button","pay-btn", due ? `標記已繳 ${fmt(due)}` : "標記已繳"); b.type="button"; b.onclick=()=>openPay(lo, ym); row.appendChild(b); }
   c.appendChild(row);
   return c;
 }
@@ -1106,12 +1113,12 @@ function openPay(lo, ym){
   const cur=(lo.payments||{})[ym];
   S.payLoan={lo, ym, edit:!!cur}; msg("pyMsg","");
   $("pyWhat").textContent=`${[lo.type,lo.bank,lo.name].filter(Boolean).join(" ")}・${ymLabel(ym)}`;
-  $("pyAmount").value = cur ? cur.a : (lo.monthly||"");
+  $("pyAmount").value = cur ? cur.a : (dueAmt(lo, ym)||"");
   delete $("pyInt").dataset.touched;
-  if(cur){ $("pyInt").value=payI(cur); $("pyPrin").value=payP(cur); if(typeof cur.i==="number") $("pyInt").dataset.touched="1"; }
+  if(cur){ $("pyInt").value=payI(cur); $("pyPrin").value=payP(cur); if(typeof cur.i==="number" && !cur.x) $("pyInt").dataset.touched="1"; }
   else syncSplit();
   const before=loanStats(lo, ym).remain;
-  $("pySplitNote").textContent = lo.rate
+  $("pySplitNote").textContent = (cur ? cur.x : lo.io) ? "緩繳本金期間：整筆都算利息，剩餘本金不變，也不算進還款期數。" + (lo.rate?`（依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% 估算）`:"") : lo.rate
     ? (intDays(lo, ym)
       ? `依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% × ${intDays(lo, ym)} 天 ÷ 365（和銀行算法一樣），這期利息約 ${fmt(autoInt(lo, ym))} 元。如果跟銀行 APP 差幾塊，照 APP 改就好。`
       : `依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% ÷ 12 估算，這期利息約 ${fmt(autoInt(lo, ym))} 元。在「編輯」填「每月繳款日」，就會改用和銀行一樣的天數算法，更準。`)
@@ -1131,7 +1138,8 @@ function syncSplit(from){
   const {lo, ym}=S.payLoan, a=Math.round(Number($("pyAmount").value)||0);
   if(from==="p"){ const p=Math.round(Number($("pyPrin").value)||0); $("pyInt").value=Math.max(a-p,0); $("pyInt").dataset.touched="1"; return; }
   if(from==="i") $("pyInt").dataset.touched="1";
-  let i = $("pyInt").dataset.touched ? Math.round(Number($("pyInt").value)||0) : Math.min(autoInt(lo, ym), a);
+  const cur=(lo.payments||{})[ym], io = cur ? !!cur.x : !!lo.io;
+  let i = $("pyInt").dataset.touched ? Math.round(Number($("pyInt").value)||0) : io ? a : Math.min(autoInt(lo, ym), a);
   if(!$("pyInt").dataset.touched) $("pyInt").value=i;
   $("pyPrin").value=Math.max(a-i,0);
 }
@@ -1154,7 +1162,7 @@ $("pyUndo").onclick=async()=>{
   await unmarkPaid(S.payLoan.lo, S.payLoan.ym); $("dlgPay").close();
 };
 async function markPaid(lo, ym, amt, prin, int){
-  if(prin==null){ int=Math.min(autoInt(lo, ym), amt); prin=amt-int; }
+  if(prin==null){ int=lo.io ? amt : Math.min(autoInt(lo, ym), amt); prin=amt-int; }
   const cur=(lo.payments||{})[ym];
   if(cur){ // 修改已繳的月份
     const rec={...cur, a:amt, p:prin, i:int};
@@ -1162,7 +1170,7 @@ async function markPaid(lo, ym, amt, prin, int){
     await updateDoc(doc(db,"loans",lo.id), { payments:{...(lo.payments||{}), [ym]:rec}, updatedAt:serverTimestamp() });
     toast(`已更新 ${ymLabel(ym)}：本金 ${fmt(prin)}、利息 ${fmt(int)}`); return;
   }
-  const rec={a:amt, p:prin, i:int, l:"", e:""};
+  const rec={a:amt, p:prin, i:int, l:"", e:""}; if(lo.io) rec.x=1;
   const ld=lo.ledgerId && S.ledgers.get(lo.ledgerId);
   if(ld && canEdit(ld)){
     const cat=(ld.categories||[]).find(c=>c.id===lo.categoryId) || (ld.categories||[]).find(c=>c.type==="out");
@@ -1170,7 +1178,7 @@ async function markPaid(lo, ym, amt, prin, int){
     const today=todayStr(); const day = ym===today.slice(0,7) ? Number(today.slice(8)) : (lo.day||1);
     const ref=doc(collection(db,"ledgers",ld.id,"entries"));
     await setDoc(ref, { type:"out", amount:amt, categoryId:cat?cat.id:"loan", categoryName:cat?cat.name:(lo.categoryName||"還款"),
-      date:`${ym}-${pad(Math.min(day,dim(ym)))}`, note:`${[lo.type,lo.bank,lo.name].filter(Boolean).join(" ")} 第 ${st.periods+1} 期`.slice(0,100),
+      date:`${ym}-${pad(Math.min(day,dim(ym)))}`, note:(`${[lo.type,lo.bank,lo.name].filter(Boolean).join(" ")} ` + (lo.io ? "緩繳期間利息" : `第 ${st.periods+1} 期`)).slice(0,100),
       pay:"轉帳", card:"", payer:"", status:"paid",
       createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
     rec.l=ld.id; rec.e=ref.id;
@@ -1207,9 +1215,9 @@ function openLoan(lo){
   const v=(id,x)=>$(id).value = x==null ? "" : x;
   v("loType",lo?lo.type:""); v("loName",lo?lo.name:""); v("loBank",lo?lo.bank:""); v("loDay",lo&&lo.day?lo.day:"");
   v("loPrincipal",lo?lo.principal:""); v("loMonthly",lo&&lo.monthly?lo.monthly:""); v("loTotal",lo&&lo.totalPeriods?lo.totalPeriods:"");
-  msg("loRateMsg","");
+  msg("loRateMsg",""); $("loIO").checked=!!(lo&&lo.io);
   v("loPeriodsBase",lo?lo.periodsBase||0:0); v("loPaidBase",lo?lo.paidBase||0:0); v("loNote",lo?lo.note:""); v("loRate",lo&&lo.rate?lo.rate:"");
-  $("loAdjBox").hidden=!lo; msg("loAdjMsg",""); $("loAdjBal").value="";
+  $("loAdjBox").hidden=!lo; msg("loAdjMsg",""); $("loAdjBal").value=""; $("loAdjN").value="";
   if(lo){ const ms=Object.keys(lo.payments||{}).sort(); $("loAdjYm").value = ms.length ? ms[ms.length-1] : addMonths(thisYM(),-1); renderAdjNow(lo); }
   fillLoanLedgers(lo?lo.ledgerId:"", lo?lo.categoryId:"");
   $("loDelete").hidden=!lo; $("loDelete").textContent="刪除"; $("loDelete").dataset.armed="";
@@ -1220,7 +1228,7 @@ function openLoan(lo){
 }
 function renderAdjNow(lo){
   const st=loanStats(lo);
-  $("loAdjNow").textContent = `目前剩餘本金 ${fmt(st.remain)}` + (hasAdj(lo) ? `・上次校正：${lo.adj.ym} 剩 ${fmt(lo.adj.bal)}` : "");
+  $("loAdjNow").textContent = `目前剩餘本金 ${fmt(st.remain)}・已繳 ${st.periods} 期` + (hasAdj(lo) ? `・上次校正：${lo.adj.ym} 剩 ${fmt(lo.adj.bal)}${typeof lo.adj.n==="number"?`、已繳 ${lo.adj.n} 期`:""}` : "");
   $("loAdjClear").hidden=!hasAdj(lo);
 }
 function renderLoanGrid(lo){
@@ -1229,19 +1237,22 @@ function renderLoanGrid(lo){
   [...months].sort().forEach(ym=>{ const p=(lo.payments||{})[ym];
     const c=el("button","pay-cell"+(p?"":" none")+(hasAdj(lo)&&lo.adj.ym===ym?" adj":"")); c.type="button";
     c.append(document.createTextNode(`${ym.slice(2,4)}/${ym.slice(5)}`), el("b",null,p?fmt(p.a):"—"));
-    if(p && payI(p)>0) c.appendChild(el("small",null,`本 ${fmt(payP(p))}・息 ${fmt(payI(p))}`));
+    if(p && p.x) c.appendChild(el("small",null,"只繳息"));
+    else if(p && payI(p)>0) c.appendChild(el("small",null,`本 ${fmt(payP(p))}・息 ${fmt(payI(p))}`));
     c.title = p ? "點一下修改本金和利息" : "點一下補記這個月";
     c.onclick=()=>openPay(S.loans.find(x=>x.id===lo.id)||lo, ym);
     g.appendChild(c); });
 }
 $("loAdjSave").onclick=async()=>{
   const lo=S.editingLoan; if(!lo) return;
-  const raw=$("loAdjBal").value.trim(), bal=Math.round(Number(raw)), ym=$("loAdjYm").value;
+  const raw=$("loAdjBal").value.trim(), bal=Math.round(Number(raw)), ym=$("loAdjYm").value, nRaw=$("loAdjN").value.trim(), n=Math.round(Number(nRaw));
+  if(nRaw!=="" && !(n>=0)){ msg("loAdjMsg","已繳期數請填數字。","err"); return; }
   if(raw==="" || !(bal>=0)){ msg("loAdjMsg","請填銀行 APP 上顯示的剩餘本金。","err"); return; }
   if(!/^\d{4}-\d{2}$/.test(ym)){ msg("loAdjMsg","請選這是繳完哪個月之後的餘額。","err"); return; }
   const before=loanStats(lo).remain;
-  try{ await updateDoc(doc(db,"loans",lo.id), { adj:{bal, ym, at:todayStr()}, updatedAt:serverTimestamp() });
-    $("loAdjBal").value=""; msg("loAdjMsg",`已校正：剩餘本金從 ${fmt(before)} 改成依銀行的 ${fmt(bal)} 計算（${ym} 之後的月份從這裡接著扣）。`,"ok"); }
+  const adj={bal, ym}; if(nRaw!=="") adj.n=n;
+  try{ await updateDoc(doc(db,"loans",lo.id), { adj, updatedAt:serverTimestamp() });
+    $("loAdjBal").value=""; $("loAdjN").value=""; msg("loAdjMsg",`已校正：剩餘本金從 ${fmt(before)} 改成依銀行的 ${fmt(bal)} 計算（${ym} 之後的月份從這裡接著扣）。`,"ok"); }
   catch(e){ msg("loAdjMsg","校正失敗："+errText(e),"err"); }
 };
 $("loAdjClear").onclick=async()=>{
@@ -1276,7 +1287,7 @@ $("formLoan").addEventListener("submit", async ev=>{
   const data={ type:type.slice(0,20), name:$("loName").value.trim().slice(0,30), bank:$("loBank").value.trim().slice(0,20),
     day:Math.min(num("loDay"),31), principal:num("loPrincipal"), monthly:num("loMonthly"), totalPeriods:num("loTotal"),
     periodsBase:num("loPeriodsBase"), paidBase:num("loPaidBase"), note:$("loNote").value.trim().slice(0,100),
-    rate:Math.min(Math.max(Number($("loRate").value)||0,0),100),
+    rate:Math.min(Math.max(Number($("loRate").value)||0,0),100), io:$("loIO").checked,
     ledgerId: ld ? ledgerId : "", categoryId: cat ? cat.id : "", categoryName: cat ? cat.name : "", updatedAt:serverTimestamp() };
   $("loSave").disabled=true;
   try{
@@ -1755,7 +1766,7 @@ $("bkRestore").onclick=async()=>{
     let nL=0;
     if(doLoans){ const have=new Set(S.loans.map(x=>x.id));
       for(const lo of BK.loans.filter(x=>!have.has(x.id))){
-        const keys=["type","name","bank","day","principal","monthly","totalPeriods","periodsBase","paidBase","note","ledgerId","categoryId","categoryName","payments","rate","adj"], o={};
+        const keys=["type","name","bank","day","principal","monthly","totalPeriods","periodsBase","paidBase","note","ledgerId","categoryId","categoryName","payments","rate","adj","io"], o={};
         keys.forEach(k=>{ if(lo[k]!==undefined) o[k]=lo[k]; });
         await setDoc(doc(db,"loans",lo.id), {type:"貸款",name:"",bank:"",day:0,principal:0,monthly:0,totalPeriods:0,periodsBase:0,paidBase:0,note:"",ledgerId:"",categoryId:"",categoryName:"",payments:{},
           ...o, ownerUid:S.user.uid, createdAt:serverTimestamp(), updatedAt:serverTimestamp()}); nL++; } }

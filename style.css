@@ -399,3 +399,5 @@ button.pay-cell:hover{border-color:var(--accent)}
 .pay-cell small{display:block;color:var(--muted);font-size:11px}
 .pay-cell.adj{border-color:var(--accent);background:var(--accent-soft)}
 .loan-left{font-size:14px;font-weight:600}
+.io-note{font-size:14px;background:var(--accent-soft);border-radius:8px;padding:8px 10px}
+.io-check{flex-wrap:wrap}

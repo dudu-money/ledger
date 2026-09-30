@@ -611,6 +611,7 @@
       <label class="field"><span class="label">開始用本系統前已還本金</span><input id="loPaidBase" type="number" inputmode="numeric" min="0" value="0"></label>
       <label class="field"><span class="label">年利率 %（無息填 0）</span><input id="loRate" type="number" inputmode="decimal" min="0" max="100" step="any" placeholder="例如 5.5"></label>
     </div>
+    <label class="check io-check"><input type="checkbox" id="loIO"> 目前緩繳本金（只繳利息）<span class="small muted">— 例如學貸緩繳期間。打開後每期整筆算利息，不算進已繳期數；緩繳結束再關掉。</span></label>
     <div class="row wrap"><button class="btn" type="button" id="loRateCalc">不知道利率？用原貸、總期數、月繳推算</button></div>
     <p class="msg" id="loRateMsg" role="status"></p>
     <p class="small muted" id="loRateHint">有填年利率的話，每期繳款會自動拆成「本金」和「利息」，剩餘金額只扣本金，和銀行 APP 的算法一樣。</p>
@@ -627,6 +628,7 @@
       <div class="grid2">
         <label class="field"><span class="label">銀行 APP 上的剩餘本金</span><input id="loAdjBal" type="number" inputmode="numeric" min="0"></label>
         <label class="field"><span class="label">這是繳完哪個月之後的餘額</span><input id="loAdjYm" type="month"></label>
+        <label class="field"><span class="label">銀行 APP 上的「已繳期數」（選填）</span><input id="loAdjN" type="number" inputmode="numeric" min="0" placeholder="例如 45"></label>
       </div>
       <div class="row"><button class="btn" type="button" id="loAdjSave">校正</button><button class="link" type="button" id="loAdjClear" hidden>取消校正</button></div>
       <p class="msg" id="loAdjMsg" role="status"></p>
