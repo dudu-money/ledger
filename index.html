@@ -83,7 +83,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="banner-warn" id="bkReminder" hidden><span id="bkReminderText"></span><a class="btn" href="#settings">去備份</a></div>
     <div class="home-head">
       <h2 class="h2">我的帳本</h2>
@@ -105,7 +105,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipRepay"></div>
     <div class="period">
       <div class="period-nav">
@@ -150,7 +150,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">投資</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipInvest"></div>
     <div class="layout">
       <section class="panel totals" aria-label="投資總覽">
@@ -190,6 +190,66 @@
   </main>
 </section>
 
+<!-- 清單 -->
+<section class="view" id="viewLists" hidden>
+  <header class="topbar">
+    <h1 class="brand-title sm">記帳本</h1>
+    <a class="btn" href="#settings">設定</a>
+  </header>
+  <main class="page">
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab" aria-current="page">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <div class="tip-slot" id="tipLists"></div>
+    <div class="home-head">
+      <h2 class="h2">我的清單</h2>
+      <button class="btn primary" id="btnNewList" type="button">＋ 新增清單</button>
+    </div>
+    <div class="ledger-grid" id="myLists"></div>
+    <div id="sharedListsWrap" hidden>
+      <h2 class="h2">別人分享給我的</h2>
+      <div class="ledger-grid" id="sharedLists"></div>
+    </div>
+    <p class="msg" id="listsMsg" role="status"></p>
+  </main>
+</section>
+
+<section class="view" id="viewList" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="liBack" type="button" aria-label="回到清單列表">‹</button>
+    <div class="ledger-title">
+      <span class="dot" id="liDot"></span>
+      <h1 id="liName">清單</h1>
+      <span class="badge" id="liRole"></span>
+    </div>
+    <button class="btn" id="liSetBtn" type="button">清單設定</button>
+  </header>
+  <main class="page narrow-page">
+    <section class="panel li-sum" aria-label="清單摘要">
+      <div><div class="label">待完成</div><div class="num mid" id="liLeftN">0 項</div></div>
+      <div><div class="label">還需準備</div><div class="num mid c-out" id="liNeed">NT$ 0</div></div>
+      <div><div class="label">已完成</div><div class="num mid" id="liDoneN">0 項</div><div class="small muted" id="liSpent"></div></div>
+      <div class="meter li-meter" id="liMeter"><i></i></div>
+    </section>
+    <form class="panel li-add-wrap" id="liAddForm" autocomplete="off">
+      <div class="li-groups" id="liGroupPick"></div>
+      <div class="li-add">
+      <input id="liAddText" type="text" maxlength="100" placeholder="新增項目，例如：紗布衣" aria-label="新增項目">
+      <input id="liAddAmt" type="number" inputmode="numeric" min="0" placeholder="預估 NT$" aria-label="預估金額">
+      <button class="btn primary" type="submit">加入</button>
+      </div>
+    </form>
+    <section class="panel">
+      <div class="between wrap-gap"><h3 class="h3">待辦項目</h3><span class="small muted">點項目可以修改；打勾代表買好／完成</span></div>
+      <div id="liItems" class="li-items"></div>
+      <details id="liDoneWrap" hidden><summary class="small" id="liDoneSum">已完成</summary><div id="liDone" class="li-items"></div></details>
+    </section>
+    <section class="panel">
+      <div class="between wrap-gap"><h3 class="h3">記事</h3><span class="small muted" id="liMemoState"></span></div>
+      <textarea id="liMemo" rows="6" maxlength="5000" placeholder="隨手記：尺寸、品牌、朋友推薦、要問醫生的事…"></textarea>
+    </section>
+    <p class="msg" id="liMsg" role="status"></p>
+  </main>
+</section>
+
 <!-- 設定 -->
 <section class="view" id="viewSettings" hidden>
   <header class="topbar">
@@ -197,7 +257,7 @@
     <a class="btn" href="#">完成</a>
   </header>
   <main class="page narrow-page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
     <div class="tip-slot" id="tipSettings"></div>
 
     <section class="panel">
@@ -277,6 +337,7 @@
             <div id="bkLedgers" class="stack"></div>
             <label class="check"><input type="checkbox" id="bkLoans" checked> <span id="bkLoansText">貸款</span></label>
             <label class="check"><input type="checkbox" id="bkHolds" checked> <span id="bkHoldsText">投資持股</span></label>
+            <label class="check"><input type="checkbox" id="bkLists" checked> <span id="bkListsText">清單</span></label>
             <label class="check"><input type="checkbox" id="bkPrefs"> 設定（預設值、常用清單）— 會取代目前的設定</label>
             <button class="btn primary" id="bkRestore" type="button">開始還原</button>
           </div>
@@ -756,6 +817,97 @@
     <p class="small muted" id="rbHint"></p>
     <div class="row"><button class="btn danger" type="button" id="rbUndo" hidden>改回待請款</button><button class="btn primary grow" type="submit" value="save" id="rbSave">確定已收到</button></div>
     <p class="msg" id="rbMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 新增清單 -->
+<dialog id="dlgNewList" aria-labelledby="nlTitle">
+  <form method="dialog" id="formNewList" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="nlTitle">新增清單</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="field"><span class="label">從範本開始</span><div class="chips" id="nlTemplates"></div></div>
+    <label class="field"><span class="label">清單名稱</span><input id="nlName" type="text" maxlength="40" required placeholder="例如：待產包"></label>
+    <label class="check" id="nlSeedWrap"><input type="checkbox" id="nlSeed" checked> <span id="nlSeedText">帶入常見項目（之後可以刪改）</span></label>
+    <div class="field"><span class="label">顏色</span><div class="swatches" id="nlColors"></div></div>
+    <button class="btn primary" type="submit" value="save" id="nlCreate">建立</button>
+    <p class="msg" id="nlMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 清單項目 -->
+<dialog id="dlgItem" aria-labelledby="itTitle">
+  <form method="dialog" id="formItem" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="itTitle">修改項目</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <label class="field"><span class="label">項目</span><input id="itText" type="text" maxlength="100" required></label>
+    <div class="grid2">
+      <label class="field"><span class="label">預估金額</span><input id="itAmt" type="number" inputmode="numeric" min="0" placeholder="不確定可留空"></label>
+      <label class="field"><span class="label">什麼時候前要準備好</span><input id="itDue" type="date"></label>
+    </div>
+    <div class="field"><span class="label">優先度</span>
+      <div class="seg sm seg4" role="group" aria-label="優先度" id="itPrio">
+        <button type="button" data-p="高" aria-pressed="false">高</button><button type="button" data-p="中" aria-pressed="false">中</button><button type="button" data-p="低" aria-pressed="false">低</button><button type="button" data-p="" aria-pressed="true">不設定</button>
+      </div>
+    </div>
+    <label class="field"><span class="label">備註</span><input id="itNote" type="text" maxlength="200" placeholder="例如：尺寸 NB、要買無香精的"></label>
+    <label class="field"><span class="label">分組</span><input id="itGroup" type="text" maxlength="20" list="dlItGroups" placeholder="例如：媽媽、寶寶（不分組可留空）"></label>
+    <datalist id="dlItGroups"></datalist>
+    <p class="small muted" id="itDoneInfo" hidden></p>
+    <div class="row">
+      <button class="btn danger" type="button" id="itDelete">刪除</button>
+      <button class="btn primary grow" type="submit" value="save" id="itSave">儲存</button>
+    </div>
+    <p class="msg" id="itMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 買好了 -->
+<dialog id="dlgBuy" aria-labelledby="byTitle">
+  <form method="dialog" id="formBuy" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="byTitle">買好了</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p id="byWhat"></p>
+    <label class="amount"><span>NT$</span><input id="byAmt" type="number" inputmode="numeric" min="0" step="1" aria-label="實際花了多少"></label>
+    <div class="grid2">
+      <label class="field"><span class="label">記到哪本帳</span><select id="byLedger"></select></label>
+      <label class="field"><span class="label">分類</span><select id="byCat"></select></label>
+      <label class="field"><span class="label">日期</span><input id="byDate" type="date"></label>
+      <label class="field"><span class="label">付款方式</span><select id="byPay"></select></label>
+    </div>
+    <div class="field" id="byPayerBox" hidden><span class="label">誰付的</span><div class="chips" id="byPayerChips"></div></div>
+    <div class="field" id="bySplitBox" hidden>
+      <span class="label">怎麼分攤</span>
+      <div class="seg sm seg3" role="group" aria-label="分攤方式" id="bySplitMode">
+        <button type="button" data-m="d" aria-pressed="true">照帳本比例</button>
+        <button type="button" data-m="s" aria-pressed="false">只算付款人</button>
+        <button type="button" data-m="a" aria-pressed="false">自訂金額</button>
+      </div>
+      <div class="split-grid" id="bySplitCustom"></div>
+      <p class="small muted" id="bySplitNote"></p>
+    </div>
+    <p class="small muted" id="byNote"></p>
+    <div class="row"><button class="btn" type="button" id="byGift">別人送的／已經有了</button><button class="btn primary grow" type="submit" value="save" id="bySave">完成</button></div>
+    <p class="msg" id="byMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 清單設定 -->
+<dialog id="dlgListSet" aria-labelledby="lsTitle">
+  <form method="dialog" class="stack" autocomplete="off" onsubmit="return false">
+    <div class="between"><h2 class="h2" id="lsTitle">清單設定</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉" id="lsClose">✕</button></div>
+    <div id="lsOwnerBox">
+      <label class="field"><span class="label">清單名稱</span><input id="lsName" type="text" maxlength="40"></label>
+      <div class="field"><span class="label">顏色</span><div class="swatches" id="lsColors"></div></div>
+      <button class="btn" type="button" id="lsSaveName">儲存名稱和顏色</button>
+      <div class="field"><span class="label">分享給家人</span>
+        <div class="row wrap"><input id="lsEmail" type="email" placeholder="對方登入用的 Email" class="grow" aria-label="Email">
+          <select id="lsRole" aria-label="權限"><option value="editor">可編輯</option><option value="viewer">僅檢視</option></select>
+          <button class="btn" type="button" id="lsInvite">分享</button></div>
+      </div>
+      <div id="lsMembers" class="members"></div>
+    </div>
+    <p class="msg" id="lsMsg" role="status"></p>
+    <div class="danger-zone">
+      <button class="btn danger" type="button" id="lsDelete">刪除這個清單</button>
+      <button class="btn danger" type="button" id="lsLeave" hidden>離開這個清單</button>
+    </div>
   </form>
 </dialog>
 

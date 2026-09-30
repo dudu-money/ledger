@@ -109,13 +109,13 @@ function projItems(entries){
 }
 
 /* ================= 畫面切換 ================= */
-const VIEWS = ["viewSetup","viewLoading","viewLogin","viewVerify","viewHome","viewRepay","viewInvest","viewSettings","viewLedger"];
+const VIEWS = ["viewSetup","viewLoading","viewLogin","viewVerify","viewHome","viewRepay","viewInvest","viewLists","viewList","viewSettings","viewLedger"];
 function show(v){ VIEWS.forEach(id=>$(id).hidden = id!==v); }
 
 if(!configured){ show("viewSetup"); }
 else {
   onAuthStateChanged(auth, async user => {
-    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs();
+    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopLists(); stopItems(); S.itemsFor=null;
     S.user = user; S.email = user && user.email ? user.email.toLowerCase() : "";
     if(!user){ show("viewLogin"); return; }
     if(!user.emailVerified){ $("verifyEmail").textContent=user.email; show("viewVerify"); return; }
@@ -125,16 +125,20 @@ else {
 function signedInStart(){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user.email);
   S.startApplied = !!location.hash; // 網址已經指定頁面時，不套用「直接進入」
-  watchLedgers(); watchLoans(); watchHoldings(); watchPrefs(); route();
+  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchPrefs(); route();
 }
 window.addEventListener("hashchange", ()=>{ if(S.user && S.user.emailVerified) route(); });
 
 function route(){
   const m = location.hash.match(/^#l\/([A-Za-z0-9_-]+)/);
+  const lm = location.hash.match(/^#list\/([A-Za-z0-9_-]+)/);
+  if(!lm){ S.listId=null; if(S.itemsFor){ stopItems(); S.itemsFor=null; } }
   if(m){ openLedger(m[1]); return; }
+  if(lm){ S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); stopRb(); openList(lm[1]); return; }
   S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); stopRb(); document.title="記帳本";
   if(location.hash==="#repay"){ show("viewRepay"); renderRepay(); return; }
   if(location.hash==="#invest"){ show("viewInvest"); renderInvest(); return; }
+  if(location.hash==="#lists"){ show("viewLists"); renderLists(); return; }
   if(location.hash==="#settings"){ show("viewSettings"); renderGlobalSettings(); return; }
   show("viewHome"); renderHome();
 }
@@ -1495,7 +1499,7 @@ function renderGlobalSettings(reset=true){
     fillPayOptions("gsPay", p.defaultPay||"現金");
     $("gsPayer").value=p.defaultPayer; $("gsCard").value=p.defaultCard;
     const st=$("gsStart"); st.textContent="";
-    [["","帳本列表"],["#repay","還款與分期"],["#invest","投資"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; st.appendChild(o); });
+    [["","帳本列表"],["#repay","還款與分期"],["#invest","投資"],["#lists","清單"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; st.appendChild(o); });
     [...S.ledgers.values()].forEach(l=>{ const o=el("option",null,"帳本："+l.name); o.value="#l/"+l.id; st.appendChild(o); });
     st.value=p.startPage; if(st.value!==p.startPage) st.value="";
     const il=$("imLedger"), cur=il.value; il.textContent="";
@@ -1690,10 +1694,16 @@ async function buildBackup(){
   }
   const {lastBackup, ...prefs}=P();
   return { app:"記帳本", version:1, exportedAt:new Date().toISOString(), email:S.email,
-    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), prefs };
+    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), prefs };
 }
 const bkName = () => { const d=new Date(); return `記帳本備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
-const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款` + ((b.holdings||[]).length ? `、${b.holdings.length} 檔持股` : "");
+const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款` + ((b.holdings||[]).length ? `、${b.holdings.length} 檔持股` : "") + ((b.lists||[]).length ? `、${b.lists.length} 個清單` : "");
+async function backupLists(){
+  const out=[];
+  for(const x of S.lists.values()){ let items=[]; try{ items=(await getDocs(collection(db,"lists",x.id,"items"))).docs.map(d=>cleanOut(d.data())); }catch(e){}
+    const {id,...data}=x; out.push({id, data:cleanOut(data), items}); }
+  return out;
+}
 async function markBackup(){ try{ await savePrefs({lastBackup:Date.now()}); }catch(e){} renderGlobalSettings(false); }
 
 $("bkDownload").onclick=async()=>{
@@ -1796,14 +1806,16 @@ function showRestore(b){
   const haveH=new Set(S.holdings.map(x=>x.id)), missH=(b.holdings||[]).filter(x=>!haveH.has(x.id));
   $("bkHolds").checked=missH.length>0; $("bkHolds").disabled=!missH.length;
   $("bkHoldsText").textContent = (b.holdings||[]).length ? `投資持股：還原目前沒有的 ${missH.length} 檔（已存在的 ${(b.holdings||[]).length-missH.length} 檔會略過）` : "投資持股：這份備份沒有持股";
+  const nLs=(b.lists||[]).length; $("bkLists").checked=nLs>0; $("bkLists").disabled=!nLs;
+  $("bkListsText").textContent = nLs ? `清單：${nLs} 個，會建立成新的清單（不會覆蓋現有的）` : "清單：這份備份沒有清單";
   $("bkPrefs").checked=false; $("bkPrefs").disabled=!b.prefs;
 }
 const EF=["type","amount","categoryId","categoryName","date","note","pay","card","payer","status","budget","priority","inst","split","rb"];
 $("bkRestore").onclick=async()=>{
   if(!BK) return;
   const picks=[...document.querySelectorAll("#bkLedgers input:checked")].map(i=>BK.ledgers[Number(i.value)]);
-  const doLoans=$("bkLoans").checked && !$("bkLoans").disabled, doPrefs=$("bkPrefs").checked, doHolds=$("bkHolds").checked && !$("bkHolds").disabled;
-  if(!picks.length && !doLoans && !doPrefs && !doHolds){ msg("bkRMsg","請勾選要還原的項目。","err"); return; }
+  const doLoans=$("bkLoans").checked && !$("bkLoans").disabled, doPrefs=$("bkPrefs").checked, doHolds=$("bkHolds").checked && !$("bkHolds").disabled, doLists=$("bkLists").checked && !$("bkLists").disabled;
+  if(!picks.length && !doLoans && !doPrefs && !doHolds && !doLists){ msg("bkRMsg","請勾選要還原的項目。","err"); return; }
   $("bkRestore").disabled=true; msg("bkRMsg","還原中…");
   try{
     const d=new Date(), tag=`（還原 ${d.getMonth()+1}/${d.getDate()}）`; let nE=0;
@@ -1834,6 +1846,19 @@ $("bkRestore").onclick=async()=>{
         keys.forEach(k=>{ if(lo[k]!==undefined) o[k]=lo[k]; });
         await setDoc(doc(db,"loans",lo.id), {type:"貸款",name:"",bank:"",day:0,principal:0,monthly:0,totalPeriods:0,periodsBase:0,paidBase:0,note:"",ledgerId:"",categoryId:"",categoryName:"",payments:{},
           ...o, ownerUid:S.user.uid, createdAt:serverTimestamp(), updatedAt:serverTimestamp()}); nL++; } }
+    let nLs=0;
+    if(doLists){ const d=new Date(), tg=`（還原 ${d.getMonth()+1}/${d.getDate()}）`;
+      for(const ls of (BK.lists||[])){ const x=ls.data||{};
+        const ref=await addDoc(collection(db,"lists"), { name:(String(x.name||"清單")+tg).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20), ownerUid:S.user.uid, ownerEmail:S.email,
+          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+        const its=ls.items||[];
+        for(let k=0;k<its.length;k+=400){ const b=writeBatch(db);
+          its.slice(k,k+400).forEach((it,j)=>b.set(doc(collection(db,"lists",ref.id,"items")), { text:String(it.text||"項目").slice(0,100), amount:Number(it.amount)||0,
+            priority:["","高","中","低"].includes(it.priority)?it.priority:"", due:String(it.due||"").slice(0,10), note:String(it.note||"").slice(0,200), group:String(it.group||"").slice(0,20),
+            via:it.via==="gift"?"gift":"", done:!!it.done, doneAt:String(it.doneAt||"").slice(0,10), spent:Number(it.spent)||0, ledgerId:"", entryId:"", order:Number(it.order)||k+j,
+            createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }));
+          await b.commit(); }
+        nLs++; } }
     let nH=0;
     if(doHolds){ const have=new Set(S.holdings.map(x=>x.id));
       for(const h of (BK.holdings||[]).filter(x=>!have.has(x.id))){
@@ -1842,7 +1867,7 @@ $("bkRestore").onclick=async()=>{
           trades:Array.isArray(h.trades)?h.trades.slice(0,1000):[], note:String(h.note||"").slice(0,100), ownerUid:S.user.uid, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }); nH++; } }
     if(doPrefs && BK.prefs){ const p=BK.prefs; await savePrefs({ defaultPay:String(p.defaultPay||""), defaultPayer:String(p.defaultPayer||""), defaultCard:String(p.defaultCard||""),
       startPage:String(p.startPage||""), ...(p.inv&&typeof p.inv==="object"?{inv:{disc:numOr(p.inv.disc,10),min:numOr(p.inv.min,20),fx:numOr(p.inv.fx,32)}}:{}), payers:(p.payers||[]).slice(0,50), cards:(p.cards||[]).slice(0,50), pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS).slice(0,30) }); }
-    msg("bkRMsg",`還原完成：${picks.length} 本帳（${nE} 筆紀錄）、${nL} 筆貸款${nH?`、${nH} 檔持股`:""}${doPrefs?"、設定":""}。還原的帳本在「帳本」頁，分享設定需要重新設定。`,"ok");
+    msg("bkRMsg",`還原完成：${picks.length} 本帳（${nE} 筆紀錄）、${nL} 筆貸款${nH?`、${nH} 檔持股`:""}${nLs?`、${nLs} 個清單`:""}${doPrefs?"、設定":""}。還原的帳本在「帳本」頁，分享設定需要重新設定。`,"ok");
     toast("還原完成"); $("bkPreview").hidden=true; BK=null;
   }catch(e){ msg("bkRMsg","還原失敗："+errText(e),"err"); }
   finally{ $("bkRestore").disabled=false; }
@@ -1890,6 +1915,7 @@ const TOUR=[
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
   { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」。" },
   { sel:'#viewHome .tabs a[href="#invest"]', title:"投資", text:"股票、ETF 記在這裡：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。手續費依你的折扣自動算，現價可以一鍵更新台股收盤價。只有你自己看得到。" },
+  { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，別人送的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
@@ -2499,4 +2525,381 @@ $("formRb").addEventListener("submit", async ev=>{
 $("rbUndo").onclick=async()=>{
   try{ await updateDoc(doc(db,"ledgers",L().id,"entries",S.rbEdit.id), { rb:{s:"pending"}, updatedAt:serverTimestamp() }); $("dlgRb").close(); toast("已改回待請款"); }
   catch(err){ msg("rbMsg","失敗："+errText(err),"err"); }
+};
+
+/* ================= 清單（待購、待產包、備忘） ================= */
+/* lists/{id}：名稱、顏色、成員（和帳本一樣可以分享）、記事 memo；項目放在 lists/{id}/items */
+const LIST_TEMPLATES={
+  "待產包":{ color:"#b23a5a", items:[
+    ["產褥墊","媽媽"],["免洗褲","媽媽"],["哺乳內衣","媽媽"],["溢乳墊","媽媽"],["月子帽／保暖外套","媽媽"],["束腹帶","媽媽"],["吸管保溫杯","媽媽"],["拖鞋","媽媽"],["盥洗用品","媽媽"],["媽媽手冊、健保卡、身分證","證件"],
+    ["紗布衣","寶寶"],["包巾","寶寶"],["紗布巾","寶寶"],["新生兒尿布（NB）","寶寶"],["濕紙巾","寶寶"],["出院衣服","寶寶"],["嬰兒汽座（出院用）","寶寶"] ]},
+  "寶寶用品":{ color:"#2f5fa8", items:[
+    ["奶瓶","餵奶"],["奶嘴","餵奶"],["奶瓶消毒鍋","餵奶"],["溫奶器","餵奶"],["嬰兒床","睡覺"],["床包／防水墊","睡覺"],["澡盆","洗澡"],["嬰兒沐浴乳","洗澡"],["指甲剪","護理"],["耳溫槍","護理"],["推車","外出"],["揹巾","外出"] ]},
+  "待購清單":{ color:"#1d6b52", items:[] },
+  "空白":{ color:"#4f6470", items:[] }
+};
+const PRIO_RANK={"高":0,"中":1,"低":2,"":3};
+const LI = () => S.lists.get(S.listId);
+S.lists=new Map(); S.listItems=[];
+
+function watchLists(){
+  stopLists(); S.listsReady=false;
+  S.unsubLists=onSnapshot(query(collection(db,"lists"), where("members","array-contains", S.email)), snap=>{
+    S.lists=new Map(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.listsReady=true;
+    if(S.listId){
+      if(!S.lists.has(S.listId)){ if(!S.listDeleting) toast("你已經看不到這個清單了"); S.listDeleting=false; stopItems(); S.listId=null; location.hash="#lists"; return; }
+      renderListHead(); renderListItems(); if($("dlgListSet").open) renderListSet(false);
+    } else if(location.hash==="#lists") renderLists();
+  }, e=>msg("listsMsg","讀取清單失敗："+errText(e),"err"));
+}
+function stopLists(){ if(S.unsubLists){ S.unsubLists(); S.unsubLists=null; } S.lists=new Map(); }
+function watchItems(id){
+  stopItems(); const tok=S.itemsTok={}; S.itemsReady=false;
+  S.unsubItems=onSnapshot(collection(db,"lists",id,"items"), snap=>{ if(tok!==S.itemsTok) return;
+    S.listItems=snap.docs.map(d=>({id:d.id,...d.data()})); S.itemsReady=true; renderListItems(); }, e=>msg("liMsg","讀取項目失敗："+errText(e),"err"));
+}
+function stopItems(){ S.itemsTok=null; if(S.unsubItems){ S.unsubItems(); S.unsubItems=null; } S.listItems=[]; }
+const listRole = x => x.ownerUid===S.user.uid ? "擁有者" : (x.editors||[]).includes(S.email) ? "可編輯" : "僅檢視";
+const canEditList = x => x && (x.ownerUid===S.user.uid || (x.editors||[]).includes(S.email));
+
+/* 清單列表 */
+function renderLists(){
+  tipsFor("tipLists", [["lists","把手機備忘錄裡的清單搬過來：待產包、寶寶用品、想買的東西都可以。每項可以填預估金額，上方會算還要準備多少錢；打勾時可以順便記一筆支出到帳本。清單也能分享給家人一起勾。"]]);
+  const mine=[], shared=[];
+  [...S.lists.values()].sort((a,b)=>(a.name||"").localeCompare(b.name||"","zh-Hant")).forEach(x=>(x.ownerUid===S.user.uid?mine:shared).push(x));
+  const g=$("myLists"); g.textContent="";
+  if(!S.listsReady) g.appendChild(el("p","small muted","讀取中…"));
+  else if(!mine.length){ const e=el("div","empty"); e.appendChild(el("strong",null,"還沒有清單"));
+    e.appendChild(document.createTextNode("按「＋ 新增清單」，可以從待產包、寶寶用品範本開始，常見項目會先幫你列好。")); g.appendChild(e); }
+  mine.forEach(x=>g.appendChild(listCard(x)));
+  $("sharedListsWrap").hidden=!shared.length; const sg=$("sharedLists"); sg.textContent=""; shared.forEach(x=>sg.appendChild(listCard(x)));
+}
+function listCard(x){
+  const b=el("button","lcard"); b.type="button"; b.onclick=()=>{ location.hash="#list/"+x.id; };
+  const n=el("div","name"); const d=el("span","dot"); d.style.background=x.color||COLORS[0]; n.append(d, document.createTextNode(x.name)); b.appendChild(n);
+  const st=x.stats||{};
+  b.appendChild(el("div","meta", typeof st.left==="number" ? `還有 ${st.left} 項` + (st.need?`・還需準備 ${money(st.need)}`:"") + (st.done?`・已完成 ${st.done} 項`:"") : "點進去新增項目"));
+  const others=(x.members||[]).length-1;
+  b.appendChild(el("div","meta", x.ownerUid===S.user.uid ? (others>0?`與 ${others} 人共用`:"只有你看得到") : `${x.ownerEmail} 分享・${listRole(x)}`));
+  return b;
+}
+
+/* 新增清單 */
+let nlColor=COLORS[0];
+$("btnNewList").onclick=()=>{
+  msg("nlMsg",""); $("nlName").value=""; $("nlSeed").checked=true;
+  const box=$("nlTemplates"); box.textContent="";
+  Object.keys(LIST_TEMPLATES).forEach(k=>{ const c=el("button","chip",k); c.type="button"; c.onclick=()=>pickListTpl(k); box.appendChild(c); });
+  pickListTpl("待產包"); $("dlgNewList").showModal();
+};
+function pickListTpl(k){
+  const t=LIST_TEMPLATES[k]; S.nlTpl=k;
+  document.querySelectorAll("#nlTemplates .chip").forEach(c=>c.setAttribute("aria-pressed", c.textContent===k));
+  $("nlName").value = k==="空白" ? "" : k; nlColor=t.color;
+  $("nlSeedWrap").hidden=!t.items.length; $("nlSeedText").textContent=`帶入 ${t.items.length} 個常見項目（之後可以刪改）`;
+  swatches("nlColors", nlColor, c=>{ nlColor=c; });
+}
+$("formNewList").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault();
+  const name=$("nlName").value.trim().slice(0,40); if(!name){ msg("nlMsg","請輸入清單名稱。","err"); return; }
+  $("nlCreate").disabled=true;
+  try{
+    const ref=await addDoc(collection(db,"lists"), { name, color:nlColor, ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email], memo:"",
+      createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+    const t=LIST_TEMPLATES[S.nlTpl];
+    if(t && t.items.length && $("nlSeed").checked && !$("nlSeedWrap").hidden){
+      const b=writeBatch(db), base=Date.now();
+      t.items.forEach(([text,group],i)=>b.set(doc(collection(db,"lists",ref.id,"items")), newItem(text,0,"",base+i,group)));
+      await b.commit();
+    }
+    $("dlgNewList").close(); location.hash="#list/"+ref.id;
+  }catch(e){ msg("nlMsg","建立失敗："+errText(e),"err"); }
+  finally{ $("nlCreate").disabled=false; }
+});
+const newItem=(text,amount,note,order,group)=>({ text:String(text).slice(0,100), amount:Math.max(0,Math.round(amount||0)), priority:"", due:"", note:String(note||"").slice(0,200),
+  group:String(group||"").slice(0,20), via:"", done:false, doneAt:"", spent:0, ledgerId:"", entryId:"", order, createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+
+/* 單一清單 */
+function openList(id){
+  S.listId=id; show("viewList");
+  if(S.itemsFor!==id){ S.itemsFor=id; watchItems(id); $("liMemo").value=""; S.memoFor=null; S.addGroup=""; S.newGroupOpen=false; }
+  renderListHead(); renderListItems();
+}
+$("liBack").onclick=()=>{ location.hash="#lists"; };
+function renderListHead(){
+  const x=LI(); if(!x){ $("liName").textContent=S.listsReady?"找不到這個清單":"讀取中…"; return; }
+  document.title=x.name+"・記帳本";
+  $("liName").textContent=x.name; $("liDot").style.background=x.color||COLORS[0]; $("liRole").textContent=listRole(x);
+  const ed=canEditList(x); $("liAddForm").hidden=!ed; $("liMemo").readOnly=!ed;
+  if(S.memoFor!==x.id || document.activeElement!==$("liMemo")){ if(S.memoFor!==x.id || !S.memoDirty){ $("liMemo").value=x.memo||""; S.memoFor=x.id; } }
+}
+function sortItems(a,b){ return (PRIO_RANK[a.priority||""]-PRIO_RANK[b.priority||""]) || ((a.due||"9999")<(b.due||"9999")?-1:(a.due||"9999")>(b.due||"9999")?1:0) || ((a.order||0)-(b.order||0)); }
+/* 分組：照每組第一個項目的先後排；沒分組的放最上面 */
+const listGroups = () => { const first=new Map(); S.listItems.forEach(i=>{ const g=i.group||""; if(g && (!first.has(g) || (i.order||0)<first.get(g))) first.set(g,i.order||0); });
+  return [...first.entries()].sort((a,b)=>a[1]-b[1]).map(e=>e[0]); };
+function renderGroupPick(x){
+  const box=$("liGroupPick"); box.textContent=""; const gs=listGroups();
+  if(S.addGroup && !gs.includes(S.addGroup)) gs.push(S.addGroup);
+  box.appendChild(el("span","small muted","加到："));
+  ["",...gs].forEach(g=>{ const b=el("button","chip",g||"不分組"); b.type="button"; b.setAttribute("aria-pressed", g===(S.addGroup||""));
+    b.onclick=()=>{ S.addGroup=g; renderGroupPick(x); $("liAddText").focus(); }; box.appendChild(b); });
+  if(S.newGroupOpen){
+    const inp=el("input"); inp.type="text"; inp.maxLength=20; inp.placeholder="新分組名稱，按 Enter"; inp.className="li-newgroup"; inp.setAttribute("aria-label","新分組名稱");
+    inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const v=inp.value.trim().slice(0,20); if(v){ S.addGroup=v; } S.newGroupOpen=false; renderGroupPick(x); $("liAddText").focus(); }
+      if(e.key==="Escape"){ S.newGroupOpen=false; renderGroupPick(x); } };
+    box.appendChild(inp); setTimeout(()=>inp.focus(),0);
+  } else { const nb=el("button","chip add","＋ 新分組"); nb.type="button"; nb.onclick=()=>{ S.newGroupOpen=true; renderGroupPick(x); }; box.appendChild(nb); }
+  $("liAddText").placeholder = S.addGroup ? `新增到「${S.addGroup}」，例如：紗布衣` : "新增項目，例如：紗布衣";
+}
+function renderListItems(){
+  const x=LI(); if(!x) return; const ed=canEditList(x);
+  if(ed && !(S.newGroupOpen && document.activeElement && document.activeElement.classList.contains("li-newgroup"))) renderGroupPick(x);
+  const todo=S.listItems.filter(i=>!i.done).sort(sortItems), done=S.listItems.filter(i=>i.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||""));
+  const need=todo.reduce((t,i)=>t+(i.amount||0),0), spent=done.reduce((t,i)=>t+(i.spent||0),0), noAmt=todo.filter(i=>!i.amount).length;
+  $("liLeftN").textContent=`${todo.length} 項`; $("liNeed").textContent=money(need); $("liDoneN").textContent=`${done.length} 項`;
+  $("liSpent").textContent = spent ? `實際花了 ${money(spent)}` : "";
+  if(noAmt && todo.length) $("liNeed").title=`有 ${noAmt} 項沒填金額`;
+  $("liMeter").firstElementChild.style.width = S.listItems.length ? (done.length/S.listItems.length*100)+"%" : "0";
+  const box=$("liItems"); box.textContent="";
+  if(!S.itemsReady) box.appendChild(el("p","small muted","讀取中…"));
+  else if(!todo.length) box.appendChild(el("p","small muted", done.length ? "全部完成了！" : "還沒有項目，在上面輸入就能加入。"));
+  const gs=listGroups();
+  if(!gs.length) todo.forEach(i=>box.appendChild(itemRow(x,i,ed)));
+  else ["",...gs].forEach(g=>{
+    const its=todo.filter(i=>(i.group||"")===g); if(!its.length) return;
+    if(g){ const h=el("div","li-ghead"); const nd=its.reduce((t,i)=>t+(i.amount||0),0);
+      h.append(el("span",null,g), el("span","small muted",`${its.length} 項`+(nd?`・${money(nd)}`:""))); box.appendChild(h); }
+    its.forEach(i=>box.appendChild(itemRow(x,i,ed,true)));
+  });
+  $("liDoneWrap").hidden=!done.length; $("liDoneSum").textContent=`已完成 ${done.length} 項` + (spent?`・實際花了 ${money(spent)}`:"");
+  const db2=$("liDone"); db2.textContent=""; done.forEach(i=>db2.appendChild(itemRow(x,i,ed)));
+  // 把摘要存回清單，列表頁就能直接顯示（只有可編輯的人會寫）
+  const st={left:todo.length, need, done:done.length};
+  if(ed && S.itemsReady && JSON.stringify(st)!==JSON.stringify(x.stats||{})){
+    const uid=S.user.uid; clearTimeout(S.statsT);
+    S.statsT=setTimeout(()=>{ if(!S.user || S.user.uid!==uid) return; updateDoc(doc(db,"lists",x.id), {stats:st}).catch(()=>{}); }, 600);
+  }
+}
+function itemRow(x,i,ed,grouped){
+  const r=el("div","li-row"+(i.done?" done":""));
+  const cb=el("input"); cb.type="checkbox"; cb.checked=!!i.done; cb.disabled=!ed; cb.setAttribute("aria-label",(i.done?"改回未完成：":"完成：")+i.text);
+  cb.onclick=ev=>{ ev.preventDefault(); if(i.done) undoItem(x,i); else openBuy(x,i); };
+  const main=el("div","li-main"); main.appendChild(el("div","li-text",i.text));
+  const meta=[]; if(i.group && !grouped) meta.push(i.group); if(i.priority) meta.push(`優先 ${i.priority}`); if(i.due) meta.push(`${i.due.slice(5).replace("-","/")} 前`); if(i.note) meta.push(i.note);
+  if(i.done){ if(i.via==="gift") meta.push("別人送的／已經有"); if(i.spent) meta.push(`實際 ${fmt(i.spent)}`); if(i.ledgerId){ const lg=S.ledgers.get(i.ledgerId); meta.push(lg?`已記到「${lg.name}」`:"已記帳"); } }
+  if(meta.length) main.appendChild(el("div","li-meta",meta.join("・")));
+  const right=el("div","li-right");
+  if(i.amount && !i.done) right.appendChild(el("span","num",fmt(i.amount)));
+  if(i.priority==="高" && !i.done) r.classList.add("hi");
+  if(i.due && !i.done && i.due<todayStr()) r.classList.add("late");
+  r.append(cb, main, right);
+  if(ed){ main.tabIndex=0; main.setAttribute("role","button"); main.onclick=()=>openItem(i); main.onkeydown=e=>{ if(e.key==="Enter") openItem(i); }; }
+  return r;
+}
+$("liAddForm").addEventListener("submit", async ev=>{
+  ev.preventDefault(); const x=LI(); if(!x) return;
+  const t=$("liAddText").value.trim(); if(!t){ $("liAddText").focus(); return; }
+  const a=Math.round(Number($("liAddAmt").value)||0);
+  $("liAddText").value=""; $("liAddAmt").value=""; $("liAddText").focus();
+  try{ await addDoc(collection(db,"lists",x.id,"items"), newItem(t,a,"",Date.now(),S.addGroup||"")); }
+  catch(e){ msg("liMsg","新增失敗："+errText(e),"err"); }
+});
+/* 記事：打字停下來 0.8 秒自動存 */
+$("liMemo").addEventListener("input", ()=>{
+  const x=LI(); if(!x || !canEditList(x)) return; S.memoDirty=true; $("liMemoState").textContent="儲存中…";
+  clearTimeout(S.memoT); const id=x.id, v=$("liMemo").value.slice(0,5000);
+  S.memoT=setTimeout(async()=>{ try{ await updateDoc(doc(db,"lists",id), {memo:v, updatedAt:serverTimestamp()}); S.memoDirty=false; $("liMemoState").textContent="已自動儲存"; }
+    catch(e){ $("liMemoState").textContent="儲存失敗："+errText(e); } }, 800);
+});
+
+/* 修改項目 */
+function openItem(i){
+  S.itEdit=i; msg("itMsg","");
+  $("itText").value=i.text; $("itAmt").value=i.amount||""; $("itDue").value=i.due||""; $("itNote").value=i.note||""; $("itGroup").value=i.group||"";
+  const dl=$("dlItGroups"); dl.textContent=""; listGroups().forEach(g=>{ const o=el("option"); o.value=g; dl.appendChild(o); });
+  setItPrio(i.priority||"");
+  $("itDoneInfo").hidden=!i.done; if(i.done) $("itDoneInfo").textContent=`${i.doneAt?i.doneAt.replace(/-/g,"/")+" ":""}完成` + (i.spent?`，實際花了 ${money(i.spent)}`:"") + "。要改回未完成，點項目前面的勾勾。";
+  $("itDelete").dataset.armed=""; $("itDelete").textContent="刪除";
+  $("dlgItem").showModal();
+}
+function setItPrio(p){ S.itPrio=p; document.querySelectorAll("#itPrio button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.p===p)); }
+document.querySelectorAll("#itPrio button").forEach(b=>b.onclick=()=>setItPrio(b.dataset.p));
+$("formItem").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault();
+  const t=$("itText").value.trim(); if(!t){ msg("itMsg","請填項目名稱。","err"); return; }
+  try{ await updateDoc(doc(db,"lists",S.listId,"items",S.itEdit.id), { text:t.slice(0,100), amount:Math.max(0,Math.round(Number($("itAmt").value)||0)),
+      due:$("itDue").value||"", priority:S.itPrio, note:$("itNote").value.trim().slice(0,200), group:$("itGroup").value.trim().slice(0,20), updatedAt:serverTimestamp() });
+    $("dlgItem").close(); }
+  catch(e){ msg("itMsg","儲存失敗："+errText(e),"err"); }
+});
+$("itDelete").onclick=async()=>{
+  const b=$("itDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？"; return; }
+  try{ await deleteDoc(doc(db,"lists",S.listId,"items",S.itEdit.id)); $("dlgItem").close(); toast("已刪除"); }
+  catch(e){ msg("itMsg","刪除失敗："+errText(e),"err"); }
+};
+
+/* 打勾：買好了，可以順便記帳 */
+function fillBuyCats(){
+  const l=S.ledgers.get($("byLedger").value), sel=$("byCat"); sel.textContent=""; sel.disabled=!l; $("byPay").disabled=!l; $("byDate").disabled=!l;
+  if(!l){ sel.appendChild(el("option",null,"—")); $("byNote").textContent="只打勾完成，不記帳。"; return; }
+  const last=store.get("ledger.buyCat");
+  (l.categories||[]).filter(c=>c.type==="out").forEach(c=>{ const o=el("option",null,c.name); o.value=c.id; o.selected=c.id===last; sel.appendChild(o); });
+  $("byNote").textContent=`會在「${l.name}」記一筆支出；之後取消打勾，那筆也會一起刪掉。`;
+  renderBuySplit();
+}
+/* 買好了：記到有開 AA 的帳本時，可以選誰付的、怎麼分攤 */
+function renderBuySplit(){
+  const l=S.ledgers.get($("byLedger").value), aa=l && aaOn(l);
+  $("byPayerBox").hidden=!l; $("bySplitBox").hidden=!aa;
+  if(!l) return;
+  const people = aa ? l.split.people : [...new Set([...P().payers])];
+  $("byPayerBox").hidden = !people.length;
+  if(S.byPayer==null) S.byPayer = P().defaultPayer && people.includes(P().defaultPayer) ? P().defaultPayer : (people[0]||"");
+  const pc=$("byPayerChips"); pc.textContent="";
+  people.forEach(p=>{ const b=el("button","chip",p); b.type="button"; b.setAttribute("aria-pressed", p===S.byPayer); b.onclick=()=>{ S.byPayer = S.byPayer===p ? "" : p; renderBuySplit(); }; pc.appendChild(b); });
+  if(!aa) return;
+  document.querySelectorAll("#bySplitMode button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===S.bySplit.m));
+  const grid=$("bySplitCustom"); grid.textContent="";
+  const amt=Math.round(Number($("byAmt").value)||0), ratio=l.split.ratio||evenRatio(people);
+  if(S.bySplit.m==="a"){
+    if(people.some(p=>S.bySplit.r[p]==null)) S.bySplit.r=splitAmtDefault(people, ratio, amt);
+    people.forEach((p,idx)=>{ const lab=el("label",null,p); const w=el("span","pct-in"); const inp=el("input"); inp.type="number"; inp.min="0"; inp.step="1"; inp.inputMode="numeric";
+      inp.value=S.bySplit.r[p]; inp.dataset.p=p; inp.setAttribute("aria-label",p+" 分攤金額");
+      inp.addEventListener("input",()=>{ S.bySplit.r[p]=Number(inp.value)||0;
+        if(people.length===2){ const o=people[1-idx], a=Math.round(Number($("byAmt").value)||0); S.bySplit.r[o]=Math.max(a-S.bySplit.r[p],0); const oi=grid.querySelector(`input[data-p="${o}"]`); if(oi) oi.value=S.bySplit.r[o]; }
+        buySplitNote(); });
+      w.append(document.createTextNode("NT$ "), inp); lab.appendChild(w); grid.appendChild(lab); });
+  }
+  buySplitNote();
+}
+function buySplitNote(){
+  const l=S.ledgers.get($("byLedger").value); if(!l || !aaOn(l)) return;
+  const n=$("bySplitNote"), people=l.split.people, amt=Math.round(Number($("byAmt").value)||0); n.classList.remove("warn-text");
+  if(!S.byPayer){ n.classList.add("warn-text"); n.textContent="選一下誰付的，這筆才會算進 AA 結算。"; return; }
+  if(S.bySplit.m==="s"){ n.textContent=`全部算 ${S.byPayer} 自己的。`; return; }
+  if(S.bySplit.m==="a"){ const sum=people.reduce((t,p)=>t+(Number(S.bySplit.r[p])||0),0);
+    if(sum!==amt){ n.classList.add("warn-text"); n.textContent=`每人金額加起來 ${money(sum)}，要等於 ${money(amt)}。`; return; }
+    n.textContent=people.map(p=>`${p} 分攤 ${money(S.bySplit.r[p]||0)}`).join("・"); return; }
+  const r=l.split.ratio||evenRatio(people); n.textContent = people.map(p=>`${p} ${r[p]}%` + (amt?`（${money(amt*(Number(r[p])||0)/100)}）`:"")).join("・");
+}
+document.querySelectorAll("#bySplitMode button").forEach(b=>b.onclick=()=>{ S.bySplit.m=b.dataset.m; if(b.dataset.m==="a") S.bySplit.r={}; renderBuySplit(); });
+$("byAmt").addEventListener("input", ()=>{ const l=S.ledgers.get($("byLedger").value); if(!l || !aaOn(l)) return;
+  if(S.bySplit.m==="a" && l.split.people.length===2){ const [a,b]=l.split.people, amt=Math.round(Number($("byAmt").value)||0);
+    S.bySplit.r[b]=Math.max(amt-(Number(S.bySplit.r[a])||0),0); const bi=$("bySplitCustom").querySelector(`input[data-p="${b}"]`); if(bi) bi.value=S.bySplit.r[b]; }
+  buySplitNote(); });
+$("byLedger").addEventListener("change", fillBuyCats);
+function openBuy(x,i){
+  S.buyItem=i; msg("byMsg",""); S.byPayer=null; S.bySplit={m:"d", r:{}};
+  $("byWhat").textContent=`${i.text}` + (i.amount?`（預估 ${money(i.amount)}）`:"");
+  $("byAmt").value=i.amount||"";
+  const sel=$("byLedger"); sel.textContent=""; const none=el("option",null,"不記帳，只打勾"); none.value=""; sel.appendChild(none);
+  [...S.ledgers.values()].filter(canEdit).forEach(l=>{ const o=el("option",null,l.name); o.value=l.id; sel.appendChild(o); });
+  const last=store.get("ledger.buyLedger"); sel.value = last!=null && [...sel.options].some(o=>o.value===last) ? last : "";
+  $("byDate").value=todayStr(); fillPayOptions("byPay", P().defaultPay||"現金", "out"); fillBuyCats();
+  $("dlgBuy").showModal(); setTimeout(()=>$("byAmt").focus(),50);
+}
+$("formBuy").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault();
+  const x=LI(), i=S.buyItem, amt=Math.max(0,Math.round(Number($("byAmt").value)||0)), lid=$("byLedger").value, l=S.ledgers.get(lid);
+  const date=$("byDate").value||todayStr();
+  if(l && !amt){ msg("byMsg","要記帳的話請填實際金額，或選「不記帳，只打勾」。","err"); return; }
+  let split=null;
+  if(l && aaOn(l)){
+    if(S.bySplit.m==="a"){ const sum=l.split.people.reduce((t,p)=>t+(Number(S.bySplit.r[p])||0),0);
+      if(sum!==amt){ msg("byMsg",`每人分攤的金額加起來要等於 ${money(amt)}。`,"err"); return; }
+      split={m:"a", r:Object.fromEntries(l.split.people.map(p=>[p,Math.round(Number(S.bySplit.r[p])||0)]))}; }
+    else split={m:S.bySplit.m};
+  }
+  $("bySave").disabled=true;
+  try{
+    let entryId="";
+    if(l){
+      const cat=(l.categories||[]).find(c=>c.id===$("byCat").value) || (l.categories||[]).find(c=>c.type==="out");
+      const ref=doc(collection(db,"ledgers",l.id,"entries"));
+      await setDoc(ref, { type:"out", amount:amt, categoryId:cat?cat.id:"other", categoryName:cat?cat.name:"其他", date,
+        note:`${i.text}（${x.name}）`.slice(0,100), pay:$("byPay").value||"現金", card:"", payer:(S.byPayer||"").slice(0,20), status:"paid", ...(split?{split}:{}),
+        createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+      entryId=ref.id; store.set("ledger.buyCat", cat?cat.id:"");
+    }
+    store.set("ledger.buyLedger", lid);
+    await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:true, doneAt:todayStr(), spent:amt, ledgerId:l?l.id:"", entryId, via:"", updatedAt:serverTimestamp() });
+    $("dlgBuy").close(); toast(l ? `完成，並記到「${l.name}」${money(amt)}` : "完成");
+  }catch(e){ msg("byMsg","儲存失敗："+errText(e),"err"); }
+  finally{ $("bySave").disabled=false; }
+});
+$("byGift").onclick=async()=>{
+  const x=LI(), i=S.buyItem;
+  try{ await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:true, doneAt:todayStr(), spent:0, ledgerId:"", entryId:"", via:"gift", updatedAt:serverTimestamp() });
+    $("dlgBuy").close(); toast("已標記：別人送的／已經有了"); }
+  catch(e){ msg("byMsg","儲存失敗："+errText(e),"err"); }
+};
+async function undoItem(x,i){
+  try{
+    let note="";
+    if(i.ledgerId && i.entryId){ try{ await deleteDoc(doc(db,"ledgers",i.ledgerId,"entries",i.entryId)); note="（帳本裡那筆也刪掉了）"; }catch(e){ note="（帳本裡那筆沒辦法刪，請自己到帳本刪除）"; } }
+    await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:false, doneAt:"", spent:0, ledgerId:"", entryId:"", via:"", updatedAt:serverTimestamp() });
+    toast("已改回未完成"+note);
+  }catch(e){ toast("更新失敗："+errText(e)); }
+}
+
+/* 清單設定：改名、顏色、分享、刪除／離開 */
+let lsColor=COLORS[0];
+$("liSetBtn").onclick=()=>{ renderListSet(true); $("dlgListSet").showModal(); };
+function renderListSet(reset){
+  const x=LI(); if(!x) return; const owner=x.ownerUid===S.user.uid;
+  $("lsOwnerBox").hidden=!owner; $("lsDelete").hidden=!owner; $("lsLeave").hidden=owner;
+  if(reset){ msg("lsMsg",""); $("lsName").value=x.name; lsColor=x.color||COLORS[0]; swatches("lsColors", lsColor, c=>{ lsColor=c; });
+    $("lsDelete").dataset.armed=""; $("lsDelete").textContent="刪除這個清單"; $("lsLeave").dataset.armed=""; $("lsLeave").textContent="離開這個清單"; }
+  if(!owner) return;
+  const mb=$("lsMembers"); mb.textContent="";
+  const me=el("div","member"); me.append(el("span","em",x.ownerEmail+"（你）"), el("span","badge","擁有者")); mb.appendChild(me);
+  [...(x.editors||[]).map(e=>[e,"editor"]), ...(x.viewers||[]).map(e=>[e,"viewer"])].forEach(([em,role])=>{
+    const r=el("div","member"); const sel=el("select"); sel.setAttribute("aria-label",em+" 的權限");
+    [["editor","可編輯"],["viewer","僅檢視"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; o.selected=v===role; sel.appendChild(o); });
+    sel.onchange=()=>setListMember(em, sel.value);
+    const rm=el("button","btn","移除"); rm.type="button";
+    rm.onclick=()=>{ if(!rm.dataset.armed){ rm.dataset.armed="1"; rm.textContent="確定移除？"; rm.classList.add("danger"); return; } setListMember(em,null); };
+    r.append(el("span","em",em), sel, rm); mb.appendChild(r); });
+  if(!(x.editors||[]).length && !(x.viewers||[]).length) mb.appendChild(el("p","small muted","目前只有你看得到這個清單。"));
+}
+async function setListMember(email, role){
+  const x=LI();
+  const editors=(x.editors||[]).filter(e=>e!==email), viewers=(x.viewers||[]).filter(e=>e!==email);
+  if(role==="editor") editors.push(email); if(role==="viewer") viewers.push(email);
+  try{ await updateDoc(doc(db,"lists",x.id), { editors, viewers, members:[x.ownerEmail, ...editors, ...viewers], updatedAt:serverTimestamp() });
+    msg("lsMsg", role ? `已分享給 ${email}（${role==="editor"?"可編輯":"僅檢視"}）` : `已移除 ${email}`, "ok"); }
+  catch(e){ msg("lsMsg","更新失敗："+errText(e),"err"); }
+}
+$("lsInvite").onclick=()=>{
+  const em=$("lsEmail").value.trim().toLowerCase(), x=LI();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ msg("lsMsg","請輸入正確的 Email。","err"); return; }
+  if(em===x.ownerEmail){ msg("lsMsg","這是你自己的 Email。","err"); return; }
+  $("lsEmail").value=""; setListMember(em, $("lsRole").value);
+};
+$("lsEmail").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("lsInvite").click(); } });
+$("lsSaveName").onclick=async()=>{
+  const x=LI(), name=$("lsName").value.trim().slice(0,40); if(!name){ msg("lsMsg","請輸入名稱。","err"); return; }
+  try{ await updateDoc(doc(db,"lists",x.id), { name, color:lsColor, updatedAt:serverTimestamp() }); msg("lsMsg","已儲存。","ok"); }
+  catch(e){ msg("lsMsg","儲存失敗："+errText(e),"err"); }
+};
+$("lsClose").onclick=()=>$("dlgListSet").close();
+$("lsDelete").onclick=async()=>{
+  const b=$("lsDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？所有項目和記事都會刪掉（已記到帳本的不受影響）"; return; }
+  const x=LI();
+  try{ const snap=await getDocs(collection(db,"lists",x.id,"items"));
+    for(let k=0;k<snap.docs.length;k+=400){ const bt=writeBatch(db); snap.docs.slice(k,k+400).forEach(d=>bt.delete(d.ref)); await bt.commit(); }
+    stopItems(); S.itemsFor=null; S.listDeleting=true; await deleteDoc(doc(db,"lists",x.id));
+    $("dlgListSet").close(); S.listId=null; location.hash="#lists"; toast("清單已刪除"); }
+  catch(e){ S.listDeleting=false; msg("lsMsg","刪除失敗："+errText(e),"err"); }
+};
+$("lsLeave").onclick=async()=>{
+  const b=$("lsLeave"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定要離開？"; return; }
+  const x=LI();
+  try{ stopItems(); S.itemsFor=null; S.listDeleting=true;
+    await updateDoc(doc(db,"lists",x.id), { members:(x.members||[]).filter(e=>e!==S.email), editors:(x.editors||[]).filter(e=>e!==S.email), viewers:(x.viewers||[]).filter(e=>e!==S.email), updatedAt:serverTimestamp() });
+    $("dlgListSet").close(); S.listId=null; location.hash="#lists"; toast("已離開這個清單"); }
+  catch(e){ S.listDeleting=false; msg("lsMsg","離開失敗："+errText(e),"err"); }
 };
