@@ -598,6 +598,8 @@ function renderList(){
       if(isRb(e)) meta.push(e.rb.s==="pending" ? "代墊・請款中" : `代墊・${e.rb.d?e.rb.d.slice(5).replace("-","/")+" ":""}已收回 ${fmt(e.rb.a||0)}`);
       if(aaOn(l) && e.type==="out" && e.split && e.split.m==="s") meta.push("只算付款人");
       if(aaOn(l) && e.type==="out" && e.split && e.split.m==="c") meta.push("自訂分攤 "+l.split.people.map(p=>`${p}${(e.split.r||{})[p]||0}%`).join("／"));
+      if(aaOn(l) && e.type==="out" && e.split && e.split.m==="a"){ const r=e.split.r||{}, tot=l.split.people.reduce((t,p)=>t+(r[p]||0),0)||1;
+        meta.push("自訂分攤 "+l.split.people.map(p=>`${p} ${e.inst ? fmt(e.amount*(r[p]||0)/tot) : fmt(r[p]||0)}`).join("／")); }
       if(shared && e.createdByEmail) meta.push(e.createdByEmail===S.email?"我記的":e.createdByEmail.split("@")[0]+" 記的");
       main.appendChild(el("div","meta", meta.join("・")));
       const right=el("div","entry-right");
@@ -896,6 +898,10 @@ $("formEntry").addEventListener("submit", async ev=>{
       const sum=l.split.people.reduce((s,p)=>s+(Number(S.eSplit.r[p])||0),0);
       if(Math.abs(sum-100)>0.01){ msg("eMsg",`自訂分攤的比例加起來要是 100%（目前 ${sum}%）。`,"err"); return; }
       common.split={m:"c", r:Object.fromEntries(l.split.people.map(p=>[p,Number(S.eSplit.r[p])||0]))};
+    } else if(S.eSplit.m==="a"){
+      const sum=l.split.people.reduce((s,p)=>s+(Number(S.eSplit.r[p])||0),0);
+      if(sum!==amt){ msg("eMsg",`每人分攤的金額加起來要等於 ${money(amt)}（目前 ${money(sum)}）。`,"err"); return; }
+      common.split={m:"a", r:Object.fromEntries(l.split.people.map(p=>[p,Math.round(Number(S.eSplit.r[p])||0)]))};
     } else common.split={m:S.eSplit.m};
   }
   $("ePay").dataset.last=pay; if(isCard) $("eCard").dataset.last=common.card;
@@ -1960,7 +1966,7 @@ function computeAA(l){
     row[e.payer].paid+=amt;
     const sp=e.split||{m:"d"};
     if(sp.m==="s"){ row[e.payer].share+=amt; return; }
-    const r = sp.m==="c" && sp.r ? sp.r : ratio;
+    const r = (sp.m==="c" || sp.m==="a") && sp.r ? sp.r : ratio;
     const tot=people.reduce((s,p)=>s+(Number(r[p])||0),0) || 100;
     people.forEach(p=>row[p].share += amt*(Number(r[p])||0)/tot);
   });
@@ -2019,16 +2025,32 @@ function renderAA(){
 }
 
 /* 記一筆：這筆怎麼分攤 */
+/* 這筆自訂：可以用比例（m:"c"，r 是 %）或直接填金額（m:"a"，r 是每人金額）。
+   結算時兩種都當權重算：分攤 = 金額 × 自己的數字 ÷ 大家的數字加總，所以金額模式也能正確套到分期或代墊差額 */
+function splitAmtDefault(people, ratio, amt){
+  let acc=0; const o={}; people.forEach((p,i)=>{ if(i===people.length-1) o[p]=amt-acc; else { o[p]=Math.round(amt*(Number(ratio[p])||0)/100); acc+=o[p]; } }); return o;
+}
 function renderSplitUI(){
   const l=L(), show=aaOn(l) && S.eType==="out";
   $("eSplitBox").hidden=!show; if(!show) return;
-  document.querySelectorAll("#eSplitMode button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===S.eSplit.m));
+  const custom=S.eSplit.m==="c"||S.eSplit.m==="a";
+  document.querySelectorAll("#eSplitMode button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m==="c" ? custom : b.dataset.m===S.eSplit.m));
   const people=l.split.people, ratio=l.split.ratio||evenRatio(people), grid=$("eSplitCustom"); grid.textContent="";
-  if(S.eSplit.m==="c"){
+  $("eSplitUnit").hidden=!custom;
+  document.querySelectorAll("#eSplitUnit button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.u===S.eSplit.m));
+  if(custom){
+    const amtMode=S.eSplit.m==="a", amt=Math.round(Number($("eAmount").value)||0);
+    if(amtMode && people.some(p=>S.eSplit.r[p]==null)) S.eSplit.r=splitAmtDefault(people, ratio, amt);
     people.forEach(p=>{ if(S.eSplit.r[p]==null) S.eSplit.r[p]=ratio[p]; });
-    people.forEach(p=>{ const lab=el("label",null,p); const w=el("span","pct-in"); const inp=el("input"); inp.type="number"; inp.min="0"; inp.max="100"; inp.step="any"; inp.inputMode="decimal";
-      inp.value=S.eSplit.r[p]; inp.setAttribute("aria-label",p+" 分攤比例"); inp.addEventListener("input",()=>{ S.eSplit.r[p]=Number(inp.value)||0; splitNote(); });
-      w.append(inp, document.createTextNode("%")); lab.appendChild(w); grid.appendChild(lab); });
+    people.forEach((p,idx)=>{ const lab=el("label",null,p); const w=el("span","pct-in"); const inp=el("input"); inp.type="number"; inp.min="0"; inp.step=amtMode?"1":"any"; inp.inputMode=amtMode?"numeric":"decimal";
+      if(!amtMode) inp.max="100";
+      inp.value=S.eSplit.r[p]; inp.dataset.p=p; inp.setAttribute("aria-label",p+(amtMode?" 分攤金額":" 分攤比例"));
+      inp.addEventListener("input",()=>{ S.eSplit.r[p]=Number(inp.value)||0;
+        if(amtMode && people.length===2){ const other=people[1-idx], a=Math.round(Number($("eAmount").value)||0);
+          S.eSplit.r[other]=Math.max(a-S.eSplit.r[p],0); const oi=grid.querySelector(`input[data-p="${other}"]`); if(oi) oi.value=S.eSplit.r[other]; }
+        splitNote(); });
+      if(amtMode) w.append(document.createTextNode("NT$ "), inp); else w.append(inp, document.createTextNode("%"));
+      lab.appendChild(w); grid.appendChild(lab); });
   }
   splitNote();
 }
@@ -2039,13 +2061,33 @@ function splitNote(){
   if(payer && !people.includes(payer)){ n.classList.add("warn-text"); n.textContent=`「${payer}」不在分攤名單（${people.join("、")}），這筆不會算進 AA。`; return; }
   if(!payer){ n.textContent="選好付款人，這筆才會算進 AA 結算。"; return; }
   if(S.eSplit.m==="s"){ n.textContent=`這筆全部算 ${payer} 自己的，不用分。`; return; }
+  if(S.eSplit.m==="a"){
+    const sum=people.reduce((s,p)=>s+(Number(S.eSplit.r[p])||0),0);
+    if(sum!==amt){ n.classList.add("warn-text"); n.textContent=`每人金額加起來是 ${money(sum)}，要等於這筆金額 ${money(amt)}（差 ${money(Math.abs(amt-sum))}）。`; return; }
+    n.textContent=people.map(p=>`${p} 分攤 ${money(S.eSplit.r[p]||0)}（${amt?Math.round((S.eSplit.r[p]||0)/amt*1000)/10:0}%）`).join("・"); return;
+  }
   const r = S.eSplit.m==="c" ? S.eSplit.r : (l.split.ratio||evenRatio(people));
   const sum=people.reduce((s,p)=>s+(Number(r[p])||0),0);
   if(Math.abs(sum-100)>0.01){ n.classList.add("warn-text"); n.textContent=`比例加起來是 ${sum}%，要剛好 100%。`; return; }
   n.textContent = amt>0 ? people.map(p=>`${p} 分攤 ${money(amt*(Number(r[p])||0)/100)}`).join("・") : people.map(p=>`${p} ${r[p]}%`).join("・");
 }
-document.querySelectorAll("#eSplitMode button").forEach(b=>b.onclick=()=>{ S.eSplit.m=b.dataset.m; renderSplitUI(); });
-$("eAmount").addEventListener("input", ()=>{ if(!$("eSplitBox").hidden) splitNote(); });
+document.querySelectorAll("#eSplitMode button").forEach(b=>b.onclick=()=>{
+  if(b.dataset.m==="c"){ if(S.eSplit.m!=="c" && S.eSplit.m!=="a"){ S.eSplit.m = store.get("ledger.splitUnit")==="a" ? "a" : "c"; S.eSplit.r={}; } }
+  else S.eSplit.m=b.dataset.m;
+  renderSplitUI(); });
+/* 比例 ↔ 金額 切換時互相換算 */
+document.querySelectorAll("#eSplitUnit button").forEach(b=>b.onclick=()=>{
+  const u=b.dataset.u; if(u===S.eSplit.m) return;
+  const l=L(), people=l.split.people, amt=Math.round(Number($("eAmount").value)||0);
+  if(u==="a"){ const pct={}; people.forEach(p=>pct[p]=Number(S.eSplit.r[p])||0); S.eSplit.r=splitAmtDefault(people, pct, amt); }
+  else { const tot=people.reduce((s,p)=>s+(Number(S.eSplit.r[p])||0),0)||1; const o={}; let acc=0;
+    people.forEach((p,i)=>{ if(i===people.length-1) o[p]=Math.round((100-acc)*100)/100; else { o[p]=Math.round((Number(S.eSplit.r[p])||0)/tot*10000)/100; acc+=o[p]; } }); S.eSplit.r=o; }
+  S.eSplit.m=u; store.set("ledger.splitUnit", u); renderSplitUI(); });
+$("eAmount").addEventListener("input", ()=>{ if($("eSplitBox").hidden) return;
+  // 金額模式、兩個人：總額改了就讓最後一個人補差額
+  const l=L(); if(S.eSplit.m==="a" && l && l.split.people.length===2){ const [a,b]=l.split.people, amt=Math.round(Number($("eAmount").value)||0);
+    S.eSplit.r[b]=Math.max(amt-(Number(S.eSplit.r[a])||0),0); const bi=$("eSplitCustom").querySelector(`input[data-p="${b}"]`); if(bi) bi.value=S.eSplit.r[b]; }
+  splitNote(); });
 $("ePayer").addEventListener("input", ()=>{ if(!$("eSplitBox").hidden) splitNote(); });
 $("ePayerChips").addEventListener("click", ()=>setTimeout(()=>{ if(!$("eSplitBox").hidden) splitNote(); },0));
 
