@@ -90,11 +90,14 @@ const roleText = l => isOwner(l) ? "擁有者" : canEdit(l) ? "可編輯" : "僅
 const isProj = l => l && l.mode === "project";
 const stLabels = l => isProj(l) ? {paid:"完成", pending:"未完成"} : {paid:"已付款", pending:"未付款"};
 const isPending = e => e.status === "pending";
+/* 分期手續費：每期多出來的利息／手續費另外記成一筆，分類固定用這個 id */
+const FEE_CAT={id:"instfee", name:"分期手續費"};
+const isFee = e => e && e.categoryId===FEE_CAT.id && !!e.inst;
 /* 專案用：同一組分期算一個項目（金額加總，預算只算一次） */
 function projItems(entries){
   const m=new Map();
   entries.filter(e=>e.type==="out").forEach(e=>{
-    const k=e.inst ? "g:"+e.inst.g : e.id;
+    const k=e.inst ? "g:"+e.inst.g+(isFee(e)?":f":"") : e.id;
     const it=m.get(k)||{categoryId:e.categoryId, categoryName:e.categoryName, amount:0, budget:0, pending:isPending(e)};
     it.amount+=e.amount; it.budget=Math.max(it.budget, e.budget||0); m.set(k,it);
   });
@@ -660,7 +663,7 @@ function syncCardUI(){
   $("eCardWrap").hidden=!isCard;
   tipsFor("tipCard", isCard ? [["card2","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月。每期金額不一樣（例如第一期多幾塊、有利息）也可以在「每期金額」選「自己填」。「還款與分期」頁的信用卡帳單會顯示第幾期、還剩幾期。"]] : []);
   const on=isCard && $("eInstOn").checked;
-  $("eInstBox").hidden=!on; $("eInstNote").hidden=!on; $("eInstModeBox").hidden=!on;
+  $("eInstBox").hidden=!on; $("eInstNote").hidden=!on; $("eInstModeBox").hidden=!on; if(!on) $("eInstFeeWrap").hidden=true;
   $("eAmtLabel").textContent = on ? (S.instMode==="custom" ? "消費金額" : "總金額") : "";
   if(on) renderInstList();
   if(isCard) renderCardChips();
@@ -684,6 +687,8 @@ function updateInstNote(){
   note.classList.remove("warn-text");
   if(!(total>0) || n<2 || n>60){ note.textContent="輸入金額和期數（2～60 期）。"; return; }
   const amts=instAmts(), sum=amts.reduce((s,x)=>s+x,0), from=ymLabel($("eInstStart").value||thisYM());
+  const fw=$("eInstFeeWrap"); fw.hidden = !(S.instMode==="custom" && sum>total);
+  if(!fw.hidden) $("eInstFeeText").textContent=`多出來的 ${money(sum-total)} 另外記成「分期手續費」（商品本身照 ${money(total)} 算，每期帳單金額不變）`;
   if(S.instMode==="custom" && sum!==total){
     note.classList.add("warn-text");
     note.textContent=`每期合計 ${money(sum)}，比消費金額${sum>total?"多":"少"} ${money(Math.abs(sum-total))}` + (sum>total?"（利息或手續費）":"，請確認每期金額") + `。會從 ${from} 起記到每個月。`;
@@ -748,6 +753,11 @@ function defaultDate(){
 }
 function openEntry(e){
   const l=L(); if(!canEdit(l)) return;
+  if(isFee(e)){ // 點到手續費那一筆：改開同一組分期的商品本身
+    const sib=S.entries.find(x=>x.inst && x.inst.g===e.inst.g && !isFee(x));
+    if(sib) e=sib;
+    else { groupDocs(l, e.inst.g).then(ds=>{ const d=ds.find(d=>!isFee(d.data())); if(d) openEntry({id:d.id, ...d.data()}); }).catch(()=>{}); return; }
+  }
   S.editing=e||null; msg("eMsg","");
   const proj=isProj(l), lb=stLabels(l);
   $("eTitle").textContent = e ? (e.inst?`編輯分期（第 ${e.inst.k}/${e.inst.n} 期）`:"編輯紀錄") : "記一筆";
@@ -760,6 +770,7 @@ function openEntry(e){
   $("eCard").value = e ? (e.card||"") : (P().defaultCard || $("eCard").dataset.last || "");
   $("eInstOn").checked = !!(e && e.inst);
   S.instMode = store.get("ledger.instMode")==="first" ? "first" : "last"; S.instCustom=null;
+  $("eInstFee").checked = store.get("ledger.instFee")!=="0";
   $("eInstN").value = e && e.inst ? e.inst.n : 12;
   $("eInstStart").value = e && e.inst ? e.inst.start : ($("eDate").value||todayStr()).slice(0,7);
   $("eNote").value = e ? (e.note||"") : "";
@@ -785,10 +796,13 @@ function openEntry(e){
     const l2=l, g=e.inst.g;
     groupDocs(l2, g).then(docs=>{
       if(S.editing!==e) return;
-      const amts=docs.map(d=>d.data()).sort((x,y)=>x.inst.k-y.inst.k).map(x=>x.amount);
+      // 同一期的商品和手續費加起來，就是當期帳單金額
+      const byK=new Map(); docs.map(d=>d.data()).forEach(x=>byK.set(x.inst.k,(byK.get(x.inst.k)||0)+x.amount));
+      const amts=[...byK.keys()].sort((a,b)=>a-b).map(k=>byK.get(k));
       const tot=amts.reduce((s,x)=>s+x,0);
       const same=(m)=>autoAmts(tot,amts.length,m).every((v,i)=>v===amts[i]);
       if(same("last")) S.instMode="last"; else if(same("first")) S.instMode="first"; else { S.instMode="custom"; S.instCustom=amts; }
+      if(docs.some(d=>isFee(d.data()))){ $("eInstFee").checked=true; }
       if(S.instMode!=="custom") $("eAmount").value=tot;
       syncCardUI();
     }).catch(()=>{});
@@ -871,9 +885,20 @@ $("formEntry").addEventListener("submit", async ev=>{
     if(old && old.inst){ (await groupDocs(l, old.inst.g)).forEach(d=>b.delete(d.ref)); }
     else if(old && inst){ b.delete(doc(db,"ledgers",l.id,"entries",old.id)); }
     if(inst){
-      buildInstallments(amts, start, date, amt).forEach(p=>b.set(doc(col), {...common, ...creator, ...p}));
+      const sum=amts.reduce((s,x)=>s+x,0);
+      const splitFee = S.instMode==="custom" && sum>amt && $("eInstFee").checked && S.eType==="out";
+      store.set("ledger.instFee", $("eInstFee").checked?"1":"0");
+      // 商品本身照消費金額按比例分到每期，剩下的是手續費
+      let items=amts.slice();
+      if(splitFee){ let acc=0; items=amts.map((a,i)=>{ if(i===amts.length-1) return amt-acc; const v=Math.floor(a*amt/sum); acc+=v; return v; }); }
+      buildInstallments(amts, start, date, amt).forEach((p,i)=>{
+        b.set(doc(col), {...common, ...creator, ...p, amount:items[i]});
+        const fee=amts[i]-items[i];
+        if(splitFee && fee>0) b.set(doc(col), {...common, ...creator, ...p, amount:fee, categoryId:FEE_CAT.id, categoryName:FEE_CAT.name,
+          note:((common.note?common.note+" ":"")+"分期手續費").slice(0,100), ...(proj?{budget:0}:{})});
+      });
       await b.commit();
-      toast(`已記下分期：${S.eCat.name} ${money(amts.reduce((s,x)=>s+x,0))}，分 ${n} 期`);
+      toast(`已記下分期：${S.eCat.name} ${money(splitFee?amt:sum)}，分 ${n} 期` + (splitFee?`，手續費 ${money(sum-amt)} 另外記`:""));
     } else if(old && !old.inst){
       await b.commit();
       await updateDoc(doc(db,"ledgers",l.id,"entries",old.id), {...common, amount:amt, date});
@@ -1321,6 +1346,14 @@ async function loadCardBill(ym){
   S.rCardTotal=total; $("rCard").textContent=fmt(total);
   renderRepay(false);
   if(!rows.length){ box.appendChild(el("p","small muted",`${ymLabel(ym)}沒有信用卡消費。記帳時付款方式選「信用卡」、填上卡片名稱，就會出現在這裡；分期的會自動顯示第幾期。`)); return; }
+  // 分期手續費併進同一期的商品那一行
+  const merged=[], seen=new Map();
+  rows.slice().sort((x,y)=>isFee(x)-isFee(y)).forEach(e=>{
+    if(e.inst){ const k=e.ledger.id+"|"+e.inst.g+"|"+e.inst.k, m=seen.get(k);
+      if(m){ m.amount+=e.amount; m.fee=(m.fee||0)+(isFee(e)?e.amount:0); return; }
+      const c={...e}; if(isFee(e)) c.fee=e.amount; seen.set(k,c); merged.push(c); }
+    else merged.push(e); });
+  rows.length=0; rows.push(...merged);
   const byCard=new Map(); rows.forEach(e=>{ const k=e.card||"未填卡片"; if(!byCard.has(k)) byCard.set(k,[]); byCard.get(k).push(e); });
   [...byCard.entries()].sort().forEach(([card,list])=>{
     const wrap=el("div","bill-card"); const sum=list.reduce((s,e)=>s+e.amount,0);
@@ -1333,7 +1366,7 @@ async function loadCardBill(ym){
       let per="一次付清", rem="—";
       if(e.inst){ const base=Math.floor(e.inst.total/e.inst.n); const left= typeof e.inst.rem==="number" ? e.inst.rem : (e.inst.k>=e.inst.n?0:e.inst.total-base*e.inst.k);
         per=`${e.inst.k}/${e.inst.n}`; rem = left ? `${e.inst.n-e.inst.k} 期・${fmt(left)}` : "繳完"; }
-      tr.append(el("td","num",pd.slice(5).replace("-","/")), el("td",null,`${e.note||e.categoryName}${e.payer?`（${e.payer}）`:""}・${e.ledger.name}`),
+      tr.append(el("td","num",pd.slice(5).replace("-","/")), el("td",null,`${e.note||e.categoryName}${e.payer?`（${e.payer}）`:""}・${e.ledger.name}${e.fee?`（含手續費 ${fmt(e.fee)}）`:""}`),
         el("td","num",per), el("td","num",fmt(e.amount)), el("td","num",rem));
       tb.appendChild(tr); });
     t.append(th,tb); tw.appendChild(t); wrap.appendChild(tw); box.appendChild(wrap);
