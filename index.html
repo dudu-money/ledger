@@ -347,6 +347,7 @@
           <div><div class="label">收入</div><div class="num mid c-in" id="tIn">0</div></div>
         </div>
         <p class="small muted" id="pendNote" hidden></p>
+        <p class="small rb-note" id="rbNote" hidden></p>
         <div class="proj" id="projBox" hidden>
           <div class="pair">
             <div><div class="label">專案總預算</div><div class="num mid" id="pjBudget">未設定</div></div>
@@ -376,6 +377,11 @@
           </div>
         </div>
         <div class="cat-list" id="catList"></div>
+      </section>
+
+      <section class="panel wide" id="rbPanel" hidden>
+        <div class="between wrap-gap"><h3 class="h3">代墊・待請款</h3><span class="small muted">公司還沒付回來的款項，不算進你自己的支出</span></div>
+        <div id="rbBody"></div>
       </section>
 
       <section class="panel wide" id="aaPanel" hidden>
@@ -426,7 +432,7 @@
     <div class="field"><span class="label">分類</span><div class="chips" id="eCats"></div></div>
     <div class="grid2">
       <label class="field"><span class="label">日期 <span id="eWeek" class="muted"></span></span><input id="eDate" type="date" required></label>
-      <label class="field"><span class="label">付款方式</span>
+      <label class="field"><span class="label" id="ePayLabel">付款方式</span>
         <select id="ePay"></select>
       </label>
     </div>
@@ -462,11 +468,12 @@
       <div class="split-grid" id="eSplitCustom"></div>
       <p class="small muted" id="eSplitNote"></p>
     </div>
+    <label class="check rb-check" id="eRbWrap"><input type="checkbox" id="eRb"> 這筆是代墊，之後會跟公司請款<span class="small muted">（例如出差車票。請款前不算自己的支出，收到款項後按「已收到」）</span></label>
     <label class="field"><span class="label">備註</span><input id="eNote" type="text" maxlength="100" placeholder="例如：午餐便當"></label>
     <details class="more" id="eMore">
       <summary>更多：付款人、狀態<span id="eMoreProj">、預算、優先度</span></summary>
       <div class="stack">
-        <div class="field" id="ePayerField"><span class="label">付款人（選填）</span>
+        <div class="field" id="ePayerField"><span class="label" id="ePayerLabel">付款人（選填）</span>
           <div class="chips tag-pick" id="ePayerChips"></div>
           <input id="ePayer" type="text" maxlength="20" placeholder="點上面的名字，或輸入新名字後按 Enter" autocomplete="off">
         </div>
@@ -730,6 +737,21 @@
     </div>
     <button class="btn primary" type="submit" value="save" id="feSave">儲存</button>
     <p class="msg" id="feMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 請款收到 -->
+<dialog id="dlgRb" aria-labelledby="rbTitle">
+  <form method="dialog" id="formRb" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="rbTitle">已收到請款</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p id="rbWhat"></p>
+    <div class="grid2">
+      <label class="field"><span class="label">公司付回來的金額</span><input id="rbAmt" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field"><span class="label">收到日期</span><input id="rbDate" type="date"></label>
+    </div>
+    <p class="small muted" id="rbHint"></p>
+    <div class="row"><button class="btn danger" type="button" id="rbUndo" hidden>改回待請款</button><button class="btn primary grow" type="submit" value="save" id="rbSave">確定已收到</button></div>
+    <p class="msg" id="rbMsg" role="status"></p>
   </form>
 </dialog>
 

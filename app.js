@@ -88,18 +88,22 @@ const isOwner = l => l && S.user && l.ownerUid === S.user.uid;
 const canEdit = l => l && (isOwner(l) || (l.editors||[]).includes(S.email));
 const roleText = l => isOwner(l) ? "擁有者" : canEdit(l) ? "可編輯" : "僅檢視";
 const isProj = l => l && l.mode === "project";
-const stLabels = l => isProj(l) ? {paid:"完成", pending:"未完成"} : {paid:"已付款", pending:"未付款"};
+const stLabels = (l, type) => isProj(l) ? {paid:"完成", pending:"未完成"} : type==="in" ? {paid:"已收到", pending:"未收到"} : {paid:"已付款", pending:"未付款"};
+const IN_PAYS=["轉帳","現金","行動支付","其他"];
 const isPending = e => e.status === "pending";
 /* 分期手續費：每期多出來的利息／手續費另外記成一筆，分類固定用這個 id */
 const FEE_CAT={id:"instfee", name:"分期手續費"};
 const isFee = e => e && e.categoryId===FEE_CAT.id && !!e.inst;
+/* 代墊請款：rb = {s:"pending"|"done", a:收回金額, d:收到日期}。請款中不算自己的支出；收回後只算沒補回的差額 */
+const isRb = e => !!(e && e.type==="out" && e.rb && (e.rb.s==="pending" || e.rb.s==="done"));
+const own = e => !isRb(e) ? (e.amount||0) : e.rb.s==="done" ? Math.max((e.amount||0)-(e.rb.a||0),0) : 0;
 /* 專案用：同一組分期算一個項目（金額加總，預算只算一次） */
 function projItems(entries){
   const m=new Map();
   entries.filter(e=>e.type==="out").forEach(e=>{
     const k=e.inst ? "g:"+e.inst.g+(isFee(e)?":f":"") : e.id;
     const it=m.get(k)||{categoryId:e.categoryId, categoryName:e.categoryName, amount:0, budget:0, pending:isPending(e)};
-    it.amount+=e.amount; it.budget=Math.max(it.budget, e.budget||0); m.set(k,it);
+    it.amount+=own(e); it.budget=Math.max(it.budget, e.budget||0); m.set(k,it);
   });
   return [...m.values()];
 }
@@ -128,7 +132,7 @@ window.addEventListener("hashchange", ()=>{ if(S.user && S.user.emailVerified) r
 function route(){
   const m = location.hash.match(/^#l\/([A-Za-z0-9_-]+)/);
   if(m){ openLedger(m[1]); return; }
-  S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); document.title="記帳本";
+  S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); stopRb(); document.title="記帳本";
   if(location.hash==="#repay"){ show("viewRepay"); renderRepay(); return; }
   if(location.hash==="#invest"){ show("viewInvest"); renderInvest(); return; }
   if(location.hash==="#settings"){ show("viewSettings"); renderGlobalSettings(); return; }
@@ -315,7 +319,7 @@ function openLedger(id){
 }
 function initLedgerView(){
   if(S.viewInitFor===S.lid) return;
-  S.viewInitFor=S.lid; stopEntries(); stopAA();
+  S.viewInitFor=S.lid; stopEntries(); stopAA(); stopRb();
   S.catFilter=null; S.stFilter="all"; S.catView="out"; $("search").value="";
   const d=new Date(); S.period={mode: isProj(L()) ? "all" : "month", y:d.getFullYear(), m:d.getMonth()+1};
 }
@@ -326,7 +330,7 @@ function renderLedgerHead(){
   $("lRole").textContent=roleText(l); document.title=l.name+"｜記帳本";
   $("btnAdd").hidden=!canEdit(l);
   renderLedgerTips(l);
-  ensureAA(l);
+  ensureAA(l); ensureRb(l);
   const lb=stLabels(l); $("stPendBtn").textContent=lb.pending; $("stDoneBtn").textContent=lb.paid;
   if(!S.unsubEntries) watchEntries();
 }
@@ -386,7 +390,7 @@ function renderAll(){
   const now=new Date(); const isNow = mode==="month" && y===now.getFullYear() && m===now.getMonth()+1;
   $("pNow").hidden = isNow;
   $("cOut").setAttribute("aria-pressed", S.catView==="out"); $("cIn").setAttribute("aria-pressed", S.catView==="in"); $("cPayer").setAttribute("aria-pressed", S.catView==="payer");
-  renderTotals(l); renderCats(l); renderTrend();
+  renderTotals(l); renderCats(l); renderTrend(); renderRb();
   const table = mode!=="month";
   $("listPanel").hidden = table && !isProj(l); $("yearPanel").hidden = !table;
   if(table) renderYearTable();
@@ -394,7 +398,9 @@ function renderAll(){
 }
 
 function renderTotals(l){
-  let o=0,i=0,pn=0,pa=0; S.entries.forEach(e=>{ if(e.type==="in") i+=e.amount; else o+=e.amount; if(isPending(e)){ pn++; pa+=e.amount; } });
+  let o=0,i=0,pn=0,pa=0; S.entries.forEach(e=>{ if(e.type==="in") i+=e.amount; else o+=own(e); if(isPending(e)){ pn++; pa+=e.amount; } });
+  const rbp=S.rbPending||[]; $("rbNote").hidden=!rbp.length;
+  if(rbp.length) $("rbNote").textContent=`另有代墊待請款 ${rbp.length} 筆，共 ${money(rbp.reduce((t,e)=>t+e.amount,0))}（不算在支出裡）`;
   const mode=S.period.mode, proj=isProj(l);
   if(proj){
     $("balLabel").textContent = mode==="all" ? "專案已支出" : mode==="year" ? "今年已支出" : "本月已支出";
@@ -474,7 +480,8 @@ function renderCats(l){
   src.forEach(e=>{
     const k = S.catView==="payer" ? "p:"+(e.payer||"") : e.categoryId;
     const name = S.catView==="payer" ? (e.payer||"未填付款人") : catName(l,e);
-    const cur=sums.get(k)||{name,v:0}; cur.v+=e.amount; sums.set(k,cur); tot+=e.amount; });
+    const v=e.type==="out"?own(e):e.amount; if(!v && e.type==="out" && isRb(e)) return;
+    const cur=sums.get(k)||{name,v:0}; cur.v+=v; sums.set(k,cur); tot+=v; });
   const rows=[...sums.entries()].sort((a,b)=>b[1].v-a[1].v);
   if(!rows.length){ box.appendChild(el("p","small muted", S.catView==="in"?"這段期間還沒有收入。":"這段期間還沒有支出。")); return; }
   const max=rows[0][1].v, clickable=S.catView!=="payer";
@@ -505,7 +512,7 @@ function renderTrend(){
   if(mode==="month"){
     $("trendTitle").textContent="每日支出";
     const dm=new Date(y,m,0).getDate(), d=new Array(dm).fill(0);
-    S.entries.forEach(e=>{ if(e.type==="out"){ const k=Number(e.date.slice(8,10))-1; if(k>=0&&k<dm) d[k]+=e.amount; } });
+    S.entries.forEach(e=>{ if(e.type==="out"){ const k=Number(e.date.slice(8,10))-1; if(k>=0&&k<dm) d[k]+=own(e); } });
     const tot=d.reduce((a,b)=>a+b,0), now=new Date(), isCur=now.getFullYear()===y&&now.getMonth()+1===m;
     $("trendNote").textContent = tot ? `日均 ${money(tot/(isCur?now.getDate():dm))}` : "";
     const mx=niceMax(Math.max(...d)), cw=(W-Lp-R)/dm, yv=v=>T+(H-T-B)*(1-v/mx);
@@ -517,7 +524,7 @@ function renderTrend(){
     $("trendTitle").textContent="每月收支";
     const keys = mode==="year" ? Array.from({length:12},(_,k)=>`${y}-${pad(k+1)}`) : monthsSpan();
     const idx=new Map(keys.map((k,i)=>[k,i])), o=new Array(keys.length).fill(0), i=new Array(keys.length).fill(0);
-    S.entries.forEach(e=>{ const k=idx.get(e.date.slice(0,7)); if(k!=null) (e.type==="in"?i:o)[k]+=e.amount; });
+    S.entries.forEach(e=>{ const k=idx.get(e.date.slice(0,7)); if(k!=null) (e.type==="in"?i:o)[k]+=(e.type==="in"?e.amount:own(e)); });
     const months=o.filter(v=>v>0).length;
     $("trendNote").innerHTML = `<span class="legend"><span><i style="background:var(--out)"></i>支出</span><span><i style="background:var(--in)"></i>收入</span>${months?`<span>月均支出 ${money(o.reduce((a,b)=>a+b,0)/months)}</span>`:""}</span>`;
     const n=keys.length, mx=niceMax(Math.max(...o,...i)), cw=(W-Lp-R)/n, yv=v=>T+(H-T-B)*(1-v/mx), bw=cw*.32;
@@ -532,7 +539,7 @@ function renderTrend(){
 }
 
 function statusChip(l, e, editable){
-  const lb=stLabels(l), p=isPending(e);
+  const lb=stLabels(l, e.type), p=isPending(e);
   const b=el("button","st "+(p?"pending":"done"), p?lb.pending:lb.paid); b.type="button";
   if(!editable){ b.disabled=true; return b; }
   b.title="點一下切換狀態";
@@ -573,7 +580,7 @@ function renderList(){
   const shared=(l.members||[]).length>1, editable=canEdit(l), proj=isProj(l);
   const groups=new Map(); list.forEach(e=>{ if(!groups.has(e.date)) groups.set(e.date,[]); groups.get(e.date).push(e); });
   groups.forEach((g,date)=>{
-    const dt=new Date(date+"T00:00"); const out=g.filter(e=>e.type==="out").reduce((a,e)=>a+e.amount,0);
+    const dt=new Date(date+"T00:00"); const out=g.filter(e=>e.type==="out").reduce((a,e)=>a+own(e),0);
     const wk=weekOf(l,date);
     const day=el("div","day"); const h=el("div","day-head");
     h.append(el("span",null,`${S.period.mode!=="month"?dt.getFullYear()+" 年 ":""}${dt.getMonth()+1} 月 ${dt.getDate()} 日（${WK[dt.getDay()]}）${wk!=null?`・${wk} 週`:""}`), el("span","num",out?"支出 "+fmt(out):""));
@@ -587,7 +594,8 @@ function renderList(){
       const meta=[];
       if(e._group) meta.push(`${e.card||"信用卡"} 分 ${e.inst.n} 期・每期約 ${fmt(Math.floor(e.inst.total/e.inst.n))}`);
       else if(e.inst) meta.push(`${e.card||"信用卡"} 分期 ${e.inst.k}/${e.inst.n}`); else if(e.card) meta.push(`${e.pay}・${e.card}`); else if(e.pay) meta.push(e.pay);
-      if(e.payer) meta.push(e.payer+" 付");
+      if(e.payer) meta.push(e.payer+(e.type==="in"?" 的收入":" 付"));
+      if(isRb(e)) meta.push(e.rb.s==="pending" ? "代墊・請款中" : `代墊・${e.rb.d?e.rb.d.slice(5).replace("-","/")+" ":""}已收回 ${fmt(e.rb.a||0)}`);
       if(aaOn(l) && e.type==="out" && e.split && e.split.m==="s") meta.push("只算付款人");
       if(aaOn(l) && e.type==="out" && e.split && e.split.m==="c") meta.push("自訂分攤 "+l.split.people.map(p=>`${p}${(e.split.r||{})[p]||0}%`).join("／"));
       if(shared && e.createdByEmail) meta.push(e.createdByEmail===S.email?"我記的":e.createdByEmail.split("@")[0]+" 記的");
@@ -595,6 +603,7 @@ function renderList(){
       const right=el("div","entry-right");
       right.appendChild(e.amount ? el("span","num "+(e.type==="in"?"c-in":"c-out"), (e.type==="in"?"+":"−")+fmt(e.amount)) : el("span","num muted","未填"));
       if(proj && e.budget) right.appendChild(el("span","sub",`預算 ${fmt(e.budget)}`));
+      if(isRb(e)) right.appendChild(el("span","sub rb-sub", e.rb.s==="pending" ? "不算支出" : own(e) ? `自付 ${fmt(own(e))}` : "已全額收回"));
       if(proj || isPending(e)) right.appendChild(statusChip(l,e,editable));
       row.append(el("span","tag"+(e.type==="in"?" in":""), catName(l,e)), main, right);
       day.appendChild(row);
@@ -607,7 +616,7 @@ function renderYearTable(){
   const mode=S.period.mode;
   const keys = mode==="year" ? Array.from({length:12},(_,k)=>`${S.period.y}-${pad(k+1)}`) : monthsSpan();
   const idx=new Map(keys.map((k,i)=>[k,i])), o=keys.map(()=>0), i=keys.map(()=>0), n=keys.map(()=>0);
-  S.entries.forEach(e=>{ const k=idx.get(e.date.slice(0,7)); if(k==null) return; (e.type==="in"?i:o)[k]+=e.amount; n[k]++; });
+  S.entries.forEach(e=>{ const k=idx.get(e.date.slice(0,7)); if(k==null) return; (e.type==="in"?i:o)[k]+=(e.type==="in"?e.amount:own(e)); n[k]++; });
   $("ytTitle").textContent = mode==="year" ? "每月明細" : "每月現金流";
   const t=$("ytable"); t.textContent="";
   const th=el("thead"), hr=el("tr"); ["月份","筆數","支出","收入","當月結餘","累計結餘"].forEach(x=>hr.appendChild(el("th",null,x))); th.appendChild(hr);
@@ -653,7 +662,14 @@ function renderEntryCats(){
   list.forEach(c=>{ const b=el("button","chip",c.name); b.type="button"; b.setAttribute("aria-pressed", S.eCat&&c.id===S.eCat.id);
     b.onclick=()=>{ S.eCat=c; renderEntryCats(); }; box.appendChild(b); });
 }
-function setEType(t){ S.eType=t; $("eOut").setAttribute("aria-pressed",t==="out"); $("eIn").setAttribute("aria-pressed",t==="in"); renderEntryCats(); if(S.eSplit) renderSplitUI(); }
+function setEType(t){ S.eType=t;
+  // 收入時：付款人 → 誰的收入，付款方式 → 收款方式
+  $("ePayerLabel").textContent = t==="in" ? "誰的收入（選填）" : "付款人（選填）";
+  $("ePayLabel").textContent = t==="in" ? "收款方式" : "付款方式";
+  $("eNote").placeholder = t==="in" ? "例如：9 月薪水" : "例如：午餐便當";
+  syncRbUI();
+  const l0=L(); if(l0 && !isProj(l0)){ const lb=stLabels(l0, t); $("eStPaid").textContent=lb.paid; $("eStPend").textContent=lb.pending; }
+  if($("dlgEntry").open){ const cur=$("ePay").value; fillPayOptions("ePay", t==="in" ? cur : (cur||P().defaultPay||"現金"), t); syncCardUI(); } $("eOut").setAttribute("aria-pressed",t==="out"); $("eIn").setAttribute("aria-pressed",t==="in"); renderEntryCats(); if(S.eSplit) renderSplitUI(); }
 $("eOut").onclick=()=>setEType("out"); $("eIn").onclick=()=>setEType("in");
 function setEStatus(s){ S.eStatus=s; $("eStPaid").setAttribute("aria-pressed",s==="paid"); $("eStPend").setAttribute("aria-pressed",s==="pending"); }
 $("eStPaid").onclick=()=>setEStatus("paid"); $("eStPend").onclick=()=>setEStatus("pending");
@@ -662,7 +678,7 @@ function syncCardUI(){
   const isCard=$("ePay").value==="信用卡";
   $("eCardWrap").hidden=!isCard;
   tipsFor("tipCard", isCard ? [["card2","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月。每期金額不一樣（例如第一期多幾塊、有利息）也可以在「每期金額」選「自己填」。「還款與分期」頁的信用卡帳單會顯示第幾期、還剩幾期。"]] : []);
-  const on=isCard && $("eInstOn").checked;
+  const on=isCard && $("eInstOn").checked; syncRbUI();
   $("eInstBox").hidden=!on; $("eInstNote").hidden=!on; $("eInstModeBox").hidden=!on; if(!on) $("eInstFeeWrap").hidden=true;
   $("eAmtLabel").textContent = on ? (S.instMode==="custom" ? "消費金額" : "總金額") : "";
   if(on) renderInstList();
@@ -725,9 +741,13 @@ const renderCardChips=tagPicker("eCardChips","eCard",knownCards,"cards");
 $("ePay").addEventListener("change",syncCardUI);
 $("eDate").addEventListener("input",()=>{ const l=L(); const w=weekOf(l,$("eDate").value); $("eWeek").textContent = w!=null?`（${w} 週）`:""; });
 
-function fillPayOptions(selId, current){
+function fillPayOptions(selId, current, type){
   const sel=$(selId); sel.textContent="";
-  const pays=[...P().pays]; if(!pays.includes("信用卡")) pays.splice(1,0,"信用卡");
+  let pays=[...P().pays]; if(!pays.includes("信用卡")) pays.splice(1,0,"信用卡");
+  if(type==="in"){ // 收入：不會用信用卡、悠遊卡收錢
+    pays=[...IN_PAYS, ...pays.filter(p=>!IN_PAYS.includes(p) && !["信用卡","悠遊卡"].includes(p))];
+    if(current && !pays.includes(current)) current="轉帳";
+  }
   if(current && !pays.includes(current)) pays.push(current);
   pays.forEach(p=>{ const o=el("option",null,p); o.value=p; sel.appendChild(o); });
   if(current) sel.value=current;
@@ -759,14 +779,14 @@ function openEntry(e){
     else { groupDocs(l, e.inst.g).then(ds=>{ const d=ds.find(d=>!isFee(d.data())); if(d) openEntry({id:d.id, ...d.data()}); }).catch(()=>{}); return; }
   }
   S.editing=e||null; msg("eMsg","");
-  const proj=isProj(l), lb=stLabels(l);
+  const proj=isProj(l), lb=stLabels(l, e ? e.type : "out");
   $("eTitle").textContent = e ? (e.inst?`編輯分期（第 ${e.inst.k}/${e.inst.n} 期）`:"編輯紀錄") : "記一筆";
   $("eDelete").hidden=!e; $("eDelete").textContent = e&&e.inst ? `刪除整組 ${e.inst.n} 期` : "刪除"; $("eDelete").dataset.armed="";
   S.eCat = e ? ((l.categories||[]).find(c=>c.id===e.categoryId) || {id:e.categoryId,name:e.categoryName,type:e.type}) : null;
   setEType(e ? e.type : "out");
   $("eAmount").value = e ? (e.inst ? (e.inst.price || e.inst.total) : e.amount) || "" : "";
   $("eDate").value = e ? (e.inst ? e.inst.purchase : e.date) : defaultDate();
-  fillPayOptions("ePay", e ? (e.pay||"現金") : (P().defaultPay || $("ePay").dataset.last || "現金"));
+  fillPayOptions("ePay", e ? (e.pay||"現金") : (P().defaultPay || $("ePay").dataset.last || "現金"), e ? e.type : "out");
   $("eCard").value = e ? (e.card||"") : (P().defaultCard || $("eCard").dataset.last || "");
   $("eInstOn").checked = !!(e && e.inst);
   S.instMode = store.get("ledger.instMode")==="first" ? "first" : "last"; S.instCustom=null;
@@ -774,6 +794,7 @@ function openEntry(e){
   $("eInstN").value = e && e.inst ? e.inst.n : 12;
   $("eInstStart").value = e && e.inst ? e.inst.start : ($("eDate").value||todayStr()).slice(0,7);
   $("eNote").value = e ? (e.note||"") : "";
+  $("eRb").checked = isRb(e);
   $("ePayer").value = e ? (e.payer||"") : P().defaultPayer;
   $("eBudget").value = e && e.budget ? e.budget : "";
   $("ePriority").value = e ? (e.priority||"") : "";
@@ -809,6 +830,7 @@ function openEntry(e){
   }
   setTimeout(()=>$("eAmount").focus(), 50);
 }
+function syncRbUI(){ const inst=$("ePay").value==="信用卡" && $("eInstOn").checked; $("eRbWrap").hidden = S.eType!=="out" || inst; }
 $("btnAdd").onclick=()=>openEntry(null);
 
 /* 同一組分期的所有紀錄 */
@@ -866,6 +888,9 @@ $("formEntry").addEventListener("submit", async ev=>{
     note:$("eNote").value.trim().slice(0,100), pay, card: isCard ? ($("eCard").value.trim() || (S.editing&&S.editing.card) || "").slice(0,20) : "",
     payer:$("ePayer").value.trim().slice(0,20), status:S.eStatus, updatedAt:serverTimestamp() };
   if(proj){ common.budget=budget; common.priority=$("ePriority").value; }
+  { const old=S.editing, want=S.eType==="out" && !(isCard && $("eInstOn").checked) && $("eRb").checked;
+    if(want) common.rb = isRb(old) ? old.rb : {s:"pending"};
+    else if(old && old.rb) common.rb = {s:"no"}; }
   if(aaOn(l) && S.eType==="out"){
     if(S.eSplit.m==="c"){
       const sum=l.split.people.reduce((s,p)=>s+(Number(S.eSplit.r[p])||0),0);
@@ -1021,7 +1046,7 @@ $("sDelete").onclick=async()=>{
       const snap=await getDocs(collection(db,"ledgers",l.id,sub));
       for(let i=0;i<snap.docs.length;i+=400){ const b=writeBatch(db); snap.docs.slice(i,i+400).forEach(d=>b.delete(d.ref)); await b.commit(); }
     }
-    stopEntries(); stopAA(); S.lid=null;
+    stopEntries(); stopAA(); stopRb(); S.lid=null;
     await deleteDoc(doc(db,"ledgers",l.id));
     $("dlgSettings").close(); location.hash=""; toast("帳本已刪除");
   }catch(e){ msg("sDangerMsg","刪除失敗："+errText(e),"err"); if(!S.lid){ S.lid=l.id; renderLedgerHead(); } }
@@ -1366,7 +1391,7 @@ async function loadCardBill(ym){
       let per="一次付清", rem="—";
       if(e.inst){ const base=Math.floor(e.inst.total/e.inst.n); const left= typeof e.inst.rem==="number" ? e.inst.rem : (e.inst.k>=e.inst.n?0:e.inst.total-base*e.inst.k);
         per=`${e.inst.k}/${e.inst.n}`; rem = left ? `${e.inst.n-e.inst.k} 期・${fmt(left)}` : "繳完"; }
-      tr.append(el("td","num",pd.slice(5).replace("-","/")), el("td",null,`${e.note||e.categoryName}${e.payer?`（${e.payer}）`:""}・${e.ledger.name}${e.fee?`（含手續費 ${fmt(e.fee)}）`:""}`),
+      tr.append(el("td","num",pd.slice(5).replace("-","/")), el("td",null,`${e.note||e.categoryName}${e.payer?`（${e.payer}）`:""}・${e.ledger.name}${e.fee?`（含手續費 ${fmt(e.fee)}）`:""}${isRb(e)?`（代墊${e.rb.s==="pending"?"・請款中":"・已收回"}）`:""}`),
         el("td","num",per), el("td","num",fmt(e.amount)), el("td","num",rem));
       tb.appendChild(tr); });
     t.append(th,tb); tw.appendChild(t); wrap.appendChild(tw); box.appendChild(wrap);
@@ -1767,7 +1792,7 @@ function showRestore(b){
   $("bkHoldsText").textContent = (b.holdings||[]).length ? `投資持股：還原目前沒有的 ${missH.length} 檔（已存在的 ${(b.holdings||[]).length-missH.length} 檔會略過）` : "投資持股：這份備份沒有持股";
   $("bkPrefs").checked=false; $("bkPrefs").disabled=!b.prefs;
 }
-const EF=["type","amount","categoryId","categoryName","date","note","pay","card","payer","status","budget","priority","inst","split"];
+const EF=["type","amount","categoryId","categoryName","date","note","pay","card","payer","status","budget","priority","inst","split","rb"];
 $("bkRestore").onclick=async()=>{
   if(!BK) return;
   const picks=[...document.querySelectorAll("#bkLedgers input:checked")].map(i=>BK.ledgers[Number(i.value)]);
@@ -1927,14 +1952,16 @@ function computeAA(l){
   const people=l.split.people, ratio=l.split.ratio||evenRatio(people);
   const row={}; people.forEach(p=>row[p]={paid:0, share:0, sent:0, recv:0});
   let skipped=0, skippedAmt=0;
-  S.aaEntries.filter(e=>e.type==="out" && e.amount>0).forEach(e=>{
-    if(!people.includes(e.payer)){ skipped++; skippedAmt+=e.amount; return; }
-    row[e.payer].paid+=e.amount;
+  // 代墊請款的只算公司沒補回的部分
+  S.aaEntries.filter(e=>e.type==="out" && own(e)>0).forEach(e=>{
+    const amt=own(e);
+    if(!people.includes(e.payer)){ skipped++; skippedAmt+=amt; return; }
+    row[e.payer].paid+=amt;
     const sp=e.split||{m:"d"};
-    if(sp.m==="s"){ row[e.payer].share+=e.amount; return; }
+    if(sp.m==="s"){ row[e.payer].share+=amt; return; }
     const r = sp.m==="c" && sp.r ? sp.r : ratio;
     const tot=people.reduce((s,p)=>s+(Number(r[p])||0),0) || 100;
-    people.forEach(p=>row[p].share += e.amount*(Number(r[p])||0)/tot);
+    people.forEach(p=>row[p].share += amt*(Number(r[p])||0)/tot);
   });
   S.settles.forEach(s=>{ if(row[s.from]) row[s.from].sent+=s.amount; if(row[s.to]) row[s.to].recv+=s.amount; });
   people.forEach(p=>{ const x=row[p]; x.bal = x.paid - x.share + x.sent - x.recv; });
@@ -2365,3 +2392,68 @@ $("hdDelete").onclick=async()=>{
   catch(err){ msg("hdMsg","刪除失敗："+errText(err),"err"); }
 };
 $("dlgHold").addEventListener("close", ()=>{ const b=$("hdDelete"); b.dataset.armed=""; b.textContent="刪除這檔（含所有交易紀錄）"; });
+
+
+/* ================= 代墊請款 ================= */
+/* 待請款的紀錄不分月份都要看得到，所以另外監看 rb.s == "pending" 的紀錄 */
+function ensureRb(l){ if(S.rbFor!==l.id) startRb(l.id); else renderRb(); }
+function startRb(lid){
+  stopRb(); const tok=S.rbTok={}; S.rbFor=lid;
+  S.unsubRb=onSnapshot(query(collection(db,"ledgers",lid,"entries"), where("rb.s","==","pending")), s=>{
+    if(tok!==S.rbTok) return; S.rbPending=s.docs.map(d=>({id:d.id,...d.data()})); renderRb(); if(S.lid && L()) renderTotals(L()); }, ()=>{});
+}
+function stopRb(){ S.rbTok=null; S.rbFor=null; if(S.unsubRb){ S.unsubRb(); S.unsubRb=null; } S.rbPending=[]; }
+function renderRb(){
+  const l=L(); if(!l) return;
+  const pend=(S.rbPending||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const done=S.entries.filter(e=>isRb(e) && e.rb.s==="done").sort((a,b)=>b.date.localeCompare(a.date));
+  $("rbPanel").hidden = !pend.length && !done.length;
+  const box=$("rbBody"); box.textContent="";
+  if(pend.length){
+    const sum=pend.reduce((t,e)=>t+e.amount,0);
+    const h=el("div","rb-sum"); h.append(el("span",null,`待請款 ${pend.length} 筆`), el("span","num",money(sum))); box.appendChild(h);
+    pend.forEach(e=>box.appendChild(rbRow(l,e)));
+  } else box.appendChild(el("p","small muted","目前沒有待請款的代墊。"));
+  if(done.length){
+    const d=el("details","rb-done"); d.appendChild(el("summary","small",`這段期間已收回 ${done.length} 筆`));
+    done.forEach(e=>d.appendChild(rbRow(l,e))); box.appendChild(d);
+  }
+}
+function rbRow(l,e){
+  const r=el("div","rb-row");
+  const m=el("div"); m.appendChild(el("div",null,e.note||catName(l,e)));
+  m.appendChild(el("div","small muted",[e.date.slice(5).replace("-","/"), catName(l,e), e.card?`${e.pay}・${e.card}`:e.pay, e.payer?e.payer+" 付":""].filter(Boolean).join("・")
+    + (e.rb.s==="done" ? `・${(e.rb.d||"").slice(5).replace("-","/")} 收回 ${fmt(e.rb.a||0)}` + (own(e)?`，自付 ${fmt(own(e))}`:"") : "")));
+  const right=el("div","rb-right"); right.appendChild(el("span","num",money(e.amount)));
+  if(canEdit(l)){ const b=el("button", e.rb.s==="pending"?"btn primary sm":"link", e.rb.s==="pending"?"已收到":"修改"); b.type="button"; b.onclick=()=>openRb(e); right.appendChild(b); }
+  r.append(m,right); return r;
+}
+function openRb(e){
+  S.rbEdit=e; msg("rbMsg","");
+  $("rbWhat").textContent=`${e.note||catName(L(),e)}・${e.date.replace(/-/g,"/")}・代墊 ${money(e.amount)}`;
+  $("rbAmt").value = e.rb.s==="done" ? (e.rb.a||0) : e.amount;
+  $("rbDate").value = e.rb.s==="done" && e.rb.d ? e.rb.d : todayStr();
+  $("rbUndo").hidden = e.rb.s!=="done"; $("rbSave").textContent = e.rb.s==="done" ? "儲存修改" : "確定已收到";
+  rbHint(); $("dlgRb").showModal();
+}
+function rbHint(){
+  const e=S.rbEdit; if(!e) return; const a=Math.round(Number($("rbAmt").value)||0);
+  $("rbHint").textContent = a<e.amount ? `公司少付 ${money(e.amount-a)}，這部分會算成你自己的支出。` : a>e.amount ? `比代墊金額多 ${money(a-e.amount)}，多的部分不會算進收入。` : "全額收回，這筆不會算進你的支出。";
+}
+$("rbAmt").addEventListener("input", rbHint);
+$("formRb").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault();
+  const e=S.rbEdit, a=Math.round(Number($("rbAmt").value)||0), d=$("rbDate").value;
+  if(a<0){ msg("rbMsg","金額不能是負數。","err"); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ msg("rbMsg","請選收到日期。","err"); return; }
+  $("rbSave").disabled=true;
+  try{ await updateDoc(doc(db,"ledgers",L().id,"entries",e.id), { rb:{s:"done", a, d}, updatedAt:serverTimestamp() });
+    $("dlgRb").close(); toast(`已記錄收回 ${money(a)}`); }
+  catch(err){ msg("rbMsg","儲存失敗："+errText(err),"err"); }
+  finally{ $("rbSave").disabled=false; }
+});
+$("rbUndo").onclick=async()=>{
+  try{ await updateDoc(doc(db,"ledgers",L().id,"entries",S.rbEdit.id), { rb:{s:"pending"}, updatedAt:serverTimestamp() }); $("dlgRb").close(); toast("已改回待請款"); }
+  catch(err){ msg("rbMsg","失敗："+errText(err),"err"); }
+};

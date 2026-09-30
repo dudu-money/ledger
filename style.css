@@ -401,3 +401,13 @@ button.pay-cell:hover{border-color:var(--accent)}
 .loan-left{font-size:14px;font-weight:600}
 .io-note{font-size:14px;background:var(--accent-soft);border-radius:8px;padding:8px 10px}
 .io-check{flex-wrap:wrap}
+/* 代墊請款 */
+.rb-check{flex-wrap:wrap}
+.rb-note{color:var(--warn)}
+.rb-sub{color:var(--warn)!important}
+.rb-sum{display:flex;justify-content:space-between;font-weight:600;padding:4px 0 8px;border-bottom:1px solid var(--rule)}
+.rb-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.rb-row>div:first-child{min-width:0}
+.rb-right{display:flex;align-items:center;gap:10px;flex:none}
+.btn.sm{padding:6px 12px;font-size:14px}
+.rb-done summary{cursor:pointer;padding:8px 0;color:var(--muted)}
