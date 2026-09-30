@@ -1082,6 +1082,8 @@ function loanCard(lo, ym){
   const nums=el("div","loan-nums");
   nums.append(el("span",null,`剩餘本金 ${money(st.remain)}`), el("span","muted",`原貸 ${fmt(lo.principal||0)}・已還本金 ${fmt(st.repaid)}`));
   c.appendChild(nums);
+  if(lo.totalPeriods && lo.monthly && st.leftPeriods>0)
+    c.appendChild(el("div","loan-left",`還要繳 ${money(st.leftPeriods*lo.monthly)}（剩 ${st.leftPeriods} 期 × ${fmt(lo.monthly)}）`));
   const meta=[]; if(lo.monthly) meta.push(`月繳 ${fmt(lo.monthly)}`); if(lo.day) meta.push(`每月 ${lo.day} 號`);
   meta.push(lo.totalPeriods ? `已繳 ${st.periods}/${lo.totalPeriods} 期・剩 ${st.leftPeriods} 期` : `已繳 ${st.periods} 期`);
   if(lo.rate) meta.push(`年利率 ${lo.rate}%`);
@@ -1205,6 +1207,7 @@ function openLoan(lo){
   const v=(id,x)=>$(id).value = x==null ? "" : x;
   v("loType",lo?lo.type:""); v("loName",lo?lo.name:""); v("loBank",lo?lo.bank:""); v("loDay",lo&&lo.day?lo.day:"");
   v("loPrincipal",lo?lo.principal:""); v("loMonthly",lo&&lo.monthly?lo.monthly:""); v("loTotal",lo&&lo.totalPeriods?lo.totalPeriods:"");
+  msg("loRateMsg","");
   v("loPeriodsBase",lo?lo.periodsBase||0:0); v("loPaidBase",lo?lo.paidBase||0:0); v("loNote",lo?lo.note:""); v("loRate",lo&&lo.rate?lo.rate:"");
   $("loAdjBox").hidden=!lo; msg("loAdjMsg",""); $("loAdjBal").value="";
   if(lo){ const ms=Object.keys(lo.payments||{}).sort(); $("loAdjYm").value = ms.length ? ms[ms.length-1] : addMonths(thisYM(),-1); renderAdjNow(lo); }
@@ -1245,6 +1248,21 @@ $("loAdjClear").onclick=async()=>{
   const lo=S.editingLoan; if(!lo) return;
   try{ await updateDoc(doc(db,"loans",lo.id), { adj:{}, updatedAt:serverTimestamp() }); msg("loAdjMsg","已取消校正，改回用每期本金計算。","ok"); }
   catch(e){ msg("loAdjMsg","失敗："+errText(e),"err"); }
+};
+/* 推算利率：本息平均攤還，已知本金、期數、月繳，反推年利率 */
+function impliedRate(P, n, M){
+  if(!(P>0 && n>0 && M>0) || M*n<=P) return 0;
+  let lo=0, hi=0.1;
+  for(let k=0;k<200;k++){ const r=(lo+hi)/2, pay=P*r/(1-Math.pow(1+r,-n)); if(pay<M) lo=r; else hi=r; }
+  return (lo+hi)/2*1200;
+}
+$("loRateCalc").onclick=()=>{
+  const P=Number($("loPrincipal").value)||0, n=Number($("loTotal").value)||0, M=Number($("loMonthly").value)||0;
+  if(!P || !n || !M){ msg("loRateMsg","請先填原貸金額、總期數和月繳金額。","err"); return; }
+  if(M*n<=P){ $("loRate").value=0; msg("loRateMsg",`月繳 × 期數（${fmt(M*n)}）沒有超過原貸金額，看起來是無息，年利率填 0。`,"ok"); return; }
+  const r=Math.round(impliedRate(P,n,M)*100)/100;
+  $("loRate").value=r;
+  msg("loRateMsg",`推算年利率約 ${r}%：總共要繳 ${fmt(M*n)}，其中利息 ${fmt(M*n-P)}。第 1 期大約利息 ${fmt(Math.round(P*r/1200))}、本金 ${fmt(M-Math.round(P*r/1200))}。記得按「儲存」。`,"ok");
 };
 $("btnNewLoan").onclick=()=>openLoan(null);
 $("formLoan").addEventListener("submit", async ev=>{

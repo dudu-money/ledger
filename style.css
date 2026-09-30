@@ -398,3 +398,4 @@ button.pay-cell{text-align:left;background:var(--sheet);color:var(--ink);cursor:
 button.pay-cell:hover{border-color:var(--accent)}
 .pay-cell small{display:block;color:var(--muted);font-size:11px}
 .pay-cell.adj{border-color:var(--accent);background:var(--accent-soft)}
+.loan-left{font-size:14px;font-weight:600}
