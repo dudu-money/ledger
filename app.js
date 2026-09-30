@@ -1110,7 +1110,9 @@ function openPay(lo, ym){
   else syncSplit();
   const before=loanStats(lo, ym).remain;
   $("pySplitNote").textContent = lo.rate
-    ? `依年利率 ${lo.rate}%、剩餘本金 ${fmt(before)} 估算，這期利息約 ${fmt(autoInt(lo, ym))} 元。銀行是照實際天數計息，可能差幾塊，照繳款明細或銀行 APP 改成一樣就會完全準確。`
+    ? (intDays(lo, ym)
+      ? `依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% × ${intDays(lo, ym)} 天 ÷ 365（和銀行算法一樣），這期利息約 ${fmt(autoInt(lo, ym))} 元。如果跟銀行 APP 差幾塊，照 APP 改就好。`
+      : `依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% ÷ 12 估算，這期利息約 ${fmt(autoInt(lo, ym))} 元。在「編輯」填「每月繳款日」，就會改用和銀行一樣的天數算法，更準。`)
     : "這筆沒有設定年利率，整筆都算本金。銀行貸款建議在「編輯」填年利率，或照繳款明細自己填利息。";
   const ld=lo.ledgerId && S.ledgers.get(lo.ledgerId);
   $("pyNote").textContent = cur ? (cur.e ? "改金額的話，帳本裡那一筆也會一起改。" : "") : (ld ? `會同時在「${ld.name}」記一筆支出。` : "沒有設定自動記帳（可在「編輯」裡設定）。");
@@ -1118,7 +1120,11 @@ function openPay(lo, ym){
   $("pyUndo").hidden=!cur; $("pyUndo").dataset.armed=""; $("pyUndo").textContent="取消這個月的已繳";
   $("dlgPay").showModal(); setTimeout(()=>$("pyAmount").select(),50);
 }
-const autoInt = (lo, ym) => lo.rate ? Math.round(loanStats(lo, ym).remain*lo.rate/1200) : 0;
+/* 利息估算：有填每月繳款日時，和銀行一樣照「上期繳款日到這期繳款日的實際天數 ÷ 365」算；沒填時用 ÷ 12 */
+const dueDate = (ym, day) => new Date(Number(ym.slice(0,4)), Number(ym.slice(5))-1, Math.min(day, dim(ym)));
+const intDays = (lo, ym) => lo.day ? Math.round((dueDate(ym, lo.day)-dueDate(addMonths(ym,-1), lo.day))/864e5) : 0;
+const autoInt = (lo, ym) => { if(!lo.rate) return 0; const r=loanStats(lo, ym).remain, d=intDays(lo, ym);
+  return Math.round(d ? r*lo.rate/100*d/365 : r*lo.rate/1200); };
 function syncSplit(from){
   const {lo, ym}=S.payLoan, a=Math.round(Number($("pyAmount").value)||0);
   if(from==="p"){ const p=Math.round(Number($("pyPrin").value)||0); $("pyInt").value=Math.max(a-p,0); $("pyInt").dataset.touched="1"; return; }
