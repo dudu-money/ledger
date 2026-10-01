@@ -1221,16 +1221,23 @@ $("pyUndo").onclick=async()=>{
   const b=$("pyUndo"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="再按一次確定取消"; return; }
   await unmarkPaid(S.payLoan.lo, S.payLoan.ym); $("dlgPay").close();
 };
+/* 某個月是第幾期：校正時填的已繳期數已經包含校正月份（含）以前的紀錄 */
+function periodNo(lo, ym){
+  const pays=lo.payments||{};
+  if(hasAdj(lo) && typeof lo.adj.n==="number" && ym<=lo.adj.ym)
+    return lo.adj.n - Object.keys(pays).filter(m=>m>ym && m<=lo.adj.ym && !pays[m].x).length;
+  return loanStats(lo, ym).periods + 1;
+}
+const loanNote = (lo, ym) => (`${[lo.type,lo.bank,lo.name].filter(Boolean).join(" ")} ` + (lo.io ? "緩繳期間利息" : `第 ${periodNo(lo, ym)} 期`)).slice(0,100);
 /* 在設定的帳本記一筆還款支出，回傳 {l, e}；沒設定或沒權限時回傳空字串 */
 async function loanEntry(lo, ym, amt){
   const ld=lo.ledgerId && S.ledgers.get(lo.ledgerId);
   if(!(ld && canEdit(ld))) return {l:"", e:""};
   const cat=(ld.categories||[]).find(c=>c.id===lo.categoryId) || (ld.categories||[]).find(c=>c.type==="out");
-  const st=loanStats(lo, ym);
   const today=todayStr(); const day = ym===today.slice(0,7) ? Number(today.slice(8)) : (lo.day||1);
   const ref=doc(collection(db,"ledgers",ld.id,"entries"));
   await setDoc(ref, { type:"out", amount:amt, categoryId:cat?cat.id:"loan", categoryName:cat?cat.name:(lo.categoryName||"還款"),
-    date:`${ym}-${pad(Math.min(day,dim(ym)))}`, note:(`${[lo.type,lo.bank,lo.name].filter(Boolean).join(" ")} ` + (lo.io ? "緩繳期間利息" : `第 ${st.periods+1} 期`)).slice(0,100),
+    date:`${ym}-${pad(Math.min(day,dim(ym)))}`, note:loanNote(lo, ym),
     pay:"轉帳", card:"", payer:"", status:"paid",
     createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
   return {l:ld.id, e:ref.id, name:ld.name};
@@ -1241,7 +1248,8 @@ async function markPaid(lo, ym, amt, prin, int){
   if(cur){ // 修改已繳的月份
     const rec={...cur, a:amt, p:prin, i:int};
     let added="";
-    if(cur.l && cur.e && cur.a!==amt){ try{ await updateDoc(doc(db,"ledgers",cur.l,"entries",cur.e), {amount:amt, updatedAt:serverTimestamp()}); }catch(e){ /* 帳本沒權限或已刪，略過 */ } }
+    // 修改時順便更新帳本那筆的金額和期數說明
+    if(cur.l && cur.e){ try{ await updateDoc(doc(db,"ledgers",cur.l,"entries",cur.e), {amount:amt, note:loanNote(lo, ym), updatedAt:serverTimestamp()}); }catch(e){ /* 帳本沒權限或已刪，略過 */ } }
     if(!cur.e){ const r=await loanEntry(lo, ym, amt); if(r.e){ rec.l=r.l; rec.e=r.e; added=`，並補記到「${r.name}」`; } } // 當初標記時還沒設定帳本：現在補記
     await updateDoc(doc(db,"loans",lo.id), { payments:{...(lo.payments||{}), [ym]:rec}, updatedAt:serverTimestamp() });
     toast(`已更新 ${ymLabel(ym)}：本金 ${fmt(prin)}、利息 ${fmt(int)}${added}`); return;
