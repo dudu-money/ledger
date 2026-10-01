@@ -1915,7 +1915,7 @@ const TOUR=[
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
   { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」。" },
   { sel:'#viewHome .tabs a[href="#invest"]', title:"投資", text:"股票、ETF 記在這裡：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。手續費依你的折扣自動算，現價可以一鍵更新台股收盤價。只有你自己看得到。" },
-  { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，別人送的也能直接勾掉。清單可以分享給家人一起勾。" },
+  { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
@@ -2687,7 +2687,7 @@ function itemRow(x,i,ed,grouped){
   cb.onclick=ev=>{ ev.preventDefault(); if(i.done) undoItem(x,i); else openBuy(x,i); };
   const main=el("div","li-main"); main.appendChild(el("div","li-text",i.text));
   const meta=[]; if(i.group && !grouped) meta.push(i.group); if(i.priority) meta.push(`優先 ${i.priority}`); if(i.due) meta.push(`${i.due.slice(5).replace("-","/")} 前`); if(i.note) meta.push(i.note);
-  if(i.done){ if(i.via==="gift") meta.push("別人送的／已經有"); if(i.spent) meta.push(`實際 ${fmt(i.spent)}`); if(i.ledgerId){ const lg=S.ledgers.get(i.ledgerId); meta.push(lg?`已記到「${lg.name}」`:"已記帳"); } }
+  if(i.done){ if(i.via==="gift") meta.push("親友送禮"); else if(i.via==="have") meta.push("已有物品"); if(i.spent) meta.push(`實際 ${fmt(i.spent)}`); if(i.ledgerId){ const lg=S.ledgers.get(i.ledgerId); meta.push(lg?`已記到「${lg.name}」`:"已記帳"); } }
   if(meta.length) main.appendChild(el("div","li-meta",meta.join("・")));
   const right=el("div","li-right");
   if(i.amount && !i.done) right.appendChild(el("span","num",fmt(i.amount)));
@@ -2830,12 +2830,15 @@ $("formBuy").addEventListener("submit", async ev=>{
   }catch(e){ msg("byMsg","儲存失敗："+errText(e),"err"); }
   finally{ $("bySave").disabled=false; }
 });
-$("byGift").onclick=async()=>{
+/* 不用花錢就完成的：親友送禮、家裡已有 */
+async function markVia(via, label){
   const x=LI(), i=S.buyItem;
-  try{ await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:true, doneAt:todayStr(), spent:0, ledgerId:"", entryId:"", via:"gift", updatedAt:serverTimestamp() });
-    $("dlgBuy").close(); toast("已標記：別人送的／已經有了"); }
+  try{ await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:true, doneAt:todayStr(), spent:0, ledgerId:"", entryId:"", via, updatedAt:serverTimestamp() });
+    $("dlgBuy").close(); toast("已標記："+label); }
   catch(e){ msg("byMsg","儲存失敗："+errText(e),"err"); }
-};
+}
+$("byGift").onclick=()=>markVia("gift","親友送禮");
+$("byHave").onclick=()=>markVia("have","已有物品");
 async function undoItem(x,i){
   try{
     let note="";
