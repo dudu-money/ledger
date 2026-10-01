@@ -701,8 +701,9 @@
       <div class="grid2">
         <label class="field"><span class="label">銀行 APP 上的剩餘本金</span><input id="loAdjBal" type="number" inputmode="numeric" min="0"></label>
         <label class="field"><span class="label">這是繳完哪個月之後的餘額</span><input id="loAdjYm" type="month"></label>
-        <label class="field"><span class="label">銀行 APP 上的「已繳期數」（選填）</span><input id="loAdjN" type="number" inputmode="numeric" min="0" placeholder="例如 45"></label>
+        <label class="field"><span class="label">銀行 APP 上的「已繳期數」（選填，不是未繳期數）</span><input id="loAdjN" type="number" inputmode="numeric" min="0" placeholder="例如 45"></label>
       </div>
+      <p class="small" id="loAdjNHint"></p>
       <div class="row"><button class="btn" type="button" id="loAdjSave">校正</button><button class="link" type="button" id="loAdjClear" hidden>取消校正</button></div>
       <p class="msg" id="loAdjMsg" role="status"></p>
     </div>
