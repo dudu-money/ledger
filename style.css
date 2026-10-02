@@ -471,3 +471,6 @@ button.pay-cell:hover{border-color:var(--accent)}
 .nw-total td{font-weight:700;border-top:2px solid var(--rule-strong)}
 .sn-loans{padding-left:28px}
 .nw-row.is-loan td:first-child{color:var(--out)}
+.brand-title{display:flex;align-items:center;gap:10px}
+.brand-logo{width:1.15em;height:1.15em;border-radius:.26em;flex:none}
+.center .brand-title{justify-content:center}

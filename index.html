@@ -16,7 +16,8 @@
 <meta name="theme-color" content="#101614" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="記帳本">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,7 +38,7 @@
 <!-- 尚未設定 Firebase -->
 <section class="view center" id="viewSetup" hidden>
   <div class="panel narrow">
-    <h1 class="brand-title">記帳本</h1>
+    <h1 class="brand-title"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <p><b>還差一步：</b>請打開 <code>firebase-config.js</code>，把 Firebase 專案的設定貼進去，再重新整理這個頁面。</p>
     <p class="muted">詳細步驟請看附上的「架設說明」。</p>
   </div>
@@ -51,7 +52,7 @@
 <!-- 登入 -->
 <section class="view center" id="viewLogin" hidden>
   <div class="panel narrow">
-    <h1 class="brand-title">記帳本</h1>
+    <h1 class="brand-title"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <p class="muted">每本帳只有你看得到，除非你分享給指定的人。</p>
     <div class="banner-warn" id="inAppWarn" hidden>你現在是在 App 內建的瀏覽器裡（例如 Facebook、Instagram），Google 登入可能會被擋。請點右上角「⋯」選「用瀏覽器開啟」，或改用 Email 登入。</div>
     <button class="btn primary block" id="btnGoogle" type="button">用 Google 帳號登入</button>
@@ -87,7 +88,7 @@
 <!-- 首頁：帳本列表 -->
 <section class="view" id="viewHome" hidden>
   <header class="topbar">
-    <h1 class="brand-title sm">記帳本</h1>
+    <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
@@ -109,7 +110,7 @@
 <!-- 還款與分期 -->
 <section class="view" id="viewRepay" hidden>
   <header class="topbar">
-    <h1 class="brand-title sm">記帳本</h1>
+    <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
@@ -154,7 +155,7 @@
 <!-- 投資 -->
 <section class="view" id="viewInvest" hidden>
   <header class="topbar">
-    <h1 class="brand-title sm">記帳本</h1>
+    <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
@@ -213,7 +214,7 @@
 <!-- 清單 -->
 <section class="view" id="viewLists" hidden>
   <header class="topbar">
-    <h1 class="brand-title sm">記帳本</h1>
+    <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
@@ -273,7 +274,7 @@
 <!-- 設定 -->
 <section class="view" id="viewSettings" hidden>
   <header class="topbar">
-    <h1 class="brand-title sm">記帳本</h1>
+    <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <a class="btn" href="#">完成</a>
   </header>
   <main class="page narrow-page">
