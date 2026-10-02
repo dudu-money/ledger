@@ -144,6 +144,14 @@ function route(){
 }
 
 /* ================= 登入 ================= */
+/* 其他 App 的內建瀏覽器（FB、IG、Messenger…）會擋 Google 登入，提醒改用瀏覽器 */
+if(/FBAN|FBAV|Instagram|Messenger|MicroMessenger|; wv\)/i.test(navigator.userAgent||"") && !/\bLine\//i.test(navigator.userAgent||"")) $("inAppWarn").hidden=false;
+const shareUrl = () => location.origin + location.pathname + "?openExternalBrowser=1";
+$("gsShareLink").onclick=async()=>{
+  const u=shareUrl();
+  try{ await navigator.clipboard.writeText(u); toast("已複製分享連結，可以直接貼到 LINE"); }
+  catch(e){ prompt("複製這個連結：", u); }
+};
 $("btnGoogle").onclick = async () => {
   msg("loginMsg","");
   try{ await signInWithPopup(auth, new GoogleAuthProvider()); }

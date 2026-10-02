@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script>
+/* 在 LINE 裡打開時，自動加上 openExternalBrowser=1，讓 LINE 改用手機的瀏覽器開啟（LINE 內建瀏覽器不能用 Google 登入） */
+(function(){ try{ var u=navigator.userAgent||"";
+  if(/\bLine\//i.test(u) && !/[?&]openExternalBrowser=1/.test(location.search)){
+    location.replace(location.origin+location.pathname+(location.search?location.search+"&":"?")+"openExternalBrowser=1"+location.hash); }
+}catch(e){} })();
+</script>
 <title>記帳本</title>
 <meta name="description" content="和親友一起用的記帳本：自訂帳本與分類、月／年統計、可分享給指定的人。">
 <meta name="theme-color" content="#1d6b52" media="(prefers-color-scheme: light)">
@@ -46,6 +53,7 @@
   <div class="panel narrow">
     <h1 class="brand-title">記帳本</h1>
     <p class="muted">每本帳只有你看得到，除非你分享給指定的人。</p>
+    <div class="banner-warn" id="inAppWarn" hidden>你現在是在 App 內建的瀏覽器裡（例如 Facebook、Instagram），Google 登入可能會被擋。請點右上角「⋯」選「用瀏覽器開啟」，或改用 Email 登入。</div>
     <button class="btn primary block" id="btnGoogle" type="button">用 Google 帳號登入</button>
     <div class="or"><span>或用 Email</span></div>
     <form id="formEmail" class="stack" autocomplete="on">
@@ -276,6 +284,7 @@
       <h3 class="h3">帳號</h3>
       <div class="between wrap-gap"><span id="gsEmail" class="who-email"></span><button class="btn" data-logout type="button">登出</button></div>
       <div class="between wrap-gap"><span class="small muted">忘了怎麼用？可以重新看一次導覽，所有小提示也會重新出現。</span><button class="btn" id="gsReplay" type="button">重新看一次教學</button></div>
+      <div class="between wrap-gap"><span class="small muted">分享網址給家人：複製的連結在 LINE 裡點開，會自動用手機瀏覽器開啟，Google 登入才不會被擋。</span><button class="btn" id="gsShareLink" type="button">複製分享連結</button></div>
     </section>
 
     <section class="panel">
