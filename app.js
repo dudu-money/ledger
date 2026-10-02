@@ -115,7 +115,7 @@ function show(v){ VIEWS.forEach(id=>$(id).hidden = id!==v); }
 if(!configured){ show("viewSetup"); }
 else {
   onAuthStateChanged(auth, async user => {
-    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopLists(); stopItems(); S.itemsFor=null;
+    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopLists(); stopItems(); S.itemsFor=null; stopSnaps();
     S.user = user; S.email = user && user.email ? user.email.toLowerCase() : "";
     if(!user){ show("viewLogin"); return; }
     if(!user.emailVerified){ $("verifyEmail").textContent=user.email; show("viewVerify"); return; }
@@ -125,7 +125,7 @@ else {
 function signedInStart(){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user.email);
   S.startApplied = !!location.hash; // 網址已經指定頁面時，不套用「直接進入」
-  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchPrefs(); route();
+  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchSnaps(); watchPrefs(); route();
 }
 window.addEventListener("hashchange", ()=>{ if(S.user && S.user.emailVerified) route(); });
 
@@ -1426,7 +1426,7 @@ async function loadCardBill(ym){
   });
 }
 
-let resizeT; window.addEventListener("resize", ()=>{ clearTimeout(resizeT); resizeT=setTimeout(()=>{ if(S.lid && L()) renderTrend(); }, 150); });
+let resizeT; window.addEventListener("resize", ()=>{ clearTimeout(resizeT); resizeT=setTimeout(()=>{ if(S.lid && L()) renderTrend(); if(location.hash==="#invest" && S.snaps && S.snaps.length>1) renderNWChart(); }, 150); });
 
 /* ================= 外觀 ================= */
 const ACCENTS=[["green","綠","#1d6b52"],["blue","藍","#2f5fa8"],["pink","粉","#b0406a"],["purple","紫","#6b4fa8"],["orange","橘","#a55a12"],["ink","墨","#33403b"]];
@@ -1517,7 +1517,7 @@ function renderGlobalSettings(reset=true){
     fillPayOptions("gsPay", p.defaultPay||"現金");
     $("gsPayer").value=p.defaultPayer; $("gsCard").value=p.defaultCard;
     const st=$("gsStart"); st.textContent="";
-    [["","帳本列表"],["#repay","還款與分期"],["#invest","投資"],["#lists","清單"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; st.appendChild(o); });
+    [["","帳本列表"],["#repay","還款與分期"],["#invest","資產"],["#lists","清單"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; st.appendChild(o); });
     [...S.ledgers.values()].forEach(l=>{ const o=el("option",null,"帳本："+l.name); o.value="#l/"+l.id; st.appendChild(o); });
     st.value=p.startPage; if(st.value!==p.startPage) st.value="";
     const il=$("imLedger"), cur=il.value; il.textContent="";
@@ -1712,7 +1712,7 @@ async function buildBackup(){
   }
   const {lastBackup, ...prefs}=P();
   return { app:"記帳本", version:1, exportedAt:new Date().toISOString(), email:S.email,
-    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), prefs };
+    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), snaps:S.snaps.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), prefs };
 }
 const bkName = () => { const d=new Date(); return `記帳本備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
 const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款` + ((b.holdings||[]).length ? `、${b.holdings.length} 檔持股` : "") + ((b.lists||[]).length ? `、${b.lists.length} 個清單` : "");
@@ -1822,8 +1822,9 @@ function showRestore(b){
   $("bkLoans").checked=missing.length>0; $("bkLoans").disabled=!missing.length;
   $("bkLoansText").textContent = (b.loans||[]).length ? `貸款：還原目前沒有的 ${missing.length} 筆（已存在的 ${(b.loans||[]).length-missing.length} 筆會略過）` : "貸款：這份備份沒有貸款";
   const haveH=new Set(S.holdings.map(x=>x.id)), missH=(b.holdings||[]).filter(x=>!haveH.has(x.id));
-  $("bkHolds").checked=missH.length>0; $("bkHolds").disabled=!missH.length;
-  $("bkHoldsText").textContent = (b.holdings||[]).length ? `投資持股：還原目前沒有的 ${missH.length} 檔（已存在的 ${(b.holdings||[]).length-missH.length} 檔會略過）` : "投資持股：這份備份沒有持股";
+  const missS=(b.snaps||[]).filter(x=>!S.snaps.some(y=>y.id===x.id));
+  $("bkHolds").checked=missH.length>0||missS.length>0; $("bkHolds").disabled=!missH.length && !missS.length;
+  $("bkHoldsText").textContent = ((b.holdings||[]).length || (b.snaps||[]).length) ? `資產與投資：還原目前沒有的 ${missH.length} 檔持股、${missS.length} 筆資產紀錄（已存在的會略過）` : "資產與投資：這份備份沒有資料";
   const nLs=(b.lists||[]).length; $("bkLists").checked=nLs>0; $("bkLists").disabled=!nLs;
   $("bkListsText").textContent = nLs ? `清單：${nLs} 個，會建立成新的清單（不會覆蓋現有的）` : "清單：這份備份沒有清單";
   $("bkPrefs").checked=false; $("bkPrefs").disabled=!b.prefs;
@@ -1878,6 +1879,10 @@ $("bkRestore").onclick=async()=>{
           await b.commit(); }
         nLs++; } }
     let nH=0;
+    if(doHolds){ const haveS=new Set(S.snaps.map(x=>x.id));
+      for(const x of (BK.snaps||[]).filter(x=>!haveS.has(x.id))){ try{ await setDoc(doc(db,"snaps",x.id), { ownerUid:S.user.uid, date:String(x.date||todayStr()).slice(0,10),
+        accounts:(x.accounts||[]).slice(0,30).map(a=>({n:String(a.n||"").slice(0,20), v:Number(a.v)||0})), inv:Number(x.inv)||0, loan:Number(x.loan)||0, loans:Array.isArray(x.loans)?x.loans.slice(0,30):[], note:String(x.note||"").slice(0,60),
+        createdAt:serverTimestamp(), updatedAt:serverTimestamp() }); }catch(e){} } }
     if(doHolds){ const have=new Set(S.holdings.map(x=>x.id));
       for(const h of (BK.holdings||[]).filter(x=>!have.has(x.id))){
         await setDoc(doc(db,"holdings",h.id), { sym:String(h.sym||"?").slice(0,12), name:String(h.name||"").slice(0,30), cur:h.cur==="USD"?"USD":"TWD",
@@ -1932,7 +1937,7 @@ const TOUR=[
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
   { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」。" },
-  { sel:'#viewHome .tabs a[href="#invest"]', title:"投資", text:"股票、ETF 記在這裡：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。手續費依你的折扣自動算，現價可以一鍵更新台股收盤價。只有你自己看得到。" },
+  { sel:'#viewHome .tabs a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
@@ -2209,10 +2214,10 @@ function holdStats(h, skipId){
 }
 
 function renderInvestTips(){
-  tipsFor("tipInvest", [["invest","買進、賣出、股息都記在這裡，會自動算持有股數、平均成本和損益（和多數券商 App 一樣用平均成本法）。依台股習慣，紅色是賺、綠色是賠。現價可以按「更新台股收盤價」，或點持股自己填。"]]);
+  tipsFor("tipInvest", [["nw2","上面的「淨資產」：想到的時候（建議每月月底）把各戶頭和現金有多少填一次，系統會自動加上投資市值、扣掉每筆貸款，畫出資產變化。下方的比較表會列出每個戶頭、每筆貸款比上次多或少多少，點一列就能看那一項的曲線。不用記轉帳，也不用跟記帳對得上。"],["invest","買進、賣出、股息都記在這裡，會自動算持有股數、平均成本和損益（和多數券商 App 一樣用平均成本法）。依台股習慣，紅色是賺、綠色是賠。現價可以按「更新台股收盤價」，或點持股自己填。"]]);
 }
 function renderInvest(){
-  renderInvestTips();
+  renderInvestTips(); renderNW();
   const rows=S.holdings.map(h=>({h, st:holdStats(h), fx:fxOf(h)}));
   const act=rows.filter(r=>r.st.q>0).sort((a,b)=>b.st.mv*b.fx-a.st.mv*a.fx);
   const sold=rows.filter(r=>r.st.q<=0);
@@ -2924,3 +2929,167 @@ $("lsLeave").onclick=async()=>{
     $("dlgListSet").close(); S.listId=null; location.hash="#lists"; toast("已離開這個清單"); }
   catch(e){ S.listDeleting=false; msg("lsMsg","離開失敗："+errText(e),"err"); }
 };
+
+/* ================= 資產快照（淨資產） ================= */
+/* 不追蹤每一筆轉帳：想到的時候（例如月底）把各戶頭、現金的金額填一次，
+   系統自動加上投資市值、扣掉貸款剩餘本金，算出淨資產並畫出變化。只有自己看得到。 */
+S.snaps=[];
+function watchSnaps(){
+  stopSnaps(); S.snapsReady=false;
+  S.unsubSnaps=onSnapshot(query(collection(db,"snaps"), where("ownerUid","==",S.user.uid)), snap=>{
+    S.snaps=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.date.localeCompare(b.date)||((a.createdAt&&a.createdAt.seconds)||0)-((b.createdAt&&b.createdAt.seconds)||0));
+    S.snapsReady=true; if(location.hash==="#invest") renderNW();
+  }, e=>msg("investMsg","讀取資產紀錄失敗："+errText(e),"err"));
+}
+function stopSnaps(){ if(S.unsubSnaps){ S.unsubSnaps(); S.unsubSnaps=null; } S.snaps=[]; }
+const snapCash = x => (x.accounts||[]).reduce((t,a)=>t+(Number(a.v)||0),0);
+const snapNet = x => snapCash(x) + (x.inv||0) - (x.loan||0);
+const curInvMV = () => Math.round(S.holdings.reduce((t,h)=>t+holdStats(h).mv*fxOf(h),0));
+const curLoanLeft = () => S.loans.reduce((t,lo)=>t+loanStats(lo).remain,0);
+const loanLabel = lo => [lo.bank,lo.name].filter(Boolean).join(" ") || lo.type || "貸款";
+const curLoans = () => S.loans.map(lo=>({n:loanLabel(lo).slice(0,30), v:loanStats(lo).remain})).filter(x=>x.v>0);
+/* 一筆紀錄拆成各項：帳戶、投資、每筆貸款（舊紀錄沒有分開時就用「貸款」合計） */
+function snapItems(x){
+  const out=(x.accounts||[]).map(a=>({k:"a:"+a.n, n:a.n, v:Number(a.v)||0, t:"acct"}));
+  if(x.inv) out.push({k:"inv", n:"投資", v:x.inv, t:"inv"});
+  if(x.loan){ if(Array.isArray(x.loans) && x.loans.length) x.loans.forEach(l=>out.push({k:"l:"+l.n, n:l.n, v:-(Number(l.v)||0), t:"loan"}));
+    else out.push({k:"l:貸款", n:"貸款", v:-x.loan, t:"loan"}); }
+  return out;
+}
+const md = d => `${Number(d.slice(5,7))}/${Number(d.slice(8,10))}`;
+
+function renderNW(){
+  const sn=S.snaps, last=sn[sn.length-1], prev=sn[sn.length-2];
+  const parts=$("nwParts"); parts.textContent="";
+  if(!last){
+    $("nwSeries").textContent=""; $("nwCompare").textContent="";
+    $("nwNet").textContent = S.snapsReady ? "還沒有記錄" : "讀取中…"; $("nwNet").className="num mid";
+    $("nwWhen").textContent="按「＋ 記錄資產」，把各戶頭和現金現在有多少填一次就好。建議每個月月底記一次，就能看到資產的變化。";
+    $("nwChart").textContent=""; $("nwHistWrap").hidden=true; return;
+  }
+  const net=snapNet(last);
+  $("nwNet").textContent=money(net); $("nwNet").className="num big"+(net<0?" c-out":"");
+  let when=`${last.date.replace(/-/g,"/")} 記錄`;
+  if(prev){ const d=net-snapNet(prev); when+=`・比上次（${md(prev.date)}）${d>=0?"多":"少"} ${money(Math.abs(d))}`; }
+  $("nwWhen").textContent=when;
+  [["戶頭與現金", snapCash(last), ""], ["投資", last.inv||0, ""], ["貸款（"+((last.loans||[]).length||1)+" 筆）", -(last.loan||0), "c-out"]].forEach(([k,v,c])=>{
+    if(k!=="戶頭與現金" && !v) return; if(k.startsWith("貸款") && !(last.loans||[]).length) k="貸款";
+    const d=el("div"); d.append(el("div","label",k), el("div","num mid "+c, (v<0?"−":"")+fmt(Math.abs(v)))); parts.appendChild(d); });
+  renderNWSeries(); renderNWChart(); renderNWCompare();
+  $("nwHistWrap").hidden=false;
+  const h=$("nwHist"); h.textContent="";
+  sn.slice().reverse().forEach(x=>{ const b=el("button","trow"); b.type="button"; b.onclick=()=>openSnap(x);
+    const m=el("div","trow-main"); m.append(el("span","small muted num",x.date), el("strong","num",money(snapNet(x))));
+    const det=snapItems(x).map(i=>`${i.n} ${i.v<0?"−":""}${fmt(Math.abs(i.v))}`).join("・");
+    b.appendChild(m); b.appendChild(el("div","small muted", det + (x.note?`・${x.note}`:""))); h.appendChild(b); });
+}
+function renderNWChart(){
+  const sn=S.snaps, box=$("nwChart");
+  if(sn.length<2){ box.innerHTML=`<p class="small muted">再記錄一次，就會畫出變化的曲線。</p>`; return; }
+  const key=S.nwSeries||"net";
+  const valOf = x => key==="net" ? snapNet(x) : ((snapItems(x).find(i=>i.k===key)||{}).v);
+  const pts=sn.slice(-24).filter(x=>valOf(x)!=null), vals=pts.map(x=>Math.abs(valOf(x)));
+  if(pts.length<2){ box.innerHTML=`<p class="small muted">這個項目還不到兩筆紀錄，畫不出變化。</p>`; return; }
+  const W=Math.max(300,Math.min(720,box.clientWidth||640)), H=W<480?180:200, Lp=54, R=14, T=14, B=26;
+  let lo=Math.min(...vals), hi=Math.max(...vals); if(lo===hi){ lo-=1000; hi+=1000; }
+  const pad0=(hi-lo)*.12; lo-=pad0; hi+=pad0;
+  const xv=i=>Lp+(W-Lp-R)*(pts.length===1?0.5:i/(pts.length-1)), yv=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="淨資產變化">`;
+  for(let k=0;k<=3;k++){ const v=lo+(hi-lo)*k/3, y=yv(v);
+    s+=`<line x1="${Lp}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--rule)"/>`;
+    s+=`<text x="${Lp-6}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--f-num)">${(v<0?"-":"")+tick(Math.abs(Math.round(v/1000)*1000))}</text>`; }
+  const col = key.startsWith("l:") ? "var(--out)" : "var(--accent)";
+  s+=`<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p,i)=>`${xv(i)},${yv(vals[i])}`).join(" ")}"/>`;
+  const every=Math.ceil(pts.length/8);
+  pts.forEach((p,i)=>{ s+=`<circle cx="${xv(i)}" cy="${yv(vals[i])}" r="${i===pts.length-1?5:3.5}" fill="${col}"><title>${p.date}：${money(vals[i])}</title></circle>`;
+    if(i%every===0 || i===pts.length-1) s+=`<text x="${xv(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--f-num)">${md(p.date)}</text>`; });
+  box.innerHTML=s+"</svg>";
+}
+
+/* 記錄／修改一筆 */
+$("nwAdd").onclick=()=>openSnap(null);
+function snapRow(n,v){
+  const r=el("div","sn-row");
+  const ni=el("input"); ni.type="text"; ni.maxLength=20; ni.placeholder="例如：郵局、現金"; ni.value=n||""; ni.className="sn-n"; ni.setAttribute("aria-label","帳戶名稱");
+  const vi=el("input"); vi.type="number"; vi.inputMode="numeric"; vi.placeholder="金額"; vi.value=v!=null&&v!==""?v:""; vi.className="sn-v"; vi.setAttribute("aria-label","金額");
+  const x=el("button","icon-btn","✕"); x.type="button"; x.setAttribute("aria-label","移除這個帳戶"); x.onclick=()=>{ r.remove(); snapTotal(); };
+  vi.addEventListener("input", snapTotal);
+  r.append(ni,vi,x); return r;
+}
+function openSnap(x){
+  S.snEdit=x; msg("snMsg","");
+  $("snTitle").textContent = x ? "修改資產紀錄" : "記錄資產";
+  $("snDate").value = x ? x.date : todayStr(); $("snNote").value = x ? (x.note||"") : "";
+  const box=$("snAccts"); box.textContent="";
+  const src = x || S.snaps[S.snaps.length-1];
+  const accts = src && (src.accounts||[]).length ? src.accounts : [{n:"",v:""},{n:"現金",v:""}];
+  accts.forEach(a=>box.appendChild(snapRow(a.n, x ? a.v : (src ? a.v : ""))));
+  S.snInv = x ? (x.inv||0) : curInvMV(); S.snLoan = x ? (x.loan||0) : curLoanLeft();
+  S.snLoans = x ? (x.loans||[]) : curLoans();
+  $("snLoans").textContent = S.snLoans.length>1 ? S.snLoans.map(l=>`${l.n} −${fmt(l.v)}`).join("・") : "";
+  $("snInvV").textContent=fmt(S.snInv); $("snLoanV").textContent="−"+fmt(S.snLoan);
+  $("snInv").checked = x ? !!x.inv : S.snInv>0; $("snLoan").checked = x ? !!x.loan : S.snLoan>0;
+  $("snInv").parentElement.hidden = !S.snInv && !x; $("snLoan").parentElement.hidden = !S.snLoan && !x;
+  $("snDelete").hidden=!x; $("snDelete").dataset.armed=""; $("snDelete").textContent="刪除這筆";
+  snapTotal(); $("dlgSnap").showModal();
+}
+$("snAddAcct").onclick=()=>{ const r=snapRow("",""); $("snAccts").appendChild(r); r.querySelector(".sn-n").focus(); };
+["snInv","snLoan"].forEach(id=>$(id).addEventListener("change", snapTotal));
+function snapRows(){ return [...document.querySelectorAll("#snAccts .sn-row")].map(r=>({n:r.querySelector(".sn-n").value.trim().slice(0,20), v:Math.round(Number(r.querySelector(".sn-v").value)||0), blank:r.querySelector(".sn-v").value.trim()===""})); }
+function snapTotal(){
+  const cash=snapRows().reduce((t,a)=>t+a.v,0), net=cash+($("snInv").checked?S.snInv:0)-($("snLoan").checked?S.snLoan:0);
+  $("snNet").textContent=money(net); $("snNet").className="num"+(net<0?" c-out":"");
+}
+$("formSnap").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault();
+  const date=$("snDate").value; if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ msg("snMsg","請選日期。","err"); return; }
+  const rows=snapRows().filter(a=>a.n || !a.blank);
+  if(rows.some(a=>!a.n)){ msg("snMsg","有金額的帳戶要填名稱，例如「郵局」「現金」。","err"); return; }
+  if(!rows.length){ msg("snMsg","至少填一個戶頭或現金。","err"); return; }
+  if(rows.length>30){ msg("snMsg","帳戶最多 30 個。","err"); return; }
+  const data={ date, accounts:rows.map(a=>({n:a.n, v:a.v})), inv:$("snInv").checked?S.snInv:0, loan:$("snLoan").checked?S.snLoan:0, loans:$("snLoan").checked?(S.snLoans||[]).slice(0,30):[],
+    note:$("snNote").value.trim().slice(0,60), updatedAt:serverTimestamp() };
+  $("snSave").disabled=true;
+  try{
+    if(S.snEdit) await updateDoc(doc(db,"snaps",S.snEdit.id), data);
+    else await addDoc(collection(db,"snaps"), {...data, ownerUid:S.user.uid, createdAt:serverTimestamp()});
+    $("dlgSnap").close(); toast(`已記錄：淨資產 ${money(snapNet(data))}`);
+  }catch(e){ msg("snMsg","儲存失敗："+errText(e),"err"); }
+  finally{ $("snSave").disabled=false; }
+});
+$("snDelete").onclick=async()=>{
+  const b=$("snDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？"; return; }
+  try{ await deleteDoc(doc(db,"snaps",S.snEdit.id)); $("dlgSnap").close(); toast("已刪除"); }
+  catch(e){ msg("snMsg","刪除失敗："+errText(e),"err"); }
+};
+
+/* 曲線要看哪一項：淨資產、某個帳戶、投資、某筆貸款 */
+function renderNWSeries(){
+  const box=$("nwSeries"); box.textContent="";
+  const keys=new Map([["net","淨資產"]]);
+  S.snaps.slice().reverse().forEach(x=>snapItems(x).forEach(i=>{ if(!keys.has(i.k)) keys.set(i.k, i.n+(i.t==="loan"?"（貸款）":"")); }));
+  if(!keys.has(S.nwSeries||"net")) S.nwSeries="net";
+  keys.forEach((label,k)=>{ const b=el("button","chip",label); b.type="button"; b.setAttribute("aria-pressed", k===(S.nwSeries||"net"));
+    b.onclick=()=>{ S.nwSeries=k; renderNWSeries(); renderNWChart(); }; box.appendChild(b); });
+}
+/* 和上一筆比：每個帳戶、投資、每筆貸款各自變多少 */
+function renderNWCompare(){
+  const box=$("nwCompare"); box.textContent=""; const sn=S.snaps; if(sn.length<2) return;
+  const a=sn[sn.length-2], b=sn[sn.length-1], A=new Map(snapItems(a).map(i=>[i.k,i])), B=new Map(snapItems(b).map(i=>[i.k,i]));
+  const keys=[...new Set([...B.keys(), ...A.keys()])];
+  const t=el("table","btable nw-cmp"), th=el("thead"), hr=el("tr");
+  ["項目",`上次 ${md(a.date)}`,`這次 ${md(b.date)}`,"變化"].forEach(x=>hr.appendChild(el("th",null,x))); th.appendChild(hr);
+  const tb=el("tbody");
+  keys.forEach(k=>{ const x=A.get(k), y=B.get(k), it=y||x, va=x?x.v:0, vb=y?y.v:0, d=vb-va;
+    const tr=el("tr"); tr.className="nw-row"+(it.t==="loan"?" is-loan":""); tr.title="看這一項的曲線"; tr.onclick=()=>{ S.nwSeries=k; renderNWSeries(); renderNWChart(); $("nwChart").scrollIntoView({block:"nearest"}); };
+    const f=v=>v==null?"—":(v<0?"−":"")+fmt(Math.abs(v));
+    tr.append(el("td",null,it.n+(it.t==="loan"?"（貸款）":"")), el("td","num",x?f(va):"—"), el("td","num",y?f(vb):"—"),
+      el("td","num "+(d>0?"c-in":d<0?"c-out":"muted"), d? (d>0?"+":"−")+fmt(Math.abs(d)) : "—"));
+    tb.appendChild(tr); });
+  const nd=snapNet(b)-snapNet(a), fr=el("tr"); fr.className="nw-total";
+  fr.append(el("td",null,"淨資產"), el("td","num",fmt(snapNet(a))), el("td","num",fmt(snapNet(b))), el("td","num "+(nd>0?"c-in":nd<0?"c-out":""), (nd>=0?"+":"−")+fmt(Math.abs(nd))));
+  tb.appendChild(fr);
+  t.append(th,tb); const w=el("div","table-wrap"); w.appendChild(t);
+  box.append(el("div","label nw-cmp-title","和上次比較（點一列可以看那一項的曲線）"), w);
+}

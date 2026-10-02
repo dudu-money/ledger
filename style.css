@@ -448,3 +448,26 @@ button.pay-cell:hover{border-color:var(--accent)}
 .li-newgroup{width:160px;padding:6px 10px!important;font-size:14px}
 .li-ghead{display:flex;justify-content:space-between;align-items:baseline;padding:14px 2px 6px;font-weight:700;border-bottom:2px solid var(--rule-strong)}
 .li-add-wrap .li-add{padding:0}
+
+/* ---- 淨資產 ---- */
+.nw-panel{margin-bottom:18px}
+.nw-top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.nw-parts{display:flex;gap:24px;flex-wrap:wrap}
+.nw-chart svg{width:100%;height:auto;display:block}
+#nwHistWrap summary{cursor:pointer;color:var(--muted);padding:6px 0}
+.iv-h{margin:6px 0 10px}
+.sn-accts{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.sn-row{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:8px;align-items:center}
+.sn-auto{justify-content:space-between}
+.sn-auto span:nth-child(2){flex:1}
+.sn-total{display:flex;justify-content:space-between;font-weight:700;font-size:18px;border-top:1px dashed var(--rule-strong);padding-top:10px}
+@media (max-width:560px){ .sn-row{grid-template-columns:minmax(0,1fr) 110px auto} .nw-parts{gap:16px} }
+.nw-series{margin-top:4px}
+.nw-series .chip{font-size:13px;padding:4px 10px}
+.nw-cmp-title{margin-top:12px}
+.nw-cmp td,.nw-cmp th{white-space:nowrap}
+.nw-row{cursor:pointer}
+.nw-row:hover td{background:var(--accent-soft)}
+.nw-total td{font-weight:700;border-top:2px solid var(--rule-strong)}
+.sn-loans{padding-left:28px}
+.nw-row.is-loan td:first-child{color:var(--out)}

@@ -83,7 +83,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="banner-warn" id="bkReminder" hidden><span id="bkReminderText"></span><a class="btn" href="#settings">去備份</a></div>
     <div class="home-head">
       <h2 class="h2">我的帳本</h2>
@@ -105,7 +105,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipRepay"></div>
     <div class="period">
       <div class="period-nav">
@@ -150,8 +150,20 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipInvest"></div>
+    <section class="panel nw-panel" aria-label="淨資產">
+      <div class="between wrap-gap"><h3 class="h3">淨資產</h3><button class="btn primary" id="nwAdd" type="button">＋ 記錄資產</button></div>
+      <div class="nw-top">
+        <div><div class="num big" id="nwNet">—</div><div class="small muted" id="nwWhen"></div></div>
+        <div class="nw-parts" id="nwParts"></div>
+      </div>
+      <div class="chips nw-series" id="nwSeries"></div>
+      <div id="nwChart" class="nw-chart"></div>
+      <div id="nwCompare"></div>
+      <details id="nwHistWrap" hidden><summary class="small">記錄明細</summary><div id="nwHist"></div></details>
+    </section>
+    <h2 class="h2 iv-h">投資</h2>
     <div class="layout">
       <section class="panel totals" aria-label="投資總覽">
         <div><div class="label">目前市值</div><div class="num big" id="ivMV">NT$ 0</div><div class="small" id="ivMVNote"></div></div>
@@ -197,7 +209,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab" aria-current="page">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab" aria-current="page">清單</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipLists"></div>
     <div class="home-head">
       <h2 class="h2">我的清單</h2>
@@ -257,7 +269,7 @@
     <a class="btn" href="#">完成</a>
   </header>
   <main class="page narrow-page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">投資</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
     <div class="tip-slot" id="tipSettings"></div>
 
     <section class="panel">
@@ -909,6 +921,29 @@
       <button class="btn danger" type="button" id="lsDelete">刪除這個清單</button>
       <button class="btn danger" type="button" id="lsLeave" hidden>離開這個清單</button>
     </div>
+  </form>
+</dialog>
+
+<!-- 記錄資產 -->
+<dialog id="dlgSnap" aria-labelledby="snTitle">
+  <form method="dialog" id="formSnap" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="snTitle">記錄資產</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p class="small muted">看銀行 App 或錢包，把現在的金額填進來就好，不用跟記帳對得上。上次填的帳戶會自動帶入。</p>
+    <label class="field"><span class="label">日期</span><input id="snDate" type="date" required></label>
+    <div class="field"><span class="label">戶頭與現金</span><div id="snAccts" class="sn-accts"></div>
+      <button class="btn" type="button" id="snAddAcct">＋ 新增帳戶</button></div>
+    <div class="field"><span class="label">自動帶入（目前的數字）</span>
+      <label class="check sn-auto"><input type="checkbox" id="snInv" checked> <span>投資市值</span><span class="num" id="snInvV"></span></label>
+      <label class="check sn-auto"><input type="checkbox" id="snLoan" checked> <span>貸款剩餘本金（扣掉）</span><span class="num" id="snLoanV"></span></label>
+      <div class="sn-loans small muted" id="snLoans"></div>
+    </div>
+    <div class="sn-total"><span>淨資產</span><span class="num" id="snNet">NT$ 0</span></div>
+    <label class="field"><span class="label">備註</span><input id="snNote" type="text" maxlength="60" placeholder="例如：年終入帳、繳完學貸"></label>
+    <div class="row">
+      <button class="btn danger" type="button" id="snDelete" hidden>刪除這筆</button>
+      <button class="btn primary grow" type="submit" value="save" id="snSave">儲存</button>
+    </div>
+    <p class="msg" id="snMsg" role="status"></p>
   </form>
 </dialog>
 
