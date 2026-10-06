@@ -683,7 +683,7 @@ function renderEntryCats(){
 }
 function setEType(t){ S.eType=t;
   // 收入時：付款人 → 誰的收入，付款方式 → 收款方式
-  { const lx=L(); $("ePayerLabel").textContent = t==="in" ? "誰的收入（選填）" : (lx && aaOn(lx)) ? "付款人（必填）" : "付款人（選填）"; }
+  { const lx=L(); $("ePayerLabel").textContent = t==="in" ? "誰的收入（選填）" : (lx && aaOn(lx)) ? "① 誰先付的錢（必填）" : "付款人（選填）"; }
   $("ePayLabel").textContent = t==="in" ? "收款方式" : "付款方式";
   $("eNote").placeholder = t==="in" ? "例如：9 月薪水" : "例如：午餐便當";
   if($("eMultiPayWrap")) renderMultiPay();
@@ -829,10 +829,11 @@ function openEntry(e){
   // 付款人：有常用名單時直接放在主畫面，方便點選
   const pf=$("ePayerField");
   if(aaOn(l) || knownPayers().length || (e&&e.payer)) $("eNote").parentElement.before(pf); else $("eMore").querySelector(".stack").prepend(pf);
+  if(aaOn(l)) pf.after($("eSplitBox")); // 先填誰付的，再選怎麼分
   $("eMore").querySelector("summary").firstChild.textContent = pf.closest("#eMore") ? "更多：付款人、狀態" : "更多：狀態";
   S.eSplit = e && e.split ? {m:e.split.m, r:{...(e.split.r||{})}} : {m:"d", r:{}};
   $("eMultiPay").checked = !!paidMap(e); S.ePaid = paidMap(e) ? {...paidMap(e)} : null;
-  fillDatalists(); syncCardUI(); renderPayerChips(); renderCardChips(); renderSplitUI(); renderMultiPay();
+  fillDatalists(); syncCardUI(); renderPayerChips(); renderCardChips(); renderSplitUI(); renderMultiPay(); syncSplitLabels(); splitNote();
   $("dlgEntry").showModal();
   if(e && e.inst){ // 讀出這組分期原本的每期金額
     const l2=l, g=e.inst.g;
@@ -2134,20 +2135,38 @@ function renderSplitUI(){
 }
 function splitNote(){
   const l=L(); if(!aaOn(l)) return;
-  const people=l.split.people, amt=Math.round(Number($("eAmount").value)||0), payer=$("ePayer").value.trim(), n=$("eSplitNote");
+  const people=l.split.people, amt=Math.round(Number($("eAmount").value)||0), n=$("eSplitNote");
+  const multi=$("eMultiPay").checked, payer=$("ePayer").value.trim();
   n.classList.remove("warn-text");
-  if(payer && !people.includes(payer)){ n.classList.add("warn-text"); n.textContent=`「${payer}」不在分攤名單（${people.join("、")}），這筆不會算進 AA。`; return; }
-  if(!payer){ n.textContent="選好付款人，這筆才會算進 AA 結算。"; return; }
-  if(S.eSplit.m==="s"){ n.textContent=`這筆全部算 ${payer} 自己的，不用分。`; return; }
-  if(S.eSplit.m==="a"){
-    const sum=people.reduce((s,p)=>s+(Number(S.eSplit.r[p])||0),0);
-    if(sum!==amt){ n.classList.add("warn-text"); n.textContent=`每人金額加起來是 ${money(sum)}，要等於這筆金額 ${money(amt)}（差 ${money(Math.abs(amt-sum))}）。`; return; }
-    n.textContent=people.map(p=>`${p} 分攤 ${money(S.eSplit.r[p]||0)}（${amt?Math.round((S.eSplit.r[p]||0)/amt*1000)/10:0}%）`).join("・"); return;
+  if(multi && S.eSplit.m==="s"){ n.textContent="各自付的就是各自負擔的，這筆不用互相補錢。"; return; }
+  if(!multi){
+    if(payer && !people.includes(payer)){ n.classList.add("warn-text"); n.textContent=`「${payer}」不在分攤名單（${people.join("、")}），這筆不會算進 AA。`; return; }
+    if(!payer){ n.textContent="先在上面選誰付的錢，這筆才會算進 AA 結算。"; return; }
+    if(S.eSplit.m==="s"){ n.textContent=`這筆全部算 ${payer} 自己的，不用分。`; return; }
   }
-  const r = S.eSplit.m==="c" ? S.eSplit.r : (l.split.ratio||evenRatio(people));
-  const sum=people.reduce((s,p)=>s+(Number(r[p])||0),0);
-  if(Math.abs(sum-100)>0.01){ n.classList.add("warn-text"); n.textContent=`比例加起來是 ${sum}%，要剛好 100%。`; return; }
-  n.textContent = amt>0 ? people.map(p=>`${p} 分攤 ${money(amt*(Number(r[p])||0)/100)}`).join("・") : people.map(p=>`${p} ${r[p]}%`).join("・");
+  // 每人應負擔
+  let share={};
+  if(S.eSplit.m==="a"){
+    const sum=people.reduce((t,p)=>t+(Number(S.eSplit.r[p])||0),0);
+    if(sum!==amt){ n.classList.add("warn-text"); n.textContent=`每人金額加起來是 ${money(sum)}，要等於這筆金額 ${money(amt)}（差 ${money(Math.abs(amt-sum))}）。`; return; }
+    people.forEach(p=>share[p]=Number(S.eSplit.r[p])||0);
+  } else {
+    const r = S.eSplit.m==="c" ? S.eSplit.r : (l.split.ratio||evenRatio(people));
+    const sum=people.reduce((t,p)=>t+(Number(r[p])||0),0);
+    if(Math.abs(sum-100)>0.01){ n.classList.add("warn-text"); n.textContent=`比例加起來是 ${sum}%，要剛好 100%。`; return; }
+    if(!(amt>0)){ n.textContent=people.map(p=>`${p} ${r[p]}%`).join("・"); return; }
+    people.forEach(p=>share[p]=amt*(Number(r[p])||0)/100);
+  }
+  // 每人實際付的
+  const paid={}; people.forEach(p=>paid[p]=0);
+  if(multi){ people.forEach(p=>paid[p]=Number((S.ePaid||{})[p])||0); } else paid[payer]=amt;
+  let txt=people.map(p=>`${p} 應負擔 ${money(share[p])}`).join("・");
+  // 這筆誰要補誰（兩個人時最清楚）
+  const bal=people.map(p=>[p, paid[p]-share[p]]).filter(x=>Math.abs(x[1])>=0.5);
+  if(people.length===2 && bal.length){ const over=bal.find(x=>x[1]>0), under=bal.find(x=>x[1]<0);
+    if(over && under) txt+=`。這筆算下來：${under[0]} 要補給 ${over[0]} ${money(over[1])}`; }
+  else if(!bal.length && amt>0) txt+="。這筆剛好打平，不用補錢";
+  n.textContent=txt+"。";
 }
 document.querySelectorAll("#eSplitMode button").forEach(b=>b.onclick=()=>{
   if(b.dataset.m==="c"){ if(S.eSplit.m!=="c" && S.eSplit.m!=="a"){ S.eSplit.m = store.get("ledger.splitUnit")==="a" ? "a" : "c"; S.eSplit.r={}; } }
@@ -3139,16 +3158,22 @@ function renderMultiPay(){
     inp.value=S.ePaid[p]; inp.dataset.p=p; inp.setAttribute("aria-label",p+" 付了多少");
     inp.addEventListener("input",()=>{ S.ePaid[p]=Math.max(0,Math.round(Number(inp.value)||0));
       if(people.length===2){ const o=people[1-idx], a=Math.round(Number($("eAmount").value)||0); S.ePaid[o]=Math.max(a-S.ePaid[p],0); const oi=grid.querySelector(`input[data-p="${o}"]`); if(oi) oi.value=S.ePaid[o]; }
-      multiPayNote(); });
+      multiPayNote(); splitNote(); });
     w.append(document.createTextNode("NT$ "), inp); lab.appendChild(w); grid.appendChild(lab); });
   multiPayNote();
 }
 function multiPayNote(){
   const l=L(); if(!l||!aaOn(l)) return; const people=l.split.people, amt=Math.round(Number($("eAmount").value)||0), n=$("eMultiPayNote");
   const sum=people.reduce((t,p)=>t+(S.ePaid[p]||0),0); n.classList.toggle("warn-text", sum!==amt);
-  n.textContent = sum!==amt ? `每人付的加起來是 ${money(sum)}，要等於這筆金額 ${money(amt)}。` : "各自先付了多少，AA 結算會照這個算誰要補給誰。";
+  n.textContent = sum!==amt ? `每人付的加起來是 ${money(sum)}，要等於這筆金額 ${money(amt)}。` : "這裡填「實際各付了多少」。如果各付的剛好就是各自該負擔的，下面選「各付各的」就好。";
 }
-$("eMultiPay").addEventListener("change", ()=>{ if($("eMultiPay").checked) S.ePaid=null; renderMultiPay(); });
+$("eMultiPay").addEventListener("change", ()=>{ if($("eMultiPay").checked) S.ePaid=null; renderMultiPay(); syncSplitLabels(); splitNote(); });
 $("eAmount").addEventListener("input", ()=>{ const l=L(); if(!l || !aaOn(l) || !$("eMultiPay").checked) return;
   const ppl=l.split.people; if(ppl.length===2){ const amt=Math.round(Number($("eAmount").value)||0); S.ePaid[ppl[1]]=Math.max(amt-(S.ePaid[ppl[0]]||0),0); const bi=$("eMultiPayGrid").querySelector(`input[data-p="${ppl[1]}"]`); if(bi) bi.value=S.ePaid[ppl[1]]; }
   multiPayNote(); });
+
+/* 「只算付款人」在兩個人各付一部分時，意思就是「各付各的」 */
+function syncSplitLabels(){
+  const b=document.querySelector('#eSplitMode button[data-m="s"]'); if(!b) return;
+  b.textContent = $("eMultiPay").checked ? "各付各的" : "只算付款人";
+}
