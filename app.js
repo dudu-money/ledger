@@ -365,12 +365,33 @@ function watchEntries(){
   const col=collection(db,"ledgers",S.lid,"entries");
   const q= r ? query(col, where("date",">=",r[0]), where("date","<=",r[1])) : query(col);
   const token = S.entriesToken = {};
-  S.unsubEntries=onSnapshot(q, snap=>{
-    if(token!==S.entriesToken) return;
-    S.entries=snap.docs.map(d=>({id:d.id, ...d.data()})); S.entriesReady=true; renderAll();
-  }, e=>{ if(token!==S.entriesToken) return; S.entriesReady=true; renderAll(); toast("讀取紀錄失敗："+errText(e)); });
+  const buy = instAtBuy(L());
+  // 分期記在刷卡當月：另外抓「刷卡日」在這段期間的分期
+  let a=null, b= buy && r ? null : [], ready=0;
+  const merge=()=>{ if(token!==S.entriesToken || a==null || b==null) return;
+    const m=new Map(); [...a, ...b].forEach(e=>m.set(e.id,e));
+    S.entries = buy ? foldInst([...m.values()], r) : [...m.values()]; S.entriesReady=true; renderAll(); };
+  const fail=e=>{ if(token!==S.entriesToken) return; S.entriesReady=true; renderAll(); toast("讀取紀錄失敗："+errText(e)); };
+  S.unsubEntries=onSnapshot(q, snap=>{ a=snap.docs.map(d=>({id:d.id, ...d.data()})); merge(); }, fail);
+  if(buy && r) S.unsubEntries2=onSnapshot(query(col, where("inst.purchase",">=",r[0]), where("inst.purchase","<=",r[1])), snap=>{ b=snap.docs.map(d=>({id:d.id, ...d.data()})); merge(); }, fail);
 }
-function stopEntries(){ S.entriesToken=null; if(S.unsubEntries){ S.unsubEntries(); S.unsubEntries=null; } S.entries=[]; }
+function stopEntries(){ S.entriesToken=null; if(S.unsubEntries){ S.unsubEntries(); S.unsubEntries=null; } if(S.unsubEntries2){ S.unsubEntries2(); S.unsubEntries2=null; } S.entries=[]; }
+/* 帳本設定「分期消費記在刷卡當月」 */
+const instAtBuy = l => !!l && l.instAt==="buy";
+/* 把同一組分期（商品、手續費分開）合成一筆，日期用刷卡日、金額用全部期數加總 */
+function foldInst(list, r){
+  const out=[], groups=new Map();
+  list.forEach(e=>{
+    if(!e.inst){ out.push(e); return; }
+    const pd=e.inst.purchase||e.date; if(r && (pd<r[0] || pd>r[1])) return;
+    const k=e.inst.g+"|"+e.categoryId; let g=groups.get(k);
+    if(!g){ g={...e, amount:0, date:pd, _fold:[], _first:e}; groups.set(k,g); out.push(g); }
+    g.amount+=e.amount; g._fold.push(e);
+    if(e.inst.k < g._first.inst.k){ g._first=e; }
+  });
+  groups.forEach(g=>{ const f=g._first; g.id=f.id; g.inst={...f.inst}; g._per=f.amount; g._start=f.date.slice(0,7); g.status = g._fold.some(isPending) ? "pending" : "paid"; });
+  return out;
+}
 
 /* 期間切換 */
 function setMode(m){ S.period.mode=m; S.catFilter=null; watchEntries(); }
@@ -414,7 +435,7 @@ function renderAll(){
 
 function renderTotals(l){
   let o=0,i=0,pn=0,pa=0; S.entries.forEach(e=>{ if(e.type==="in") i+=e.amount; else o+=own(e); if(isPending(e)){ pn++; pa+=e.amount; } });
-  const rbp=S.rbPending||[]; $("rbNote").hidden=!rbp.length;
+  const rr=periodRange(), rbp=(S.rbPending||[]).filter(e=>!rr || (e.date>=rr[0] && e.date<=rr[1])); $("rbNote").hidden=!rbp.length;
   if(rbp.length) $("rbNote").textContent=`另有代墊待請款 ${rbp.length} 筆，共 ${money(rbp.reduce((t,e)=>t+e.amount,0))}（不算在支出裡）`;
   const mode=S.period.mode, proj=isProj(l);
   if(proj){
@@ -610,6 +631,7 @@ function renderList(){
       main.appendChild(note);
       const meta=[];
       if(e._group) meta.push(`${e.card||"信用卡"} 分 ${e.inst.n} 期・每期約 ${fmt(Math.floor(e.inst.total/e.inst.n))}`);
+      else if(e.inst && e._fold) meta.push(`${e.card||"信用卡"} 分期 ${e.inst.n} 期・${Number(e._start.slice(5))} 月起每期 ${fmt(e._per)}`);
       else if(e.inst) meta.push(`${e.card||"信用卡"} 分期 ${e.inst.k}/${e.inst.n}`); else if(e.card) meta.push(`${e.pay}・${e.card}`); else if(e.pay) meta.push(e.pay);
       if(paidMap(e) && !e.inst) meta.push(Object.entries(paidMap(e)).map(([p,a])=>`${p} ${fmt(a)}`).join("＋")+" 付");
       else if(e.payer) meta.push(e.payer+(e.type==="in"?" 的收入":" 付"));
@@ -1018,14 +1040,14 @@ function renderSettings(resetInputs){
   const owner=isOwner(l), editor=canEdit(l);
   if(resetInputs){
     $("sName").value=l.name; $("sBudget").value=l.budget||0; S.sColor=l.color||COLORS[0];
-    $("sProject").checked=isProj(l); $("sPBudget").value=l.projectBudget||0; $("sWeek").value=l.weekStart||"";
+    $("sProject").checked=isProj(l); $("sPBudget").value=l.projectBudget||0; $("sWeek").value=l.weekStart||""; $("sInstAt").value=instAtBuy(l)?"buy":"bill";
     ["sBasicMsg","sCatMsg","sShareMsg","sDangerMsg"].forEach(id=>msg(id,"")); $("sDelConfirm").value=""; $("sEmail").value="";
   }
   if(resetInputs){ const sp=l.split||{}; const ppl=(sp.people&&sp.people.length?sp.people:knownPayersAll().slice(0,2));
     S.aaDraft={ on:!!sp.on, people:[...ppl], ratio:{...(sp.ratio||evenRatio(ppl))} }; msg("sAAMsg",""); }
   $("sAA").hidden=!editor; renderAASettings();
   $("sName").disabled=!owner; $("sBudget").disabled=!editor; $("sSaveBasic").hidden=!editor;
-  $("sProject").disabled=!owner; $("sWeek").disabled=!owner; $("sPBudget").disabled=!editor;
+  $("sProject").disabled=!owner; $("sWeek").disabled=!owner; $("sInstAt").disabled=!owner; $("sPBudget").disabled=!editor;
   $("sProjBox").hidden=!$("sProject").checked;
   if(resetInputs || !$("sColors").childElementCount) swatches("sColors", S.sColor, c=>{ S.sColor=c; }, !owner);
   $("sCats").hidden=!editor;
@@ -1064,9 +1086,10 @@ $("sSaveBasic").onclick=async()=>{
   upd.budget=Math.max(0,Math.round(Number($("sBudget").value)||0));
   upd.projectBudget=Math.max(0,Math.round(Number($("sPBudget").value)||0));
   if(isOwner(l)){ const n=$("sName").value.trim(); if(!n){ msg("sBasicMsg","帳本名稱不能空白。","err"); return; }
-    upd.name=n; upd.color=S.sColor; upd.mode=$("sProject").checked?"project":"normal"; upd.weekStart=$("sWeek").value||""; }
+    upd.name=n; upd.color=S.sColor; upd.mode=$("sProject").checked?"project":"normal"; upd.weekStart=$("sWeek").value||""; upd.instAt=$("sInstAt").value==="buy"?"buy":""; }
   try{ await updateDoc(doc(db,"ledgers",l.id), upd); msg("sBasicMsg","已儲存。","ok");
-    if(isOwner(l) && (upd.mode==="project")!==isProj(l)){ S.period.mode = upd.mode==="project" ? "all" : "month"; S.catFilter=null; watchEntries(); } }
+    if(isOwner(l) && (upd.mode==="project")!==isProj(l)){ S.period.mode = upd.mode==="project" ? "all" : "month"; S.catFilter=null; watchEntries(); }
+    else if(isOwner(l) && (upd.instAt==="buy")!==instAtBuy(l)){ l.instAt=upd.instAt; watchEntries(); } }
   catch(e){ msg("sBasicMsg","儲存失敗："+errText(e),"err"); }
 };
 async function saveCats(fn, okText){
@@ -2159,7 +2182,7 @@ $("bkRestore").onclick=async()=>{
       const ref=await addDoc(collection(db,"ledgers"), { name:(x.name+tag).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20),
         ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email],
         categories:Array.isArray(x.categories)?x.categories.slice(0,200):[], budget:Number(x.budget)||0,
-        mode:x.mode==="project"?"project":"normal", projectBudget:Number(x.projectBudget)||0, weekStart:String(x.weekStart||"").slice(0,10),
+        mode:x.mode==="project"?"project":"normal", projectBudget:Number(x.projectBudget)||0, weekStart:String(x.weekStart||"").slice(0,10), ...(x.instAt==="buy"?{instAt:"buy"}:{}),
         ...(x.split && typeof x.split==="object" ? {split:x.split} : {}),
         createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
       const col=collection(db,"ledgers",ref.id,"entries");
@@ -2835,24 +2858,32 @@ function startRb(lid){
 function stopRb(){ S.rbTok=null; S.rbFor=null; if(S.unsubRb){ S.unsubRb(); S.unsubRb=null; } S.rbPending=[]; }
 function renderRb(){
   const l=L(); if(!l) return;
-  const pend=(S.rbPending||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  // 只列這段期間墊付的；其他月份還沒收回的收成一行提醒
+  const r=periodRange(), inP = e => !r || (e.date>=r[0] && e.date<=r[1]);
+  const all=(S.rbPending||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const pend=all.filter(inP), other=all.filter(e=>!inP(e));
   const done=S.entries.filter(e=>isRb(e) && e.rb.s==="done").sort((a,b)=>b.date.localeCompare(a.date));
-  $("rbPanel").hidden = !pend.length && !done.length;
+  $("rbPanel").hidden = !all.length && !done.length;
   const box=$("rbBody"); box.textContent="";
+  if(other.length){
+    const months=[...new Set(other.map(e=>Number(e.date.slice(5,7))+" 月"))].join("、");
+    const d=el("details","rb-other"); d.appendChild(el("summary",null,`另有 ${months} ${other.length} 筆待請款 ${money(other.reduce((t,e)=>t+e.amount,0))}`));
+    other.forEach(e=>d.appendChild(rbRow(l,e,true))); box.appendChild(d);
+  }
   if(pend.length){
     const sum=pend.reduce((t,e)=>t+e.amount,0);
     const h=el("div","rb-sum"); h.append(el("span",null,`待請款 ${pend.length} 筆`), el("span","num",money(sum))); box.appendChild(h);
     pend.forEach(e=>box.appendChild(rbRow(l,e)));
-  } else box.appendChild(el("p","small muted","目前沒有待請款的代墊。"));
+  } else box.appendChild(el("p","small muted", r ? "這段期間沒有待請款的代墊。" : "目前沒有待請款的代墊。"));
   if(done.length){
     const d=el("details","rb-done"); d.appendChild(el("summary","small",`這段期間已收回 ${done.length} 筆`));
     done.forEach(e=>d.appendChild(rbRow(l,e))); box.appendChild(d);
   }
 }
-function rbRow(l,e){
+function rbRow(l,e,withYear){
   const r=el("div","rb-row");
   const m=el("div"); m.appendChild(el("div",null,e.note||catName(l,e)));
-  m.appendChild(el("div","small muted",[e.date.slice(5).replace("-","/"), catName(l,e), e.card?`${e.pay}・${e.card}`:e.pay, e.payer?e.payer+" 付":""].filter(Boolean).join("・")
+  m.appendChild(el("div","small muted",[withYear && e.date.slice(0,4)!==String(new Date().getFullYear()) ? e.date.replace(/-/g,"/") : e.date.slice(5).replace("-","/"), catName(l,e), e.card?`${e.pay}・${e.card}`:e.pay, e.payer?e.payer+" 付":""].filter(Boolean).join("・")
     + (e.rb.s==="done" ? `・${(e.rb.d||"").slice(5).replace("-","/")} 收回 ${fmt(e.rb.a||0)}` + (own(e)?`，自付 ${fmt(own(e))}`:"") : "")));
   const right=el("div","rb-right"); right.appendChild(el("span","num",money(e.amount)));
   if(canEdit(l)){ const b=el("button", e.rb.s==="pending"?"btn primary sm":"link", e.rb.s==="pending"?"已收到":"修改"); b.type="button"; b.onclick=()=>openRb(e); right.appendChild(b); }

@@ -491,3 +491,6 @@ button.pay-cell:hover{border-color:var(--accent)}
 .xfer-btn.done{background:transparent;color:var(--accent)}
 .btable td:nth-child(2){min-width:7.5em}
 .bill-move{font-size:12px;white-space:nowrap}
+.rb-other{border:1px solid var(--rule);border-radius:10px;padding:0 12px;margin-bottom:8px;background:var(--paper)}
+.rb-other summary{cursor:pointer;padding:9px 0;color:var(--out);font-weight:700;font-size:14px}
+.rb-other .rb-row:last-child{border-bottom:0}

@@ -479,7 +479,7 @@
       </section>
 
       <section class="panel wide" id="rbPanel" hidden>
-        <div class="between wrap-gap"><h3 class="h3">代墊・待請款</h3><span class="small muted">公司還沒付回來的款項，不算進你自己的支出</span></div>
+        <div class="between wrap-gap"><h3 class="h3">代墊・待請款</h3><span class="small muted">這段期間墊付的款項，收回前不算進自己的支出</span></div>
         <div id="rbBody"></div>
       </section>
 
@@ -646,6 +646,8 @@
         <label class="field"><span class="label">孕週起算日（選填，最後一次月經第一天；填了會自動顯示孕週）</span><input id="sWeek" type="date"></label>
       </div>
       <label class="field"><span class="label">每月預算（0 表示不設定）</span><input id="sBudget" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field"><span class="label">信用卡分期記在</span><select id="sInstAt"><option value="bill">每期帳單月份（每月記一期，看得出每月實際要付多少）</option><option value="buy">刷卡當月整筆（看得出哪個月買了什麼）</option></select></label>
+      <p class="small muted" style="margin:-4px 0 0">只影響這本帳本的月支出和明細。信用卡帳單、還款與分期還是照每期帳單月份顯示。</p>
       <button class="btn primary" id="sSaveBasic" type="button">儲存</button>
       <p class="msg" id="sBasicMsg" role="status"></p>
     </section>
