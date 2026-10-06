@@ -490,3 +490,4 @@ button.pay-cell:hover{border-color:var(--accent)}
 .xfer-btn{border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:999px;padding:7px 14px;font-weight:700}
 .xfer-btn.done{background:transparent;color:var(--accent)}
 .btable td:nth-child(2){min-width:7.5em}
+.bill-move{font-size:12px;white-space:nowrap}

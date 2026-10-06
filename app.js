@@ -698,13 +698,35 @@ $("eStPaid").onclick=()=>setEStatus("paid"); $("eStPend").onclick=()=>setEStatus
 function syncCardUI(){
   const isCard=$("ePay").value==="信用卡";
   $("eCardWrap").hidden=!isCard;
-  tipsFor("tipCard", isCard ? [["card3","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月。每期金額不一樣（例如第一期多幾塊、有利息）可以在「每期金額」選「自己填」，多出來的利息會另外記成「分期手續費」。出差先幫公司刷的，勾「代墊」就不會算成自己的支出。"]] : []);
+  tipsFor("tipCard", isCard ? [["card4","勾選「分期付款」並填期數，系統會把金額自動分到之後每個月。每期金額不一樣（例如第一期多幾塊、有利息）可以在「每期金額」選「自己填」，多出來的利息會另外記成「分期手續費」。出差先幫公司刷的，勾「代墊」就不會算成自己的支出。商家比較晚請款、沒出現在原本那期帳單的，可以在「算在哪個月的帳單」改到下一期。"]] : []);
   const on=isCard && $("eInstOn").checked; syncRbUI();
   $("eInstBox").hidden=!on; $("eInstNote").hidden=!on; $("eInstModeBox").hidden=!on; if(!on) $("eInstFeeWrap").hidden=true;
   $("eAmtLabel").textContent = on ? (S.instMode==="custom" ? "消費金額" : "總金額") : "";
   if(on) renderInstList();
   if(isCard) renderCardChips();
+  renderBillSel();
 }
+/* 這筆消費照卡片設定會算在哪個月繳的帳單 */
+function autoBillYm(card, date){
+  const m=date.slice(0,7);
+  for(let k=0;k<3;k++){ const ym=addMonths(m,k), [s0,e0]=cardRange(card, ym); if(date>=s0 && date<=e0) return ym; }
+  return m;
+}
+function renderBillSel(){
+  const isCard=$("ePay").value==="信用卡", inst=isCard && $("eInstOn").checked, date=$("eDate").value;
+  $("eBillWrap").hidden = !isCard || inst || !/^\d{4}-\d{2}-\d{2}$/.test(date);
+  if($("eBillWrap").hidden) return;
+  const sel=$("eBill"), cur = sel.dataset.v ?? sel.value, card=$("eCard").value.trim(), auto=autoBillYm(card, date);
+  sel.textContent="";
+  const o0=el("option",null,`自動（${Number(auto.slice(5))} 月繳的帳單）`); o0.value=""; sel.appendChild(o0);
+  for(let k=-1;k<=3;k++){ const ym=addMonths(date.slice(0,7),k); if(ym===auto) continue; const o=el("option",null,`${ymLabel(ym)}繳的帳單`); o.value=ym; sel.appendChild(o); }
+  sel.value=cur||""; if(sel.value!==(cur||"")){ const o=el("option",null,`${ymLabel(cur)}繳的帳單`); o.value=cur; sel.appendChild(o); sel.value=cur; }
+  delete sel.dataset.v;
+}
+$("eBill").addEventListener("change",()=>{ $("eBill").dataset.v=$("eBill").value; });
+$("eCard").addEventListener("input",renderBillSel);
+$("eCardChips").addEventListener("click",()=>setTimeout(renderBillSel,0));
+$("eDate").addEventListener("change",renderBillSel);
 function renderInstList(){
   document.querySelectorAll("#eInstMode button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===S.instMode));
   const box=$("eInstList"); box.textContent="";
@@ -809,6 +831,7 @@ function openEntry(e){
   $("eDate").value = e ? (e.inst ? e.inst.purchase : e.date) : defaultDate();
   fillPayOptions("ePay", e ? (e.pay||"現金") : (P().defaultPay || $("ePay").dataset.last || "現金"), e ? e.type : "out");
   $("eCard").value = e ? (e.card||"") : (P().defaultCard || $("eCard").dataset.last || "");
+  $("eBill").dataset.v = e && e.bill ? e.bill : "";
   $("eInstOn").checked = !!(e && e.inst);
   S.instMode = store.get("ledger.instMode")==="first" ? "first" : "last"; S.instCustom=null;
   $("eInstFee").checked = store.get("ledger.instFee")!=="0";
@@ -909,7 +932,8 @@ $("formEntry").addEventListener("submit", async ev=>{
   if(inst && (amts.length!==n || amts.some(x=>!(x>0)))){ msg("eMsg","每一期的金額都要大於 0。","err"); return; }
   const common={ type:S.eType, categoryId:S.eCat.id, categoryName:S.eCat.name,
     note:$("eNote").value.trim().slice(0,100), pay, card: isCard ? ($("eCard").value.trim() || (S.editing&&S.editing.card) || "").slice(0,20) : "",
-    payer:$("ePayer").value.trim().slice(0,20), status:S.eStatus, updatedAt:serverTimestamp() };
+    payer:$("ePayer").value.trim().slice(0,20), status:S.eStatus, updatedAt:serverTimestamp(),
+    bill: isCard && !inst && /^\d{4}-\d{2}$/.test($("eBill").value) ? $("eBill").value : "" };
   if(proj){ common.budget=budget; common.priority=$("ePriority").value; }
   { const old=S.editing, want=S.eType==="out" && !(isCard && $("eInstOn").checked) && $("eRb").checked;
     if(want) common.rb = isRb(old) ? old.rb : {s:"pending"};
@@ -1191,7 +1215,7 @@ $("rNow").onclick=()=>{ S.rYM=thisYM(); renderRepay(); };
 let billToken=null;
 function renderRepay(reloadBill=true){
   const ym=S.rYM;
-  tipsFor("tipRepay", [["repay8","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」。"]]);
+  tipsFor("tipRepay", [["repay9","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」；商家晚請款的消費可以按「移到下期」。"]]);
   $("rTitle").textContent=ymLabel(ym); $("rNow").hidden = ym===thisYM();
   const active=[], done=[];
   S.loans.slice().sort((a,b)=>(a.type+a.name).localeCompare(b.type+b.name,"zh-Hant")).forEach(lo=>{
@@ -1548,13 +1572,18 @@ async function loadCardBill(ym){
   try{
     for(const l of S.ledgers.values()){
       const snap=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("date",">=",a), where("date","<=",b)));
-      snap.docs.forEach(d=>{ const e=d.data(); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
+      const seenId=new Set();
+      snap.docs.forEach(d=>{ const e=d.data(); seenId.add(d.id); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
+      // 手動改到這個月帳單、但消費日期比較早的
+      const moved=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("bill","==",ym)));
+      moved.docs.forEach(d=>{ if(seenId.has(d.id)) return; const e=d.data(); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
     }
   }catch(e){ if(token!==billToken) return; box.textContent=""; box.appendChild(el("p","msg err","讀取信用卡紀錄失敗："+errText(e))); return; }
   if(token!==billToken) return;
   // 照每張卡的帳單區間過濾
   // 分期的每一期已經指定「帳單月份」，直接照月份；一般消費照每張卡的帳單區間
-  const rows=raw.filter(e=>{ if(e.inst) return e.date.slice(0,7)===ym; const [s0,e0]=cardRange(e.card||"", ym); return e.date>=s0 && e.date<=e0; });
+  // 手動指定帳單月份的照指定
+  const rows=raw.filter(e=>{ if(e.inst) return e.date.slice(0,7)===ym; if(e.bill) return e.bill===ym; const [s0,e0]=cardRange(e.card||"", ym); return e.date>=s0 && e.date<=e0; });
   // 分期手續費併進同一期的商品那一行
   const merged=[], seen=new Map();
   rows.slice().sort((x,y)=>isFee(x)-isFee(y)).forEach(e=>{
@@ -1590,13 +1619,19 @@ async function loadCardBill(ym){
     const tw=el("div","table-wrap"), t=el("table","btable"), th=el("thead"), hr=el("tr");
     cols.forEach(x=>hr.appendChild(el("th",null,x))); th.appendChild(hr);
     const tb=el("tbody");
-    list.sort((x,y)=>(x.inst?x.inst.purchase:x.date).localeCompare(y.inst?y.inst.purchase:y.date)).forEach(e=>{ const tr=el("tr"); cells(e).forEach(([c,v])=>tr.appendChild(el("td",c,v))); tb.appendChild(tr); });
+    list.sort((x,y)=>(x.inst?x.inst.purchase:x.date).localeCompare(y.inst?y.inst.purchase:y.date)).forEach(e=>{ const tr=el("tr"); cells(e).forEach(([c,v,extra])=>{ const td=el("td",c,v); if(extra){ td.append(" ", extra); } tr.appendChild(td); }); tb.appendChild(tr); });
     t.append(th,tb); tw.appendChild(t); return tw; };
-  const itemText=e=>`${e.note||e.categoryName}${e.payer?`（${e.payer}）`:""}・${e.ledger.name}${e.part?"（我付的部分）":""}${e.fee?`（含手續費 ${fmt(e.fee)}）`:""}${isRb(e)?`（代墊${e.rb.s==="pending"?"・請款中":"・已收回"}）`:""}`;
+  const itemText=e=>`${e.note||e.categoryName}${e.payer?`（${e.payer}）`:""}・${e.ledger.name}${e.part?"（我付的部分）":""}${e.fee?`（含手續費 ${fmt(e.fee)}）`:""}${isRb(e)?`（代墊${e.rb.s==="pending"?"・請款中":"・已收回"}）`:""}${e.bill?"（手動調整帳單月份）":""}`;
+  /* 商家晚請款：一鍵移到下一期帳單（或改回自動） */
+  const moveBtn=e=>{ if(e.inst || !canEdit(e.ledger)) return null;
+    const b=el("button","link bill-move", e.bill ? "改回自動" : "移到下期"); b.type="button";
+    b.title = e.bill ? "照卡片的結帳日自動算" : "商家比較晚請款，這筆會出現在下一期帳單";
+    b.onclick=async()=>{ b.disabled=true; try{ await updateDoc(doc(db,"ledgers",e.ledger.id,"entries",e.id), { bill: e.bill ? "" : addMonths(ym,1), updatedAt:serverTimestamp() }); toast(e.bill?"已改回自動":"已移到下一期帳單"); loadCardBill(S.rYM); }catch(err){ toast("改不了："+errText(err)); b.disabled=false; } };
+    return b; };
   const billCells=e=>{ const pd=e.inst?e.inst.purchase:e.date; let per="一次付清", rem="—";
     if(e.inst){ const base=Math.floor(e.inst.total/e.inst.n); const left= typeof e.inst.rem==="number" ? e.inst.rem : (e.inst.k>=e.inst.n?0:e.inst.total-base*e.inst.k);
       per=`${e.inst.k}/${e.inst.n}`; rem = left ? `${e.inst.n-e.inst.k} 期・${fmt(left)}` : "繳完"; }
-    return [["num",pd.slice(5).replace("-","/")],[null,itemText(e)],["num",per],["num",fmt(e.amount)],["num",rem]]; };
+    return [["num",pd.slice(5).replace("-","/")],[null,itemText(e),moveBtn(e)],["num",per],["num",fmt(e.amount)],["num",rem]]; };
   const cardBlock=(card, list, cls, title)=>{
     const wrap=el("div","bill-card"+(cls?" "+cls:"")); wrap.dataset.card=card;
     const h=el("div","bill-head"), nm=el("span",null,title); nm.appendChild(setLink()); h.append(nm, el("span","num",money(sum(list)))); wrap.appendChild(h);
@@ -2207,7 +2242,7 @@ function renderLedgerTips(l){
 }
 function refreshTips(){
   if(S.lid && L() && !$("viewLedger").hidden) renderLedgerTips(L());
-  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay8","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」。"]]);
+  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay9","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」；商家晚請款的消費可以按「移到下期」。"]]);
   if(!$("viewInvest").hidden) renderInvestTips();
   if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
 }

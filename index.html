@@ -540,6 +540,8 @@
       <span class="label">卡片</span>
       <div class="chips tag-pick" id="eCardChips"></div>
       <input id="eCard" type="text" maxlength="20" placeholder="點上面的卡片，或輸入新卡片後按 Enter" autocomplete="off">
+      <label class="field" id="eBillWrap" hidden><span class="label">算在哪個月的帳單</span><select id="eBill"></select>
+        <span class="small muted" id="eBillHint">商家比較晚請款、沒出現在原本那期帳單時，可以手動改到下一期。</span></label>
       <label class="check"><input type="checkbox" id="eInstOn"> 分期付款</label>
       <div class="grid2" id="eInstBox" hidden>
         <label class="field"><span class="label">期數</span><input id="eInstN" type="number" inputmode="numeric" min="2" max="60" step="1" value="12"></label>
