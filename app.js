@@ -1119,7 +1119,31 @@ function stopLoans(){ if(S.unsubLoans){ S.unsubLoans(); S.unsubLoans=null; } S.l
    adj = {bal, ym}：校正後「繳完 ym 那個月之後」的剩餘本金，之後的月份從這裡接著扣。 */
 const payP = p => typeof p.p==="number" ? p.p : (p.a||0);
 /* 這個月應繳：緩繳本金期間有填利率就用算出來的利息，否則用月繳金額 */
-const dueAmt = (lo, ym) => lo.io && lo.rate ? autoInt(lo, ym) : (lo.monthly||0);
+const dueAmt = (lo, ym) => { if(lo.io && lo.rate) return autoInt(lo, ym);
+  const fin=finalDue(lo, ym); return fin ? fin.amt : (lo.monthly||0); };
+/* 最後一期（或剩餘本金＋利息已經比月繳少）：應繳＝剩餘本金＋這期利息，繳完剛好結清 */
+function finalDue(lo, ym){
+  if(lo.io || !lo.monthly) return null;
+  const st=loanStats(lo, ym); if(st.remain<=0) return null;
+  const i=autoInt(lo, ym), amt=st.remain+i;
+  if(st.leftPeriods===1 || amt<=lo.monthly) return { amt, remain:st.remain, i, last: st.leftPeriods===1 };
+  return null;
+}
+/* 往後試算到繳完：每期月繳，最後一期繳剩下的本金＋利息 */
+function loanPlan(lo){
+  const st=loanStats(lo); if(lo.io || !lo.monthly || st.remain<=0) return null;
+  const ms=Object.keys(lo.payments||{}).sort(); let ym = ms.length ? addMonths(ms[ms.length-1],1) : thisYM();
+  if(ym<thisYM() && !(lo.payments||{})[thisYM()]) ym=thisYM();
+  let bal=st.remain, total=0, n=0, last=0, interest=0;
+  const max = st.leftPeriods>0 ? st.leftPeriods : 600;
+  while(bal>0 && n<max){
+    const i=intOn(lo, ym, bal); n++;
+    const pay = (n===max || bal+i<=lo.monthly) ? bal+i : lo.monthly;
+    bal = Math.max(bal-(pay-i),0); total+=pay; interest+=i; last=pay; ym=addMonths(ym,1);
+    if(pay<=i && n>3) return { total, n, last, interest, never:true };
+  }
+  return { total, n, last, interest, left:st.leftPeriods };
+}
 const payI = p => typeof p.i==="number" ? p.i : 0;
 const hasAdj = lo => !!(lo.adj && typeof lo.adj.bal==="number" && lo.adj.ym);
 function loanStats(lo, beforeYm){
@@ -1143,7 +1167,7 @@ $("rNow").onclick=()=>{ S.rYM=thisYM(); renderRepay(); };
 let billToken=null;
 function renderRepay(reloadBill=true){
   const ym=S.rYM;
-  tipsFor("tipRepay", [["repay3","新增貸款時填「開始用本系統前已還本金」和「已繳期數」，就能從現在的進度接著記。銀行貸款記得填年利率，每期會自動拆成本金和利息；不知道利率可以按「推算利率」；學貸緩繳期間勾「緩繳本金」。跟銀行 APP 對不起來時，在「編輯」用「校正剩餘本金」（連同已繳期數）對齊。"]]);
+  tipsFor("tipRepay", [["repay5","新增貸款時填「開始用本系統前已還本金」和「已繳期數」，就能從現在的進度接著記。銀行貸款記得填年利率，每期會自動拆成本金和利息；不知道利率可以按「推算利率」；學貸緩繳期間勾「緩繳本金」。跟銀行 APP 對不起來時，在「編輯」用「校正剩餘本金」（連同已繳期數）對齊。APP 看不到已繳期數時，可以按「幫我推算」。最後一期金額常跟月繳不同，系統會自動算成「剩餘本金＋利息」，繳完剛好結清。"]]);
   $("rTitle").textContent=ymLabel(ym); $("rNow").hidden = ym===thisYM();
   const active=[], done=[];
   S.loans.slice().sort((a,b)=>(a.type+a.name).localeCompare(b.type+b.name,"zh-Hant")).forEach(lo=>{
@@ -1176,8 +1200,7 @@ function loanCard(lo, ym){
   c.appendChild(nums);
   if(lo.io){ const b=el("div","io-note");
     b.append(el("strong",null,"緩繳本金中"), document.createTextNode(`：每月只繳利息${lo.rate?`（這個月約 ${fmt(autoInt(lo, ym))} 元）`:""}，本金不會減少，也不算還款期數。`)); c.appendChild(b); }
-  else if(lo.totalPeriods && lo.monthly && st.leftPeriods>0)
-    c.appendChild(el("div","loan-left",`還要繳 ${money(st.leftPeriods*lo.monthly)}（剩 ${st.leftPeriods} 期 × ${fmt(lo.monthly)}）`));
+  else { const pl=loanPlan(lo); if(pl) c.appendChild(el("div","loan-left", planText(lo, pl))); }
   const meta=[]; if(lo.monthly && !lo.io) meta.push(`月繳 ${fmt(lo.monthly)}`); if(lo.monthly && lo.io) meta.push(`恢復還本後月繳 ${fmt(lo.monthly)}`); if(lo.day) meta.push(`每月 ${lo.day} 號`);
   meta.push(lo.totalPeriods ? `已繳 ${st.periods}/${lo.totalPeriods} 期・剩 ${st.leftPeriods} 期` : `已繳 ${st.periods} 期`);
   if(lo.rate) meta.push(`年利率 ${lo.rate}%`);
@@ -1195,6 +1218,17 @@ function loanCard(lo, ym){
   return c;
 }
 
+function planText(lo, pl){
+  if(pl.never) return `照月繳 ${fmt(lo.monthly)} 只夠付利息，本金不會減少，請確認月繳金額或年利率。`;
+  const pre = lo.rate ? "約 " : "";
+  if(pl.n===1) return `還要繳 ${pre}${money(pl.total)}（剩最後 1 期，剩餘本金${lo.rate?"＋利息":""}）`;
+  const diff=Math.abs(pl.last-lo.monthly);
+  let t = diff<1 ? `還要繳 ${pre}${money(pl.total)}（剩 ${pl.n} 期 × ${fmt(lo.monthly)}）`
+    : `還要繳 ${pre}${money(pl.total)}（剩 ${pl.n} 期：前 ${pl.n-1} 期 × ${fmt(lo.monthly)}，最後一期${pre}${fmt(pl.last)}）`;
+  if(pl.left && pl.n<pl.left) t+=`・照月繳會比原定早 ${pl.left-pl.n} 期繳完`;
+  return t;
+}
+
 /* 標記已繳 */
 function openPay(lo, ym){
   const cur=(lo.payments||{})[ym];
@@ -1208,6 +1242,8 @@ function openPay(lo, ym){
   $("pySplitNote").textContent = (cur ? cur.x : lo.io) ? "緩繳本金期間：整筆都算利息，剩餘本金不變，也不算進還款期數。" + (lo.rate?`（依${intFormula(lo, ym, before)}，約 ${fmt(autoInt(lo, ym))} 元）。如果跟銀行不同，可以在「編輯」改「利息怎麼算」。`:"") : lo.rate
     ? `依${intFormula(lo, ym, before)}，這期利息約 ${fmt(autoInt(lo, ym))} 元。如果跟銀行差幾塊，可以在「編輯」改「利息怎麼算」，或直接照銀行的數字改。`
     : "這筆沒有設定年利率，整筆都算本金。銀行貸款建議在「編輯」填年利率，或照繳款明細自己填利息。";
+  const fin=!cur && finalDue(lo, ym);
+  if(fin) $("pySplitNote").textContent = (fin.last ? "這是最後一期" : "剩下的本金已經比月繳少") + `：應繳＝剩餘本金 ${fmt(fin.remain)}` + (fin.i?`＋利息約 ${fmt(fin.i)}`:"") + `＝${fmt(fin.amt)}，繳完就結清。如果銀行通知的金額不一樣，直接改成銀行的數字。`;
   const ld=lo.ledgerId && S.ledgers.get(lo.ledgerId);
   $("pyNote").textContent = cur ? (cur.e ? "改金額的話，帳本裡那一筆也會一起改。" : ld ? `這個月還沒記到帳本，按「儲存修改」會補記一筆到「${ld.name}」。` : "") : (ld ? `會同時在「${ld.name}」記一筆支出。` : "沒有設定自動記帳（可在「編輯」裡設定）。");
   $("pySave").textContent = cur ? "儲存修改" : "確定已繳";
@@ -1219,9 +1255,10 @@ const dueDate = (ym, day) => new Date(Number(ym.slice(0,4)), Number(ym.slice(5))
 /* 計息方式：day＝實際天數÷365；month＝÷12 四捨五入；monthFloor＝÷12 無條件捨去。沒選時：有繳款日就 day，否則 month */
 const intMethod = lo => lo.im || (lo.day ? "day" : "month");
 const intDays = (lo, ym) => intMethod(lo)==="day" && lo.day ? Math.round((dueDate(ym, lo.day)-dueDate(addMonths(ym,-1), lo.day))/864e5) : 0;
-const autoInt = (lo, ym) => { if(!lo.rate) return 0; const r=loanStats(lo, ym).remain, d=intDays(lo, ym), m=intMethod(lo);
+const intOn = (lo, ym, r) => { if(!lo.rate) return 0; const d=intDays(lo, ym), m=intMethod(lo);
   const raw = d ? r*lo.rate/100*d/365 : r*lo.rate/1200;
   return m==="monthFloor" ? Math.floor(raw+1e-9) : Math.round(raw); };
+const autoInt = (lo, ym) => intOn(lo, ym, loanStats(lo, ym).remain);
 const intFormula = (lo, ym, before) => { const d=intDays(lo, ym), m=intMethod(lo);
   return d ? `剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% × ${d} 天 ÷ 365` : `剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% ÷ 12` + (m==="monthFloor"?"（無條件捨去）":""); };
 function syncSplit(from){
@@ -1351,6 +1388,20 @@ $("loAdjN").addEventListener("input", ()=>{
   if($("loAdjN").value.trim()===""||!(n>=0)){ h.textContent=""; return; }
   h.textContent = tot ? `校正後會顯示：已繳 ${n} 期、剩 ${Math.max(tot-n,0)} 期（共 ${tot} 期）。跟銀行 APP 一樣就對了。` : `校正後會顯示：已繳 ${n} 期。`;
 });
+/* 看不到已繳期數：用剩餘本金、月繳、年利率往後試算還要幾期，總期數減掉就是已繳期數 */
+$("loAdjGuess").onclick=()=>{
+  const bal=Math.round(Number($("loAdjBal").value)), mo=Math.round(Number($("loMonthly").value)), tot=Math.round(Number($("loTotal").value)), ym=$("loAdjYm").value;
+  const tmp={ rate:Number($("loRate").value)||0, im:$("loIM").value, day:Number($("loDay").value)||0 };
+  if(!(bal>0)){ msg("loAdjMsg","請先填銀行 APP 上的剩餘本金，再按推算。","err"); return; }
+  if(!(mo>0)){ msg("loAdjMsg","推算需要上面的「月繳金額」。","err"); return; }
+  if(!(tot>0)){ msg("loAdjMsg","推算需要上面的「總期數」（例如 120）。","err"); return; }
+  let b=bal, n=0, last=0, m=/^\d{4}-\d{2}$/.test(ym) ? addMonths(ym,1) : thisYM();
+  while(b>0 && n<1200){ const i=intOn(tmp, m, b); if(n>3 && mo<=i){ msg("loAdjMsg",`月繳 ${fmt(mo)} 只夠付利息，沒辦法推算，請確認月繳金額或年利率。`,"err"); return; }
+    n++; if(b+i<=mo){ last=b+i; b=0; } else b-=mo-i; m=addMonths(m,1); }
+  if(n>tot){ msg("loAdjMsg",`照月繳 ${fmt(mo)} 還要繳 ${n} 期，比總期數 ${tot} 還多，請確認月繳金額、年利率或總期數。`,"err"); return; }
+  $("loAdjN").value=tot-n; $("loAdjN").dispatchEvent(new Event("input"));
+  msg("loAdjMsg",`照剩餘本金 ${fmt(bal)}、月繳 ${fmt(mo)}${tmp.rate?`、年利率 ${tmp.rate}%`:""} 往後算，還要繳 ${n} 期（最後一期約 ${fmt(last)}），所以已繳 ${tot-n} 期。確認沒問題就按「校正」。`,"ok");
+};
 $("loAdjSave").onclick=async()=>{
   const lo=S.editingLoan; if(!lo) return;
   const raw=$("loAdjBal").value.trim(), bal=Math.round(Number(raw)), ym=$("loAdjYm").value, nRaw=$("loAdjN").value.trim(), n=Math.round(Number(nRaw));
@@ -1955,7 +2006,7 @@ function renderLedgerTips(l){
 }
 function refreshTips(){
   if(S.lid && L() && !$("viewLedger").hidden) renderLedgerTips(L());
-  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay3","新增貸款時填「開始用本系統前已還本金」和「已繳期數」，就能從現在的進度接著記。銀行貸款記得填年利率，每期會自動拆成本金和利息；不知道利率可以按「推算利率」；學貸緩繳期間勾「緩繳本金」。跟銀行 APP 對不起來時，在「編輯」用「校正剩餘本金」（連同已繳期數）對齊。"]]);
+  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay5","新增貸款時填「開始用本系統前已還本金」和「已繳期數」，就能從現在的進度接著記。銀行貸款記得填年利率，每期會自動拆成本金和利息；不知道利率可以按「推算利率」；學貸緩繳期間勾「緩繳本金」。跟銀行 APP 對不起來時，在「編輯」用「校正剩餘本金」（連同已繳期數）對齊。APP 看不到已繳期數時，可以按「幫我推算」。最後一期金額常跟月繳不同，系統會自動算成「剩餘本金＋利息」，繳完剛好結清。"]]);
   if(!$("viewInvest").hidden) renderInvestTips();
   if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
 }
@@ -1966,7 +2017,7 @@ const TOUR=[
   { sel:"#btnNewLedger", title:"第一步：建立帳本", text:"可以從個人、家庭、孕期、寶寶、搬家範本開始，分類都能自己增減。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
-  { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」。" },
+  { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。" },
   { sel:'#viewHome .tabs a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
