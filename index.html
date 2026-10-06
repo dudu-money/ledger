@@ -264,7 +264,10 @@
       </div>
     </form>
     <section class="panel">
-      <div class="between wrap-gap"><h3 class="h3">待辦項目</h3><span class="small muted">點項目可以修改；打勾代表買好／完成</span></div>
+      <div class="between wrap-gap"><h3 class="h3">待辦項目</h3>
+        <div class="row li-sortbar"><select id="liSort" aria-label="排序方式"><option value="">自動排序（優先度、截止日）</option><option value="manual">自己排順序</option></select>
+        <button class="btn" type="button" id="liReorder" hidden>調整順序</button></div></div>
+      <p class="small muted" id="liSortHint">點項目可以修改；打勾代表買好／完成</p>
       <div id="liItems" class="li-items"></div>
       <details id="liDoneWrap" hidden><summary class="small" id="liDoneSum">已完成</summary><div id="liDone" class="li-items"></div></details>
     </section>

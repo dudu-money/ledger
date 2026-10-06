@@ -2208,7 +2208,7 @@ $("bkRestore").onclick=async()=>{
     if(doLists){ const d=new Date(), tg=`（還原 ${d.getMonth()+1}/${d.getDate()}）`;
       for(const ls of (BK.lists||[])){ const x=ls.data||{};
         const ref=await addDoc(collection(db,"lists"), { name:(String(x.name||"清單")+tg).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20), ownerUid:S.user.uid, ownerEmail:S.email,
-          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), ...(x.sort==="manual"?{sort:"manual"}:{}), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
         const its=ls.items||[];
         for(let k=0;k<its.length;k+=400){ const b=writeBatch(db);
           its.slice(k,k+400).forEach((it,j)=>b.set(doc(collection(db,"lists",ref.id,"items")), { text:String(it.text||"項目").slice(0,100), amount:Number(it.amount)||0,
@@ -2959,7 +2959,7 @@ function watchItems(id){
   S.unsubItems=onSnapshot(collection(db,"lists",id,"items"), snap=>{ if(tok!==S.itemsTok) return;
     S.listItems=snap.docs.map(d=>({id:d.id,...d.data()})); S.itemsReady=true; renderListItems(); }, e=>msg("liMsg","讀取項目失敗："+errText(e),"err"));
 }
-function stopItems(){ S.itemsTok=null; if(S.unsubItems){ S.unsubItems(); S.unsubItems=null; } S.listItems=[]; }
+function stopItems(){ S.itemsTok=null; S.reorder=false; if(S.unsubItems){ S.unsubItems(); S.unsubItems=null; } S.listItems=[]; }
 const listRole = x => x.ownerUid===S.user.uid ? "擁有者" : (x.editors||[]).includes(S.email) ? "可編輯" : "僅檢視";
 const canEditList = x => x && (x.ownerUid===S.user.uid || (x.editors||[]).includes(S.email));
 
@@ -3056,7 +3056,11 @@ function renderGroupPick(x){
 function renderListItems(){
   const x=LI(); if(!x) return; const ed=canEditList(x);
   if(ed && !(S.newGroupOpen && document.activeElement && document.activeElement.classList.contains("li-newgroup"))) renderGroupPick(x);
-  const todo=S.listItems.filter(i=>!i.done).sort(sortItems), done=S.listItems.filter(i=>i.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||""));
+  const manual=x.sort==="manual";
+  $("liSort").value=manual?"manual":""; $("liSort").disabled=!ed;
+  $("liReorder").hidden=!ed || !manual; $("liReorder").textContent=S.reorder?"完成":"調整順序"; $("liReorder").classList.toggle("primary",!!S.reorder);
+  $("liSortHint").textContent = S.reorder ? "用 ↑ ↓ 移動項目，排好按「完成」。順序會同步給一起用這份清單的人。" : "點項目可以修改；打勾代表買好／完成";
+  const todo=S.listItems.filter(i=>!i.done).sort(manual?((a,b)=>(a.order||0)-(b.order||0)):sortItems), done=S.listItems.filter(i=>i.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||""));
   const need=todo.reduce((t,i)=>t+(i.amount||0),0), spent=done.reduce((t,i)=>t+(i.spent||0),0), noAmt=todo.filter(i=>!i.amount).length;
   $("liLeftN").textContent=`${todo.length} 項`; $("liNeed").textContent=money(need); $("liDoneN").textContent=`${done.length} 項`;
   $("liSpent").textContent = spent ? `實際花了 ${money(spent)}` : "";
@@ -3066,12 +3070,13 @@ function renderListItems(){
   if(!S.itemsReady) box.appendChild(el("p","small muted","讀取中…"));
   else if(!todo.length) box.appendChild(el("p","small muted", done.length ? "全部完成了！" : "還沒有項目，在上面輸入就能加入。"));
   const gs=listGroups();
-  if(!gs.length) todo.forEach(i=>box.appendChild(itemRow(x,i,ed)));
+  const mv=(its,k)=>S.reorder && ed ? { up: k>0 ? ()=>swapOrder(x, its[k], its[k-1]) : null, down: k<its.length-1 ? ()=>swapOrder(x, its[k], its[k+1]) : null } : null;
+  if(!gs.length) todo.forEach((i,k)=>box.appendChild(itemRow(x,i,ed,false,mv(todo,k))));
   else ["",...gs].forEach(g=>{
     const its=todo.filter(i=>(i.group||"")===g); if(!its.length) return;
     if(g){ const h=el("div","li-ghead"); const nd=its.reduce((t,i)=>t+(i.amount||0),0);
       h.append(el("span",null,g), el("span","small muted",`${its.length} 項`+(nd?`・${money(nd)}`:""))); box.appendChild(h); }
-    its.forEach(i=>box.appendChild(itemRow(x,i,ed,true)));
+    its.forEach((i,k)=>box.appendChild(itemRow(x,i,ed,true,mv(its,k))));
   });
   $("liDoneWrap").hidden=!done.length; $("liDoneSum").textContent=`已完成 ${done.length} 項` + (spent?`・實際花了 ${money(spent)}`:"");
   const db2=$("liDone"); db2.textContent=""; done.forEach(i=>db2.appendChild(itemRow(x,i,ed)));
@@ -3082,7 +3087,28 @@ function renderListItems(){
     S.statsT=setTimeout(()=>{ if(!S.user || S.user.uid!==uid) return; updateDoc(doc(db,"lists",x.id), {stats:st}).catch(()=>{}); }, 600);
   }
 }
-function itemRow(x,i,ed,grouped){
+/* 自己排順序：跟相鄰的項目交換順序 */
+async function swapOrder(x,a,b){
+  let oa=a.order||0, ob=b.order||0; if(oa===ob) ob=oa+(S.listItems.indexOf(b)>S.listItems.indexOf(a)?1:-1);
+  const bt=writeBatch(db);
+  bt.update(doc(db,"lists",x.id,"items",a.id), {order:ob, updatedAt:serverTimestamp()});
+  bt.update(doc(db,"lists",x.id,"items",b.id), {order:oa, updatedAt:serverTimestamp()});
+  a.order=ob; b.order=oa; renderListItems();
+  try{ await bt.commit(); }catch(e){ msg("liMsg","調整順序失敗："+errText(e),"err"); }
+}
+$("liSort").addEventListener("change", async()=>{
+  const x=LI(); if(!x) return; const v=$("liSort").value==="manual"?"manual":"";
+  // 改成自己排：先照目前畫面上的順序重新編號，從現在的樣子開始調整
+  try{
+    if(v==="manual"){ const cur=S.listItems.filter(i=>!i.done).sort(sortItems), bt=writeBatch(db), base=Date.now();
+      cur.forEach((i,k)=>{ const o=base+k; if(i.order!==o){ bt.update(doc(db,"lists",x.id,"items",i.id), {order:o, updatedAt:serverTimestamp()}); i.order=o; } });
+      await bt.commit(); S.reorder=true; }
+    else S.reorder=false;
+    x.sort=v; await updateDoc(doc(db,"lists",x.id), {sort:v, updatedAt:serverTimestamp()}); renderListItems();
+  }catch(e){ msg("liMsg","儲存排序失敗："+errText(e),"err"); }
+});
+$("liReorder").onclick=()=>{ S.reorder=!S.reorder; renderListItems(); };
+function itemRow(x,i,ed,grouped,mv){
   const r=el("div","li-row"+(i.done?" done":""));
   const cb=el("input"); cb.type="checkbox"; cb.checked=!!i.done; cb.disabled=!ed; cb.setAttribute("aria-label",(i.done?"改回未完成：":"完成：")+i.text);
   cb.onclick=ev=>{ ev.preventDefault(); if(i.done) undoItem(x,i); else openBuy(x,i); };
@@ -3095,6 +3121,9 @@ function itemRow(x,i,ed,grouped){
   if(i.priority==="高" && !i.done) r.classList.add("hi");
   if(i.due && !i.done && i.due<todayStr()) r.classList.add("late");
   r.append(cb, main, right);
+  if(mv){ const w=el("div","li-move");
+    [["↑","往上移",mv.up],["↓","往下移",mv.down]].forEach(([t,lab,fn])=>{ const b=el("button","icon-btn",t); b.type="button"; b.setAttribute("aria-label",lab+"："+i.text); b.disabled=!fn; if(fn) b.onclick=ev=>{ ev.stopPropagation(); fn(); }; w.appendChild(b); });
+    r.appendChild(w); }
   if(ed){ main.tabIndex=0; main.setAttribute("role","button"); main.onclick=()=>openItem(i); main.onkeydown=e=>{ if(e.key==="Enter") openItem(i); }; }
   return r;
 }
