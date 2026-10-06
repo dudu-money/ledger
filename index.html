@@ -133,7 +133,7 @@
         </div>
         <div class="pair">
           <div><div class="label">我的信用卡</div><div class="num mid" id="rCard">0</div></div>
-          <div><div class="label">要還給持卡人</div><div class="num mid" id="rXfer">0</div></div>
+          <div><div class="label">要轉給持卡人</div><div class="num mid" id="rXfer">0</div></div>
         </div>
         <div class="pair">
           <div><div class="label">貸款剩餘總額</div><div class="num mid" id="rLeft">0</div></div>
@@ -344,10 +344,11 @@
 
     <section class="panel" id="cardSetPanel">
       <h3 class="h3">信用卡與持卡人</h3>
-      <p class="small muted">設定每張卡的持卡人、卡費怎麼付、幾號結帳。「還款與分期」的信用卡帳單會照這裡分成「我的卡」、「別人的卡」和「其他信用卡紀錄」。</p>
+      <p class="small muted">設定每張卡的持卡人、卡費怎麼付、幾號結帳。「還款與分期」的信用卡帳單會照這裡分成「我的卡」、「別人名下的卡」和「其他信用卡紀錄」。</p>
       <label class="field"><span class="label">我在帳本裡的名字</span><input id="gsMe" type="text" maxlength="20" list="dlGsPayers" placeholder="例如：我"></label>
       <p class="small muted">記帳時「付款人」空白或是這個名字，才算自己要繳的錢；付款人是其他人的，會列在「其他信用卡紀錄」，不算進本月應繳。</p>
       <div id="gsCardRows" class="card-rows"></div>
+      <div class="row"><input type="text" id="gsCardNew" maxlength="20" placeholder="新增信用卡，例如：台新" aria-label="新增信用卡" class="grow"><button class="btn" type="button" id="gsCardAdd">＋ 新增</button></div>
       <button class="btn primary" id="gsCardSave" type="button">儲存信用卡設定</button>
       <p class="msg" id="gsCardMsg" role="status"></p>
     </section>
@@ -870,17 +871,17 @@
   </form>
 </dialog>
 
-<!-- 標記已還款給持卡人 -->
+<!-- 標記已轉帳給持卡人 -->
 <dialog id="dlgXfer" aria-labelledby="xfTitle">
   <form method="dialog" id="formXfer" class="stack" autocomplete="off">
-    <div class="between"><h2 class="h2" id="xfTitle">標記已還款</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="between"><h2 class="h2" id="xfTitle">標記已轉帳</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
     <p id="xfWhat"></p>
     <div class="grid2">
-      <label class="field"><span class="label">實際還了多少</span><input id="xfAmt" type="number" inputmode="numeric" min="0" step="1"></label>
-      <label class="field"><span class="label">還款日期</span><input id="xfDate" type="date"></label>
+      <label class="field"><span class="label">實際轉了多少</span><input id="xfAmt" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field"><span class="label">轉帳日期</span><input id="xfDate" type="date"></label>
     </div>
-    <p class="small muted" id="xfHint">還款給持卡人不會再記一筆支出（刷卡當天已經記過了），這裡只記下這期還了沒、還了多少。</p>
-    <div class="row"><button class="btn danger" type="button" id="xfUndo" hidden>取消已還款</button><button class="btn primary grow" type="submit" value="save" id="xfSave">確定已還款</button></div>
+    <p class="small muted" id="xfHint">轉帳給持卡人繳卡費，不會再記一筆支出（刷卡當天已經記過了），這裡只記下這期轉了沒、轉了多少。</p>
+    <div class="row"><button class="btn danger" type="button" id="xfUndo" hidden>取消已轉帳</button><button class="btn primary grow" type="submit" value="save" id="xfSave">確定已轉帳</button></div>
     <p class="msg" id="xfMsg" role="status"></p>
   </form>
 </dialog>
