@@ -563,6 +563,9 @@
         <div class="field" id="ePayerField"><span class="label" id="ePayerLabel">付款人（選填）</span>
           <div class="chips tag-pick" id="ePayerChips"></div>
           <input id="ePayer" type="text" maxlength="20" placeholder="點上面的名字，或輸入新名字後按 Enter" autocomplete="off">
+          <label class="check" id="eMultiPayWrap" hidden><input type="checkbox" id="eMultiPay"> 不只一個人付（各付一部分）</label>
+          <div class="split-grid" id="eMultiPayGrid" hidden></div>
+          <p class="small muted" id="eMultiPayNote" hidden></p>
         </div>
         <div class="field"><span class="label">狀態</span>
           <div class="seg" role="group" aria-label="狀態">
