@@ -132,8 +132,12 @@
           <div><div class="label">貸款未繳</div><div class="num mid c-out" id="rUnpaid">0</div></div>
         </div>
         <div class="pair">
-          <div><div class="label">信用卡本月</div><div class="num mid" id="rCard">0</div></div>
+          <div><div class="label">我的信用卡</div><div class="num mid" id="rCard">0</div></div>
+          <div><div class="label">要還給持卡人</div><div class="num mid" id="rXfer">0</div></div>
+        </div>
+        <div class="pair">
           <div><div class="label">貸款剩餘總額</div><div class="num mid" id="rLeft">0</div></div>
+          <div></div>
         </div>
       </section>
       <section class="panel">
@@ -141,7 +145,8 @@
         <div id="loanList" class="loan-list"></div>
       </section>
       <section class="panel wide">
-        <div class="between wrap-gap"><h3 class="h3">信用卡帳單</h3><span class="small muted">來自各帳本中付款方式為「信用卡」的紀錄</span></div>
+        <div class="between wrap-gap"><h3 class="h3">信用卡帳單</h3><button class="link" type="button" id="rCardSet">信用卡設定</button></div>
+        <p class="small muted" id="cardBillNote">來自各帳本中付款方式為「信用卡」的紀錄。付款人是自己的才算進本月應繳，其他人付的列在「其他信用卡紀錄」。</p>
         <div id="cardBill"></div>
       </section>
       <section class="panel wide" id="loanDoneWrap" hidden>
@@ -329,12 +334,22 @@
       <h3 class="h3">常用清單</h3>
       <p class="small muted">記帳時會出現在選單裡。記帳時輸入新的付款人或卡片，也會自動加進來。</p>
       <div class="list-edit" data-list="payers"><span class="label">付款人</span><div class="chips"></div>
-        <div class="row"><input type="text" maxlength="20" placeholder="例如：世翔" aria-label="新增付款人" class="grow"><button class="btn" type="button">新增</button></div></div>
+        <div class="row"><input type="text" maxlength="20" placeholder="例如：小明" aria-label="新增付款人" class="grow"><button class="btn" type="button">新增</button></div></div>
       <div class="list-edit" data-list="cards"><span class="label">信用卡</span><div class="chips"></div>
         <div class="row"><input type="text" maxlength="20" placeholder="例如：玉山、永豐" aria-label="新增信用卡" class="grow"><button class="btn" type="button">新增</button></div></div>
       <div class="list-edit" data-list="pays"><span class="label">付款方式（「信用卡」固定保留，才能記分期）</span><div class="chips"></div>
         <div class="row"><input type="text" maxlength="20" placeholder="例如：LINE Pay" aria-label="新增付款方式" class="grow"><button class="btn" type="button">新增</button></div></div>
       <p class="msg" id="gsListMsg" role="status"></p>
+    </section>
+
+    <section class="panel" id="cardSetPanel">
+      <h3 class="h3">信用卡與持卡人</h3>
+      <p class="small muted">設定每張卡的持卡人、卡費怎麼付、幾號結帳。「還款與分期」的信用卡帳單會照這裡分成「我的卡」、「別人的卡」和「其他信用卡紀錄」。</p>
+      <label class="field"><span class="label">我在帳本裡的名字</span><input id="gsMe" type="text" maxlength="20" list="dlGsPayers" placeholder="例如：我"></label>
+      <p class="small muted">記帳時「付款人」空白或是這個名字，才算自己要繳的錢；付款人是其他人的，會列在「其他信用卡紀錄」，不算進本月應繳。</p>
+      <div id="gsCardRows" class="card-rows"></div>
+      <button class="btn primary" id="gsCardSave" type="button">儲存信用卡設定</button>
+      <p class="msg" id="gsCardMsg" role="status"></p>
     </section>
 
     <section class="panel" id="backupPanel">
@@ -638,7 +653,7 @@
       <div class="stack" id="sAABox">
         <div class="field"><span class="label">一起分攤的人（2～4 人，點選或輸入新名字按 Enter）</span>
           <div class="chips tag-pick" id="sAAPeople"></div>
-          <input id="sAANew" type="text" maxlength="20" placeholder="例如：世翔" autocomplete="off">
+          <input id="sAANew" type="text" maxlength="20" placeholder="例如：小明" autocomplete="off">
         </div>
         <div class="field"><span class="label">預設分攤比例（%）</span><div class="split-grid" id="sAARatio"></div></div>
         <div class="row wrap"><button class="btn" id="sAAEven" type="button">平均分</button><span class="small muted" id="sAASum"></span></div>
@@ -697,7 +712,7 @@
     <div class="between"><h2 class="h2" id="loTitle">新增貸款</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
     <div class="grid2">
       <label class="field"><span class="label">品項</span><input id="loType" type="text" maxlength="20" list="dlLoanTypes" required placeholder="學貸、信貸、信用卡協商"></label>
-      <label class="field"><span class="label">名稱</span><input id="loName" type="text" maxlength="30" placeholder="例如：大樹速貸、Iphone"></label>
+      <label class="field"><span class="label">名稱</span><input id="loName" type="text" maxlength="30" placeholder="例如：信貸、iPhone 分期"></label>
       <label class="field"><span class="label">銀行</span><input id="loBank" type="text" maxlength="20" placeholder="例如：國泰"></label>
       <label class="field"><span class="label">每月繳款日</span><input id="loDay" type="number" inputmode="numeric" min="1" max="31" placeholder="例如 12"></label>
       <label class="field"><span class="label">原貸金額</span><input id="loPrincipal" type="number" inputmode="numeric" min="0" required></label>
@@ -720,7 +735,7 @@
     <div class="row wrap"><button class="btn" type="button" id="loRateCalc">不知道利率？用原貸、總期數、月繳推算</button></div>
     <p class="msg" id="loRateMsg" role="status"></p>
     <p class="small muted" id="loRateHint">有填年利率的話，每期繳款會自動拆成「本金」和「利息」，剩餘金額只扣本金，和銀行 APP 的算法一樣。</p>
-    <label class="field"><span class="label">備註</span><input id="loNote" type="text" maxlength="100" placeholder="例如：總期數84期，每月12號帳戶扣款"></label>
+    <label class="field"><span class="label">備註</span><input id="loNote" type="text" maxlength="100" placeholder="例如：每月 12 號自動扣款"></label>
     <div class="field"><span class="label">標記已繳時，自動記一筆支出到</span>
       <div class="grid2">
         <select id="loLedger" aria-label="記到哪本帳"></select>
@@ -852,6 +867,21 @@
     <p class="small muted" id="rbHint"></p>
     <div class="row"><button class="btn danger" type="button" id="rbUndo" hidden>改回待請款</button><button class="btn primary grow" type="submit" value="save" id="rbSave">確定已收到</button></div>
     <p class="msg" id="rbMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 標記已還款給持卡人 -->
+<dialog id="dlgXfer" aria-labelledby="xfTitle">
+  <form method="dialog" id="formXfer" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="xfTitle">標記已還款</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p id="xfWhat"></p>
+    <div class="grid2">
+      <label class="field"><span class="label">實際還了多少</span><input id="xfAmt" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field"><span class="label">還款日期</span><input id="xfDate" type="date"></label>
+    </div>
+    <p class="small muted" id="xfHint">還款給持卡人不會再記一筆支出（刷卡當天已經記過了），這裡只記下這期還了沒、還了多少。</p>
+    <div class="row"><button class="btn danger" type="button" id="xfUndo" hidden>取消已還款</button><button class="btn primary grow" type="submit" value="save" id="xfSave">確定已還款</button></div>
+    <p class="msg" id="xfMsg" role="status"></p>
   </form>
 </dialog>
 
