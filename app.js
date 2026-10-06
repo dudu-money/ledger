@@ -1191,7 +1191,7 @@ $("rNow").onclick=()=>{ S.rYM=thisYM(); renderRepay(); };
 let billToken=null;
 function renderRepay(reloadBill=true){
   const ym=S.rYM;
-  tipsFor("tipRepay", [["repay8","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人和結帳日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」。"]]);
+  tipsFor("tipRepay", [["repay8","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」。"]]);
   $("rTitle").textContent=ymLabel(ym); $("rNow").hidden = ym===thisYM();
   const active=[], done=[];
   S.loans.slice().sort((a,b)=>(a.type+a.name).localeCompare(b.type+b.name,"zh-Hant")).forEach(lo=>{
@@ -1517,19 +1517,26 @@ $("loDelete").onclick=async()=>{
 /* ---- 信用卡：卡主、結帳日、轉帳 ---- */
 /* 沒設定「我在帳本裡的名字」時用預設付款人；兩個都沒設定就全部算自己的（跟以前一樣） */
 const meName = () => P().me || P().defaultPayer || "";
-const cardCfg = card => { const c=(P().cardSet||{})[card]||{}; return { o:String(c.o||""), m:c.m==="o"?"o":"x", d:Math.max(0,Math.min(31,Number(c.d)||0)) }; };
+const cardCfg = card => { const c=(P().cardSet||{})[card]||{}; return { o:String(c.o||""), m:c.m==="o"?"o":"x", d:Math.max(0,Math.min(31,Number(c.d)||0)), p:Math.max(0,Math.min(31,Number(c.p)||0)) }; };
+/* 這個月要繳的是哪個月結帳的帳單：繳款日在結帳日之後＝同月結帳；否則是上個月結帳的（沒填繳款日時，結帳後約 18 天繳款來推估） */
+function closeYmFor(card, ym){
+  const c=cardCfg(card); if(!c.d) return ym;
+  const sameMonth = c.p ? c.p>c.d : c.d+18<=28;
+  return sameMonth ? ym : addMonths(ym,-1);
+}
 const isMe = name => !name || !meName() || name===meName() || name==="我";
 /* 卡主是不是別人（卡主沒填、填「我」或自己的名字都算自己） */
 const ownerOther = o => !!o && o!=="我" && o!==meName();
-/* 卡片的帳單區間：有結帳日就是「上月結帳日隔天～本月結帳日」，沒有就是整個月 */
-function cardRange(card, ym){
-  const d=cardCfg(card).d; if(!d) return [`${ym}-01`, `${ym}-${pad(dim(ym))}`];
+/* 卡片這個月要繳的帳單區間：有結帳日就是「結帳月的上月結帳日隔天～結帳日」，沒有就是整個月 */
+function cardRange(card, payYm){
+  const d=cardCfg(card).d; if(!d) return [`${payYm}-01`, `${payYm}-${pad(dim(payYm))}`];
+  const ym=closeYmFor(card, payYm);
   const prev=addMonths(ym,-1), pe=Math.min(d, dim(prev)), e=Math.min(d, dim(ym));
   const start = pe>=dim(prev) ? `${ym}-01` : `${prev}-${pad(pe+1)}`;
   return [start, `${ym}-${pad(e)}`];
 }
 function cleanCardSet(cs){ const out={}; if(cs && typeof cs==="object") Object.entries(cs).slice(0,50).forEach(([k,v])=>{ if(!v||typeof v!=="object") return;
-  out[String(k).slice(0,20)]={ o:String(v.o||"").slice(0,20), m:v.m==="o"?"o":"x", d:Math.max(0,Math.min(31,Math.round(Number(v.d)||0))) }; }); return out; }
+  out[String(k).slice(0,20)]={ o:String(v.o||"").slice(0,20), m:v.m==="o"?"o":"x", d:Math.max(0,Math.min(31,Math.round(Number(v.d)||0))), p:Math.max(0,Math.min(31,Math.round(Number(v.p)||0))) }; }); return out; }
 function cleanXfer(x){ const out={}; if(x && typeof x==="object") Object.entries(x).sort().slice(-600).forEach(([k,v])=>{ if(v&&typeof v==="object") out[String(k).slice(0,40)]={ a:Math.round(Number(v.a)||0), d:String(v.d||"").slice(0,10) }; }); return out; }
 const xferKey = (card, ym) => `${card}|${ym}`;
 const mdLabel = d => `${Number(d.slice(5,7))}/${pad(Number(d.slice(8,10)))}`;
@@ -1537,7 +1544,7 @@ const mdLabel = d => `${Number(d.slice(5,7))}/${pad(Number(d.slice(8,10)))}`;
 async function loadCardBill(ym){
   const box=$("cardBill"); const token=billToken={}; S.rCardTotal=0; S.rXferTotal=0; $("rCard").textContent="…"; $("rXfer").textContent="…";
   box.textContent=""; box.appendChild(el("p","small muted","讀取中…"));
-  const prev=addMonths(ym,-1), a=`${prev}-02`, b=`${ym}-${pad(dim(ym))}`, raw=[];
+  const a=`${addMonths(ym,-2)}-01`, b=`${ym}-${pad(dim(ym))}`, raw=[];
   try{
     for(const l of S.ledgers.values()){
       const snap=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("date",">=",a), where("date","<=",b)));
@@ -1546,7 +1553,8 @@ async function loadCardBill(ym){
   }catch(e){ if(token!==billToken) return; box.textContent=""; box.appendChild(el("p","msg err","讀取信用卡紀錄失敗："+errText(e))); return; }
   if(token!==billToken) return;
   // 照每張卡的帳單區間過濾
-  const rows=raw.filter(e=>{ const [s0,e0]=cardRange(e.card||"", ym); return e.date>=s0 && e.date<=e0; });
+  // 分期的每一期已經指定「帳單月份」，直接照月份；一般消費照每張卡的帳單區間
+  const rows=raw.filter(e=>{ if(e.inst) return e.date.slice(0,7)===ym; const [s0,e0]=cardRange(e.card||"", ym); return e.date>=s0 && e.date<=e0; });
   // 分期手續費併進同一期的商品那一行
   const merged=[], seen=new Map();
   rows.slice().sort((x,y)=>isFee(x)-isFee(y)).forEach(e=>{
@@ -1575,7 +1583,8 @@ async function loadCardBill(ym){
   S.rCardTotal=mineTotal; S.rXferTotal=xferTotal; $("rCard").textContent=fmt(mineTotal); $("rXfer").textContent=fmt(xferTotal);
   renderRepay(false);
   if(!merged.length){ box.appendChild(el("p","small muted",`${ymLabel(ym)}沒有信用卡消費。記帳時付款方式選「信用卡」、填上卡片名稱，就會出現在這裡；分期的會自動顯示第幾期。`)); return; }
-  const rangeText=(card)=>{ const c=cardCfg(card); if(!c.d) return "照消費月份"; const [s0,e0]=cardRange(card, ym); return `每月 ${c.d} 號結帳（${mdLabel(s0)}–${mdLabel(e0)} 的消費）`; };
+  const rangeText=(card)=>{ const c=cardCfg(card); if(!c.d) return "照消費月份"; const [s0,e0]=cardRange(card, ym);
+    return `${Number(e0.slice(5,7))}/${c.d} 結帳的帳單（${mdLabel(s0)}–${mdLabel(e0)} 的消費）` + (c.p ? `・${Number(ym.slice(5))}/${c.p} 前繳` : ""); };
   const setLink=()=>{ const k=el("button","link","設定"); k.type="button"; k.onclick=gotoCardSet; return k; };
   const table=(list, cols, cells)=>{
     const tw=el("div","table-wrap"), t=el("table","btable"), th=el("thead"), hr=el("tr");
@@ -1654,21 +1663,30 @@ function renderCardSet(force){
   if(!cards.length){ box.appendChild(el("p","small muted","還沒有信用卡。在下面直接新增，或記帳時填上卡片名稱，就會出現在這裡。")); return; }
   cards.forEach(card=>{ const c=cardCfg(card);
     const r=el("div","card-row"); r.dataset.card=card; r.appendChild(el("strong",null,card));
-    const g=el("div","grid3");
-    const f1=el("label","field"); f1.appendChild(el("span","label","持卡人（填人名，例如：小明）")); const o=el("input"); o.type="text"; o.maxLength=20; o.placeholder="空白＝自己"; o.value=c.o; o.setAttribute("list","dlGsPayers"); o.className="cs-o"; f1.appendChild(o);
+    const g=el("div","grid4");
+    const f1=el("label","field"); f1.appendChild(el("span","label","持卡人（填人名）")); const o=el("input"); o.type="text"; o.maxLength=20; o.placeholder="空白＝自己"; o.value=c.o; o.setAttribute("list","dlGsPayers"); o.className="cs-o"; f1.appendChild(o);
     const f2=el("label","field"); f2.appendChild(el("span","label","卡費怎麼付")); const m=el("select"); m.className="cs-m";
     [["x","轉帳給持卡人繳費"],["o","持卡人自己繳（不算我的）"]].forEach(([v,t])=>{ const op=el("option",null,t); op.value=v; m.appendChild(op); }); m.value=c.m; f2.appendChild(m);
     const f3=el("label","field"); f3.appendChild(el("span","label","結帳日")); const d=el("select"); d.className="cs-d";
-    const op0=el("option",null,"不設定（照消費月份）"); op0.value="0"; d.appendChild(op0);
+    const op0=el("option",null,"不設定"); op0.value="0"; d.appendChild(op0);
     for(let i=1;i<=31;i++){ const op=el("option",null,`每月 ${i} 號`); op.value=String(i); d.appendChild(op); } d.value=String(c.d); f3.appendChild(d);
+    const f4=el("label","field"); f4.appendChild(el("span","label","繳款截止日")); const pd=el("select"); pd.className="cs-p";
+    const opp=el("option",null,"不設定"); opp.value="0"; pd.appendChild(opp);
+    for(let i=1;i<=31;i++){ const op=el("option",null,`每月 ${i} 號`); op.value=String(i); pd.appendChild(op); } pd.value=String(c.p); f4.appendChild(pd);
     const sync=()=>{ const v=o.value.trim(), me=$("gsMe").value.trim()||P().defaultPayer; const self=!v || v==="我" || v===me; m.disabled=self; f2.style.opacity=self?.5:1; };
     o.addEventListener("input", sync); sync();
-    g.append(f1,f2,f3); r.appendChild(g); box.appendChild(r); });
+    const hint=el("p","small muted cs-hint");
+    const sh=()=>{ const dv=Number(d.value)||0, pv=Number(pd.value)||0; pd.disabled=!dv; f4.style.opacity=dv?1:.5;
+      hint.textContent = !dv ? "沒設定結帳日：每個月的帳單就是那個月的消費。"
+        : pv ? (pv>dv ? `${dv} 號結帳、同月 ${pv} 號前繳：這個月繳的是本月 ${dv} 號結帳的帳單。` : `${dv} 號結帳、隔月 ${pv} 號前繳：這個月繳的是上個月 ${dv} 號結帳的帳單。`)
+        : "建議填繳款截止日（帳單上都有），金額才會出現在你真正要繳的那個月。"; };
+    d.addEventListener("change", sh); pd.addEventListener("change", sh); sh();
+    g.append(f1,f2,f3,f4); r.append(g, hint); box.appendChild(r); });
 }
 function readCardSet(){
   const cs={};
-  document.querySelectorAll("#gsCardRows .card-row").forEach(r=>{ const o=r.querySelector(".cs-o").value.trim().slice(0,20), m=r.querySelector(".cs-m").value, d=Number(r.querySelector(".cs-d").value)||0;
-    if(o||d) cs[r.dataset.card]={o, m:m==="o"?"o":"x", d}; });
+  document.querySelectorAll("#gsCardRows .card-row").forEach(r=>{ const o=r.querySelector(".cs-o").value.trim().slice(0,20), m=r.querySelector(".cs-m").value, d=Number(r.querySelector(".cs-d").value)||0, pp=d ? Number(r.querySelector(".cs-p").value)||0 : 0;
+    if(o||d) cs[r.dataset.card]={o, m:m==="o"?"o":"x", d, p:pp}; });
   return cs;
 }
 $("gsCardSave").onclick=async()=>{
@@ -1770,7 +1788,7 @@ async function savePrefs(patch){
 
 function renderGlobalSettings(reset=true){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user?S.user.email:"");
-  tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人和結帳日。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
+  tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
   const lb=P().lastBackup;
   $("bkLast").textContent = lb ? `上次備份：${new Date(lb).toLocaleDateString("zh-TW")}（${Math.floor((Date.now()-lb)/864e5)} 天前）` : "還沒有備份過";
   renderLook();
@@ -2189,9 +2207,9 @@ function renderLedgerTips(l){
 }
 function refreshTips(){
   if(S.lid && L() && !$("viewLedger").hidden) renderLedgerTips(L());
-  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay8","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人和結帳日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」。"]]);
+  if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay8","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」。"]]);
   if(!$("viewInvest").hidden) renderInvestTips();
-  if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人和結帳日。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
+  if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
 }
 
 /* 歡迎導覽 */
@@ -2203,7 +2221,7 @@ const TOUR=[
   { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
   { sel:'#viewHome .tabs a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
-  { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人和結帳日、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
+  { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
 const tourTarget = () => { const s=TOUR[tourI].sel; const t=s && document.querySelector(s); return t && t.offsetParent!==null ? t : null; };

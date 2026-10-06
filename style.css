@@ -478,8 +478,9 @@ button.pay-cell:hover{border-color:var(--accent)}
 /* 信用卡：卡主、轉帳 */
 .card-rows{display:flex;flex-direction:column;gap:10px}
 .card-row{border:1px solid var(--rule);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.card-row .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-@media (max-width:560px){.card-row .grid3{grid-template-columns:1fr 1fr}.card-row .grid3 .field:first-child{grid-column:1/-1}}
+.card-row .grid4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.card-row .cs-hint{margin:0}
+
 .bill-sec{font-size:13px;font-weight:700;color:var(--muted);margin:6px 0 -2px;letter-spacing:.04em}
 .bill-card.xfer{border:1px solid var(--accent);background:var(--accent-soft);border-radius:12px;padding:10px 12px;margin-top:6px}
 .bill-card.other{opacity:.9}
