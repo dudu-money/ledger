@@ -2575,7 +2575,7 @@ function holdStats(h, skipId){
 }
 
 function renderInvestTips(){
-  tipsFor("tipInvest", [["nw2","上面的「淨資產」：想到的時候（建議每月月底）把各戶頭和現金有多少填一次，系統會自動加上投資市值、扣掉每筆貸款，畫出資產變化。下方的比較表會列出每個戶頭、每筆貸款比上次多或少多少，點一列就能看那一項的曲線。不用記轉帳，也不用跟記帳對得上。"],["invest","買進、賣出、股息都記在這裡，會自動算持有股數、平均成本和損益（和多數券商 App 一樣用平均成本法）。依台股習慣，紅色是賺、綠色是賠。現價可以按「更新台股收盤價」，或點持股自己填。"]]);
+  tipsFor("tipInvest", [["nw2","上面的「淨資產」：想到的時候（建議每月月底）把各戶頭和現金有多少填一次，系統會自動加上投資市值、扣掉每筆貸款，畫出資產變化。下方的比較表會列出每個戶頭、每筆貸款比上次多或少多少，點一列就能看那一項的曲線。不用記轉帳，也不用跟記帳對得上。"],["invest2","買進、賣出、股息都記在這裡，會自動算持有股數、平均成本和損益（和多數券商 App 一樣用平均成本法）。依台股習慣，紅色是賺、綠色是賠。現價可以按「更新台股收盤價」，或點持股自己填。在「手續費設定」填券商的折扣和最低手續費（零股常見 2.8 折、最低 1 元），市值下面就會算出跟券商 APP 一樣的參考現值。"]]);
 }
 function renderInvest(){
   renderInvestTips(); renderNW();
@@ -2587,7 +2587,16 @@ function renderInvest(){
   const unreal=mv-cost, total=unreal+real+div;
   $("ivMV").textContent=money(mv);
   const hasUSD=rows.some(r=>r.h.cur==="USD");
-  $("ivMVNote").textContent = hasUSD ? `美股以匯率 ${fmtP(P().inv.fx)} 換算成台幣（可在「手續費設定」改）` : "";
+  // 券商 APP 的「參考現值」通常先扣掉賣出時的手續費和交易稅
+  // 券商逐檔取整數：市值無條件捨去、成本四捨五入
+  const v=P().inv; let sc=0, net=0, costR=0;
+  act.forEach(r=>{ const m=r.st.mv;
+    if(r.h.cur!=="TWD"){ net+=m*r.fx; costR+=r.st.cost*r.fx; return; }
+    const f=Math.max(v.min, Math.floor(m*0.001425*v.disc/10)) + Math.floor(m*(TAX_RATE[r.h.kind]??0.001));
+    sc+=f; net+=Math.floor(m)-f; costR+=Math.round(r.st.cost); });
+  const nu=net-costR, cost2=costR;
+  $("ivMVNote").textContent = (sc>0 ? `扣掉賣出手續費和交易稅約 ${money(net)}，報酬 ${sgn(nu)}${cost2?`（${(nu/cost2*100>=0?"+":"")}${(nu/cost2*100).toFixed(2)}%）`:""}，跟券商 APP 的參考現值算法一樣。` : "")
+    + (hasUSD ? `美股以匯率 ${fmtP(v.fx)} 換算成台幣（可在「手續費設定」改）。` : "");
   $("ivMVNote").className="small muted";
   $("ivCost").textContent=fmt(cost);
   const setPL=(id,v)=>{ const e=$(id); e.textContent=sgn(v); e.className="num mid "+upDown(v); };
