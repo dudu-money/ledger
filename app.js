@@ -1205,10 +1205,8 @@ function openPay(lo, ym){
   if(cur){ $("pyInt").value=payI(cur); $("pyPrin").value=payP(cur); if(typeof cur.i==="number" && !cur.x) $("pyInt").dataset.touched="1"; }
   else syncSplit();
   const before=loanStats(lo, ym).remain;
-  $("pySplitNote").textContent = (cur ? cur.x : lo.io) ? "緩繳本金期間：整筆都算利息，剩餘本金不變，也不算進還款期數。" + (lo.rate?`（依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% 估算）`:"") : lo.rate
-    ? (intDays(lo, ym)
-      ? `依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% × ${intDays(lo, ym)} 天 ÷ 365（和銀行算法一樣），這期利息約 ${fmt(autoInt(lo, ym))} 元。如果跟銀行 APP 差幾塊，照 APP 改就好。`
-      : `依剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% ÷ 12 估算，這期利息約 ${fmt(autoInt(lo, ym))} 元。在「編輯」填「每月繳款日」，就會改用和銀行一樣的天數算法，更準。`)
+  $("pySplitNote").textContent = (cur ? cur.x : lo.io) ? "緩繳本金期間：整筆都算利息，剩餘本金不變，也不算進還款期數。" + (lo.rate?`（依${intFormula(lo, ym, before)}，約 ${fmt(autoInt(lo, ym))} 元）。如果跟銀行不同，可以在「編輯」改「利息怎麼算」。`:"") : lo.rate
+    ? `依${intFormula(lo, ym, before)}，這期利息約 ${fmt(autoInt(lo, ym))} 元。如果跟銀行差幾塊，可以在「編輯」改「利息怎麼算」，或直接照銀行的數字改。`
     : "這筆沒有設定年利率，整筆都算本金。銀行貸款建議在「編輯」填年利率，或照繳款明細自己填利息。";
   const ld=lo.ledgerId && S.ledgers.get(lo.ledgerId);
   $("pyNote").textContent = cur ? (cur.e ? "改金額的話，帳本裡那一筆也會一起改。" : ld ? `這個月還沒記到帳本，按「儲存修改」會補記一筆到「${ld.name}」。` : "") : (ld ? `會同時在「${ld.name}」記一筆支出。` : "沒有設定自動記帳（可在「編輯」裡設定）。");
@@ -1218,9 +1216,14 @@ function openPay(lo, ym){
 }
 /* 利息估算：有填每月繳款日時，和銀行一樣照「上期繳款日到這期繳款日的實際天數 ÷ 365」算；沒填時用 ÷ 12 */
 const dueDate = (ym, day) => new Date(Number(ym.slice(0,4)), Number(ym.slice(5))-1, Math.min(day, dim(ym)));
-const intDays = (lo, ym) => lo.day ? Math.round((dueDate(ym, lo.day)-dueDate(addMonths(ym,-1), lo.day))/864e5) : 0;
-const autoInt = (lo, ym) => { if(!lo.rate) return 0; const r=loanStats(lo, ym).remain, d=intDays(lo, ym);
-  return Math.round(d ? r*lo.rate/100*d/365 : r*lo.rate/1200); };
+/* 計息方式：day＝實際天數÷365；month＝÷12 四捨五入；monthFloor＝÷12 無條件捨去。沒選時：有繳款日就 day，否則 month */
+const intMethod = lo => lo.im || (lo.day ? "day" : "month");
+const intDays = (lo, ym) => intMethod(lo)==="day" && lo.day ? Math.round((dueDate(ym, lo.day)-dueDate(addMonths(ym,-1), lo.day))/864e5) : 0;
+const autoInt = (lo, ym) => { if(!lo.rate) return 0; const r=loanStats(lo, ym).remain, d=intDays(lo, ym), m=intMethod(lo);
+  const raw = d ? r*lo.rate/100*d/365 : r*lo.rate/1200;
+  return m==="monthFloor" ? Math.floor(raw+1e-9) : Math.round(raw); };
+const intFormula = (lo, ym, before) => { const d=intDays(lo, ym), m=intMethod(lo);
+  return d ? `剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% × ${d} 天 ÷ 365` : `剩餘本金 ${fmt(before)} × 年利率 ${lo.rate}% ÷ 12` + (m==="monthFloor"?"（無條件捨去）":""); };
 function syncSplit(from){
   const {lo, ym}=S.payLoan, a=Math.round(Number($("pyAmount").value)||0);
   if(from==="p"){ const p=Math.round(Number($("pyPrin").value)||0); $("pyInt").value=Math.max(a-p,0); $("pyInt").dataset.touched="1"; return; }
@@ -1315,7 +1318,7 @@ function openLoan(lo){
   const v=(id,x)=>$(id).value = x==null ? "" : x;
   v("loType",lo?lo.type:""); v("loName",lo?lo.name:""); v("loBank",lo?lo.bank:""); v("loDay",lo&&lo.day?lo.day:"");
   v("loPrincipal",lo?lo.principal:""); v("loMonthly",lo&&lo.monthly?lo.monthly:""); v("loTotal",lo&&lo.totalPeriods?lo.totalPeriods:"");
-  msg("loRateMsg",""); $("loIO").checked=!!(lo&&lo.io);
+  msg("loRateMsg",""); $("loIO").checked=!!(lo&&lo.io); $("loIM").value = lo && lo.im ? lo.im : "";
   v("loPeriodsBase",lo?lo.periodsBase||0:0); v("loPaidBase",lo?lo.paidBase||0:0); v("loNote",lo?lo.note:""); v("loRate",lo&&lo.rate?lo.rate:"");
   $("loAdjBox").hidden=!lo; msg("loAdjMsg",""); $("loAdjBal").value=""; $("loAdjN").value=""; $("loAdjNHint").textContent="";
   if(lo){ const ms=Object.keys(lo.payments||{}).sort(); $("loAdjYm").value = ms.length ? ms[ms.length-1] : addMonths(thisYM(),-1); renderAdjNow(lo); }
@@ -1392,7 +1395,7 @@ $("formLoan").addEventListener("submit", async ev=>{
   const data={ type:type.slice(0,20), name:$("loName").value.trim().slice(0,30), bank:$("loBank").value.trim().slice(0,20),
     day:Math.min(num("loDay"),31), principal:num("loPrincipal"), monthly:num("loMonthly"), totalPeriods:num("loTotal"),
     periodsBase:num("loPeriodsBase"), paidBase:num("loPaidBase"), note:$("loNote").value.trim().slice(0,100),
-    rate:Math.min(Math.max(Number($("loRate").value)||0,0),100), io:$("loIO").checked,
+    rate:Math.min(Math.max(Number($("loRate").value)||0,0),100), io:$("loIO").checked, im:$("loIM").value,
     ledgerId: ld ? ledgerId : "", categoryId: cat ? cat.id : "", categoryName: cat ? cat.name : "", updatedAt:serverTimestamp() };
   $("loSave").disabled=true;
   try{
@@ -1888,7 +1891,7 @@ $("bkRestore").onclick=async()=>{
     let nL=0;
     if(doLoans){ const have=new Set(S.loans.map(x=>x.id));
       for(const lo of BK.loans.filter(x=>!have.has(x.id))){
-        const keys=["type","name","bank","day","principal","monthly","totalPeriods","periodsBase","paidBase","note","ledgerId","categoryId","categoryName","payments","rate","adj","io"], o={};
+        const keys=["type","name","bank","day","principal","monthly","totalPeriods","periodsBase","paidBase","note","ledgerId","categoryId","categoryName","payments","rate","adj","io","im"], o={};
         keys.forEach(k=>{ if(lo[k]!==undefined) o[k]=lo[k]; });
         await setDoc(doc(db,"loans",lo.id), {type:"貸款",name:"",bank:"",day:0,principal:0,monthly:0,totalPeriods:0,periodsBase:0,paidBase:0,note:"",ledgerId:"",categoryId:"",categoryName:"",payments:{},
           ...o, ownerUid:S.user.uid, createdAt:serverTimestamp(), updatedAt:serverTimestamp()}); nL++; } }

@@ -709,6 +709,13 @@
       <label class="field"><span class="label">開始用本系統前已還本金</span><input id="loPaidBase" type="number" inputmode="numeric" min="0" value="0"></label>
       <label class="field"><span class="label">年利率 %（無息填 0）</span><input id="loRate" type="number" inputmode="decimal" min="0" max="100" step="any" placeholder="例如 5.5"></label>
     </div>
+    <label class="field"><span class="label">利息怎麼算（照你的銀行選）</span>
+      <select id="loIM">
+        <option value="">自動（有填每月繳款日就照天數，沒填就按月）</option>
+        <option value="day">照實際天數 ÷ 365，四捨五入（例如國泰信貸）</option>
+        <option value="month">按月：年利率 ÷ 12，四捨五入</option>
+        <option value="monthFloor">按月：年利率 ÷ 12，無條件捨去（例如臺銀學貸）</option>
+      </select></label>
     <label class="check io-check"><input type="checkbox" id="loIO"> 目前緩繳本金（只繳利息）<span class="small muted">— 例如學貸緩繳期間。打開後每期整筆算利息，不算進已繳期數；緩繳結束再關掉。</span></label>
     <div class="row wrap"><button class="btn" type="button" id="loRateCalc">不知道利率？用原貸、總期數、月繳推算</button></div>
     <p class="msg" id="loRateMsg" role="status"></p>
