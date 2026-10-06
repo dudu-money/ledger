@@ -729,9 +729,10 @@
     </div>
     <div id="loAdjBox" class="adj-box" hidden>
       <div class="between wrap-gap"><span class="label">校正剩餘本金</span><span class="small muted" id="loAdjNow"></span></div>
-      <p class="small muted">跟銀行 APP 對不起來時，把 APP 上的「剩餘本金」填進來，系統會從這個數字接著算。</p>
+      <p class="small muted">跟銀行 APP 對不起來時，把 APP 上的剩餘金額填進來，系統會從這個數字接著算。</p>
       <div class="grid2">
-        <label class="field"><span class="label">銀行 APP 上的剩餘本金</span><input id="loAdjBal" type="number" inputmode="numeric" min="0"></label>
+        <label class="field"><span class="label">銀行 APP 上寫的是</span><select id="loAdjKind"><option value="p">剩餘本金</option><option value="t">剩餘費用（含利息）</option></select></label>
+        <label class="field"><span class="label" id="loAdjBalLabel">APP 上的剩餘本金</span><input id="loAdjBal" type="number" inputmode="numeric" min="0"></label>
         <label class="field"><span class="label">這是繳完哪個月之後的餘額</span><input id="loAdjYm" type="month"></label>
         <label class="field"><span class="label">銀行 APP 上的「已繳期數」（選填，不是未繳期數）</span><input id="loAdjN" type="number" inputmode="numeric" min="0" placeholder="例如 45"></label>
       </div>
