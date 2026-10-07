@@ -921,8 +921,10 @@
       </div>
     </div>
     <label class="field"><span class="label">備註</span><input id="itNote" type="text" maxlength="200" placeholder="例如：尺寸 NB、要買無香精的"></label>
-    <label class="field"><span class="label">分組</span><input id="itGroup" type="text" maxlength="20" list="dlItGroups" placeholder="例如：媽媽、寶寶（不分組可留空）"></label>
-    <datalist id="dlItGroups"></datalist>
+    <div class="grid2">
+      <label class="field"><span class="label">分組</span><select id="itGroup"></select></label>
+      <label class="field" id="itGroupNewWrap" hidden><span class="label">新分組名稱</span><input id="itGroupNew" type="text" maxlength="20" placeholder="例如：媽媽、寶寶"></label>
+    </div>
     <p class="small muted" id="itDoneInfo" hidden></p>
     <div class="row">
       <button class="btn danger" type="button" id="itDelete">刪除</button>
@@ -962,6 +964,18 @@
 </dialog>
 
 <!-- 清單設定 -->
+<!-- 管理分組 -->
+<dialog id="dlgGroups" aria-labelledby="grTitle">
+  <form method="dialog" id="formGroups" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="grTitle">管理分組</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <p class="small muted">可以改名、調整先後順序、刪除。刪除分組不會刪掉品項，裡面的品項會改成「不分組」。</p>
+    <div id="grRows" class="gr-rows"></div>
+    <div class="row"><input id="grNew" type="text" maxlength="20" placeholder="新增分組，例如：寶寶" class="grow" aria-label="新增分組"><button class="btn" type="button" id="grAdd">＋ 新增</button></div>
+    <button class="btn primary" type="submit" value="save" id="grSave">儲存</button>
+    <p class="msg" id="grMsg" role="status"></p>
+  </form>
+</dialog>
+
 <dialog id="dlgListSet" aria-labelledby="lsTitle">
   <form method="dialog" class="stack" autocomplete="off" onsubmit="return false">
     <div class="between"><h2 class="h2" id="lsTitle">清單設定</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉" id="lsClose">✕</button></div>

@@ -2208,7 +2208,7 @@ $("bkRestore").onclick=async()=>{
     if(doLists){ const d=new Date(), tg=`（還原 ${d.getMonth()+1}/${d.getDate()}）`;
       for(const ls of (BK.lists||[])){ const x=ls.data||{};
         const ref=await addDoc(collection(db,"lists"), { name:(String(x.name||"清單")+tg).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20), ownerUid:S.user.uid, ownerEmail:S.email,
-          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), ...(x.sort==="manual"?{sort:"manual"}:{}), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), ...(x.sort==="manual"?{sort:"manual"}:{}), ...(Array.isArray(x.groups)?{groups:x.groups.map(g=>String(g).slice(0,20)).filter(Boolean).slice(0,50)}:{}), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
         const its=ls.items||[];
         for(let k=0;k<its.length;k+=400){ const b=writeBatch(db);
           its.slice(k,k+400).forEach((it,j)=>b.set(doc(collection(db,"lists",ref.id,"items")), { text:String(it.text||"項目").slice(0,100), amount:Number(it.amount)||0,
@@ -3037,8 +3037,16 @@ function renderListHead(){
 }
 function sortItems(a,b){ return (PRIO_RANK[a.priority||""]-PRIO_RANK[b.priority||""]) || ((a.due||"9999")<(b.due||"9999")?-1:(a.due||"9999")>(b.due||"9999")?1:0) || ((a.order||0)-(b.order||0)); }
 /* 分組：照每組第一個項目的先後排；沒分組的放最上面 */
-const listGroups = () => { const first=new Map(); S.listItems.forEach(i=>{ const g=i.group||""; if(g && (!first.has(g) || (i.order||0)<first.get(g))) first.set(g,i.order||0); });
-  return [...first.entries()].sort((a,b)=>a[1]-b[1]).map(e=>e[0]); };
+/* 分組：清單裡存的分組（照設定的順序）在前，品項上有、但清單還沒存的舊分組接在後面 */
+const listGroups = () => { const x=LI(), base=(x && Array.isArray(x.groups) ? x.groups : []).filter(Boolean);
+  const first=new Map(); S.listItems.forEach(i=>{ const g=i.group||""; if(g && !base.includes(g) && (!first.has(g) || (i.order||0)<first.get(g))) first.set(g,i.order||0); });
+  return [...base, ...[...first.entries()].sort((a,b)=>a[1]-b[1]).map(e=>e[0])]; };
+async function addGroup(x, name){
+  const v=String(name||"").trim().slice(0,20); if(!v) return "";
+  const gs=listGroups(); if(!gs.includes(v)){ if(gs.length>=50){ toast("分組最多 50 個"); return ""; }
+    await updateDoc(doc(db,"lists",x.id), {groups:[...gs, v], updatedAt:serverTimestamp()}); x.groups=[...gs, v]; }
+  return v;
+}
 function renderGroupPick(x){
   const box=$("liGroupPick"); box.textContent=""; const gs=listGroups();
   if(S.addGroup && !gs.includes(S.addGroup)) gs.push(S.addGroup);
@@ -3047,10 +3055,12 @@ function renderGroupPick(x){
     b.onclick=()=>{ S.addGroup=g; renderGroupPick(x); $("liAddText").focus(); }; box.appendChild(b); });
   if(S.newGroupOpen){
     const inp=el("input"); inp.type="text"; inp.maxLength=20; inp.placeholder="新分組名稱，按 Enter"; inp.className="li-newgroup"; inp.setAttribute("aria-label","新分組名稱");
-    inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const v=inp.value.trim().slice(0,20); if(v){ S.addGroup=v; } S.newGroupOpen=false; renderGroupPick(x); $("liAddText").focus(); }
+    inp.onkeydown=async e=>{ if(e.key==="Enter"){ e.preventDefault(); const v=inp.value.trim().slice(0,20); S.newGroupOpen=false;
+        if(v){ try{ S.addGroup=await addGroup(x, v); }catch(err){ msg("liMsg","新增分組失敗："+errText(err),"err"); } } renderGroupPick(x); $("liAddText").focus(); }
       if(e.key==="Escape"){ S.newGroupOpen=false; renderGroupPick(x); } };
     box.appendChild(inp); setTimeout(()=>inp.focus(),0);
   } else { const nb=el("button","chip add","＋ 新分組"); nb.type="button"; nb.onclick=()=>{ S.newGroupOpen=true; renderGroupPick(x); }; box.appendChild(nb); }
+  if(gs.length){ const mg=el("button","link small","管理分組"); mg.type="button"; mg.onclick=openGroups; box.appendChild(mg); }
   $("liAddText").placeholder = S.addGroup ? `新增到「${S.addGroup}」，例如：紗布衣` : "新增項目，例如：紗布衣";
 }
 function renderListItems(){
@@ -3146,21 +3156,69 @@ $("liMemo").addEventListener("input", ()=>{
 /* 修改項目 */
 function openItem(i){
   S.itEdit=i; msg("itMsg","");
-  $("itText").value=i.text; $("itAmt").value=i.amount||""; $("itDue").value=i.due||""; $("itNote").value=i.note||""; $("itGroup").value=i.group||"";
-  const dl=$("dlItGroups"); dl.textContent=""; listGroups().forEach(g=>{ const o=el("option"); o.value=g; dl.appendChild(o); });
+  $("itText").value=i.text; $("itAmt").value=i.amount||""; $("itDue").value=i.due||""; $("itNote").value=i.note||"";
+  const sel=$("itGroup"); sel.textContent="";
+  [["","不分組"], ...listGroups().map(g=>[g,g]), ["__new","＋ 新增分組…"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; sel.appendChild(o); });
+  sel.value=i.group||""; $("itGroupNew").value=""; $("itGroupNewWrap").hidden=true;
   setItPrio(i.priority||"");
   $("itDoneInfo").hidden=!i.done; if(i.done) $("itDoneInfo").textContent=`${i.doneAt?i.doneAt.replace(/-/g,"/")+" ":""}完成` + (i.spent?`，實際花了 ${money(i.spent)}`:"") + "。要改回未完成，點項目前面的勾勾。";
   $("itDelete").dataset.armed=""; $("itDelete").textContent="刪除";
   $("dlgItem").showModal();
 }
+$("itGroup").addEventListener("change",()=>{ const nw=$("itGroup").value==="__new"; $("itGroupNewWrap").hidden=!nw; if(nw) $("itGroupNew").focus(); });
+
+/* 管理分組：改名、排順序、刪除、新增 */
+function openGroups(){
+  S.grRows=listGroups().map(g=>({from:g, name:g})); msg("grMsg",""); renderGroupRows(); $("dlgGroups").showModal();
+}
+function renderGroupRows(){
+  const box=$("grRows"); box.textContent="";
+  if(!S.grRows.length) box.appendChild(el("p","small muted","還沒有分組，在下面新增。"));
+  S.grRows.forEach((r,k)=>{
+    const row=el("div","gr-row");
+    const inp=el("input"); inp.type="text"; inp.maxLength=20; inp.value=r.name; inp.setAttribute("aria-label","分組名稱"); inp.oninput=()=>{ r.name=inp.value; };
+    const n=r.from ? S.listItems.filter(i=>i.group===r.from).length : 0;
+    const info=el("span","small muted", `${n} 項`);
+    const mk=(t,lab,fn,dis)=>{ const b=el("button","icon-btn",t); b.type="button"; b.setAttribute("aria-label",lab); b.disabled=!!dis; b.onclick=fn; return b; };
+    const up=mk("↑","往上移",()=>{ [S.grRows[k-1],S.grRows[k]]=[S.grRows[k],S.grRows[k-1]]; renderGroupRows(); }, k===0);
+    const dn=mk("↓","往下移",()=>{ [S.grRows[k+1],S.grRows[k]]=[S.grRows[k],S.grRows[k+1]]; renderGroupRows(); }, k===S.grRows.length-1);
+    const del=el("button","link danger-link","刪除"); del.type="button";
+    del.onclick=()=>{ if(n && !del.dataset.armed){ del.dataset.armed="1"; del.textContent=`確定？${n} 項會改成不分組`; return; } S.grRows.splice(k,1); renderGroupRows(); };
+    row.append(inp, info, up, dn, del); box.appendChild(row); });
+}
+$("grAdd").onclick=()=>{ const v=$("grNew").value.trim().slice(0,20); if(!v) return;
+  if(S.grRows.some(r=>r.name.trim()===v)){ msg("grMsg",`已經有「${v}」了`,"err"); return; }
+  S.grRows.push({from:"", name:v}); $("grNew").value=""; msg("grMsg",""); renderGroupRows(); };
+$("grNew").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("grAdd").click(); } });
+$("formGroups").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault(); const x=LI(); if(!x) return;
+  const names=S.grRows.map(r=>r.name.trim().slice(0,20));
+  if(names.some(n=>!n)){ msg("grMsg","分組名稱不能空白。","err"); return; }
+  if(new Set(names).size!==names.length){ msg("grMsg","有重複的分組名稱。","err"); return; }
+  const map=new Map(S.grRows.filter(r=>r.from).map(r=>[r.from, r.name.trim().slice(0,20)]));
+  try{
+    const bt=writeBatch(db); let n=0;
+    S.listItems.forEach(i=>{ if(!i.group) return; const to = map.has(i.group) ? map.get(i.group) : (listGroups().includes(i.group) ? "" : i.group);
+      if(to!==i.group){ bt.update(doc(db,"lists",x.id,"items",i.id), {group:to, updatedAt:serverTimestamp()}); n++; } });
+    bt.update(doc(db,"lists",x.id), {groups:names, updatedAt:serverTimestamp()});
+    await bt.commit(); x.groups=names;
+    if(S.addGroup && !names.includes(S.addGroup)) S.addGroup=map.get(S.addGroup)||"";
+    $("dlgGroups").close(); toast(n?`已更新分組（${n} 項跟著調整）`:"已更新分組"); renderListItems();
+  }catch(e){ msg("grMsg","儲存失敗："+errText(e),"err"); }
+});
+
 function setItPrio(p){ S.itPrio=p; document.querySelectorAll("#itPrio button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.p===p)); }
 document.querySelectorAll("#itPrio button").forEach(b=>b.onclick=()=>setItPrio(b.dataset.p));
 $("formItem").addEventListener("submit", async ev=>{
   if(ev.submitter && ev.submitter.value!=="save") return;
   ev.preventDefault();
   const t=$("itText").value.trim(); if(!t){ msg("itMsg","請填項目名稱。","err"); return; }
-  try{ await updateDoc(doc(db,"lists",S.listId,"items",S.itEdit.id), { text:t.slice(0,100), amount:Math.max(0,Math.round(Number($("itAmt").value)||0)),
-      due:$("itDue").value||"", priority:S.itPrio, note:$("itNote").value.trim().slice(0,200), group:$("itGroup").value.trim().slice(0,20), updatedAt:serverTimestamp() });
+  let grp=$("itGroup").value;
+  if(grp==="__new"){ grp=$("itGroupNew").value.trim().slice(0,20); if(!grp){ msg("itMsg","請填新分組名稱。","err"); $("itGroupNew").focus(); return; } }
+  try{ if(grp) grp=await addGroup(LI(), grp);
+    await updateDoc(doc(db,"lists",S.listId,"items",S.itEdit.id), { text:t.slice(0,100), amount:Math.max(0,Math.round(Number($("itAmt").value)||0)),
+      due:$("itDue").value||"", priority:S.itPrio, note:$("itNote").value.trim().slice(0,200), group:grp, updatedAt:serverTimestamp() });
     $("dlgItem").close(); }
   catch(e){ msg("itMsg","儲存失敗："+errText(e),"err"); }
 });

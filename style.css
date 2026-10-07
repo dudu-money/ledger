@@ -499,3 +499,11 @@ button.pay-cell:hover{border-color:var(--accent)}
 .li-move{display:flex;gap:4px;flex:none}
 .li-move .icon-btn{width:34px;height:34px}
 .li-move .icon-btn:disabled{opacity:.3}
+.gr-rows{display:flex;flex-direction:column;gap:8px}
+.gr-row{display:flex;align-items:center;gap:6px}
+.gr-row input{flex:1;min-width:0}
+.gr-row .small{flex:none;min-width:2.6em;text-align:right}
+.gr-row .icon-btn{width:34px;height:34px;flex:none}
+.gr-row .icon-btn:disabled{opacity:.3}
+.danger-link{color:var(--out);flex:none;white-space:nowrap}
+#liGroupPick .link{margin-left:4px}
