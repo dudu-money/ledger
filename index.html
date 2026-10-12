@@ -92,7 +92,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab" aria-current="page">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#cal" class="tab">行事曆</a><a href="#settings" class="tab">設定</a></nav>
     <div class="banner-warn" id="bkReminder" hidden><span id="bkReminderText"></span><a class="btn" href="#settings">去備份</a></div>
     <div class="home-head">
       <h2 class="h2">我的帳本</h2>
@@ -114,7 +114,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab" aria-current="page">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#cal" class="tab">行事曆</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipRepay"></div>
     <div class="period">
       <div class="period-nav">
@@ -164,7 +164,7 @@
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab" aria-current="page">資產</a><a href="#lists" class="tab">清單</a><a href="#cal" class="tab">行事曆</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipInvest"></div>
     <section class="panel nw-panel" aria-label="淨資產">
       <div class="between wrap-gap"><h3 class="h3">淨資產</h3><button class="btn primary" id="nwAdd" type="button">＋ 記錄資產</button></div>
@@ -217,13 +217,46 @@
 </section>
 
 <!-- 清單 -->
+<section class="view" id="viewCal" hidden>
+  <header class="topbar">
+    <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
+    <a class="btn" href="#settings">設定</a>
+  </header>
+  <main class="page">
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#cal" class="tab" aria-current="page">行事曆</a><a href="#settings" class="tab">設定</a></nav>
+    <div class="tip-slot" id="tipCal"></div>
+    <div class="period">
+      <div class="period-nav">
+        <button class="icon-btn" id="cPrev" type="button" aria-label="上個月">‹</button>
+        <h2 id="cTitle">—</h2>
+        <button class="icon-btn" id="cNext" type="button" aria-label="下個月">›</button>
+      </div>
+      <button class="link" id="cNow" type="button">回到本月</button>
+      <button class="btn primary" id="cAdd" type="button">＋ 新增行程</button>
+    </div>
+    <div class="cal-filters" id="calFilters"></div>
+    <section class="panel cal-panel">
+      <div class="cal-grid" id="calGrid" role="grid" aria-label="月曆"></div>
+    </section>
+    <section class="panel">
+      <div class="between wrap-gap"><h3 class="h3" id="calDayTitle">今天</h3><button class="btn" id="cAddDay" type="button">＋ 這天新增</button></div>
+      <div id="calDay" class="cal-agenda"></div>
+    </section>
+    <section class="panel">
+      <h3 class="h3">這個月</h3>
+      <div id="calMonth" class="cal-agenda"></div>
+    </section>
+    <p class="msg" id="calMsg" role="status"></p>
+  </main>
+</section>
+
 <section class="view" id="viewLists" hidden>
   <header class="topbar">
     <h1 class="brand-title sm"><img class="brand-logo" src="icon.svg" alt="">記帳本</h1>
     <a class="btn" href="#settings">設定</a>
   </header>
   <main class="page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab" aria-current="page">清單</a><a href="#settings" class="tab">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab" aria-current="page">清單</a><a href="#cal" class="tab">行事曆</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipLists"></div>
     <div class="home-head">
       <h2 class="h2">我的清單</h2>
@@ -286,7 +319,7 @@
     <a class="btn" href="#">完成</a>
   </header>
   <main class="page narrow-page">
-    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
+    <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#cal" class="tab">行事曆</a><a href="#settings" class="tab" aria-current="page">設定</a></nav>
     <div class="tip-slot" id="tipSettings"></div>
 
     <section class="panel">
@@ -379,6 +412,7 @@
             <label class="check"><input type="checkbox" id="bkLoans" checked> <span id="bkLoansText">貸款</span></label>
             <label class="check"><input type="checkbox" id="bkHolds" checked> <span id="bkHoldsText">投資持股</span></label>
             <label class="check"><input type="checkbox" id="bkLists" checked> <span id="bkListsText">清單</span></label>
+            <label class="check"><input type="checkbox" id="bkCals" checked> <span id="bkCalsText">行事曆</span></label>
             <label class="check"><input type="checkbox" id="bkPrefs"> 設定（預設值、常用清單）— 會取代目前的設定</label>
             <button class="btn primary" id="bkRestore" type="button">開始還原</button>
           </div>
@@ -964,6 +998,49 @@
 </dialog>
 
 <!-- 清單設定 -->
+<!-- 行程 -->
+<dialog id="dlgEvent" aria-labelledby="evTitle">
+  <form method="dialog" id="formEvent" class="stack" autocomplete="off">
+    <div class="between"><h2 class="h2" id="evTitle">新增行程</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <label class="field"><span class="label">行程</span><input id="evName" type="text" maxlength="60" required placeholder="例如：產檢、打預防針、家族聚餐"></label>
+    <div class="grid2">
+      <label class="field"><span class="label">日期</span><input id="evDate" type="date" required></label>
+      <label class="field"><span class="label">時間（選填）</span><input id="evTime" type="time"></label>
+      <label class="field"><span class="label">結束日期（多天的行程才填）</span><input id="evEnd" type="date"></label>
+      <label class="field"><span class="label">放在哪本行事曆</span><select id="evCal"></select></label>
+    </div>
+    <label class="field"><span class="label">地點（選填）</span><input id="evPlace" type="text" maxlength="60" placeholder="例如：○○婦產科"></label>
+    <label class="field"><span class="label">備註（選填）</span><input id="evNote" type="text" maxlength="300" placeholder="例如：要帶媽媽手冊、健保卡"></label>
+    <p class="small muted" id="evBy" hidden></p>
+    <div class="row"><button class="btn danger" type="button" id="evDelete" hidden>刪除</button><button class="btn primary grow" type="submit" value="save" id="evSave">儲存</button></div>
+    <p class="msg" id="evMsg" role="status"></p>
+  </form>
+</dialog>
+
+<!-- 行事曆設定 -->
+<dialog id="dlgCalSet" aria-labelledby="csTitle">
+  <form method="dialog" class="stack" autocomplete="off" onsubmit="return false">
+    <div class="between"><h2 class="h2" id="csTitle">行事曆設定</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉" id="csClose">✕</button></div>
+    <div id="csOwnerBox">
+      <label class="field"><span class="label">行事曆名稱</span><input id="csName" type="text" maxlength="40"></label>
+      <div class="field"><span class="label">顏色</span><div class="swatches" id="csColors"></div></div>
+      <button class="btn" type="button" id="csSaveName">儲存名稱和顏色</button>
+      <div class="field"><span class="label">分享給家人</span>
+        <div class="row wrap"><input id="csEmail" type="email" placeholder="對方登入用的 Email" class="grow" aria-label="Email">
+          <select id="csRole" aria-label="權限"><option value="editor">可編輯</option><option value="viewer">僅檢視</option></select>
+          <button class="btn" type="button" id="csInvite">分享</button></div>
+      </div>
+      <div id="csMembers" class="members"></div>
+    </div>
+    <p class="small muted" id="csSharedNote" hidden></p>
+    <p class="msg" id="csMsg" role="status"></p>
+    <div class="danger-zone">
+      <button class="btn danger" type="button" id="csDelete">刪除這本行事曆</button>
+      <button class="btn danger" type="button" id="csLeave" hidden>離開這本行事曆</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- 管理分組 -->
 <dialog id="dlgGroups" aria-labelledby="grTitle">
   <form method="dialog" id="formGroups" class="stack" autocomplete="off">

@@ -112,13 +112,13 @@ function projItems(entries){
 }
 
 /* ================= 畫面切換 ================= */
-const VIEWS = ["viewSetup","viewLoading","viewLogin","viewVerify","viewHome","viewRepay","viewInvest","viewLists","viewList","viewSettings","viewLedger"];
+const VIEWS = ["viewSetup","viewLoading","viewLogin","viewVerify","viewHome","viewRepay","viewInvest","viewLists","viewList","viewCal","viewSettings","viewLedger"];
 function show(v){ VIEWS.forEach(id=>$(id).hidden = id!==v); }
 
 if(!configured){ show("viewSetup"); }
 else {
   onAuthStateChanged(auth, async user => {
-    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopLists(); stopItems(); S.itemsFor=null; stopSnaps();
+    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopLists(); stopCals(); stopItems(); S.itemsFor=null; stopSnaps();
     S.user = user; S.email = user && user.email ? user.email.toLowerCase() : "";
     if(!user){ show("viewLogin"); return; }
     if(!user.emailVerified){ $("verifyEmail").textContent=user.email; show("viewVerify"); return; }
@@ -128,7 +128,7 @@ else {
 function signedInStart(){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user.email);
   S.startApplied = !!location.hash; // 網址已經指定頁面時，不套用「直接進入」
-  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchSnaps(); watchPrefs(); route();
+  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchCals(); watchSnaps(); watchPrefs(); route();
 }
 window.addEventListener("hashchange", ()=>{ if(S.user && S.user.emailVerified) route(); });
 
@@ -142,6 +142,7 @@ function route(){
   if(location.hash==="#repay"){ show("viewRepay"); renderRepay(); return; }
   if(location.hash==="#invest"){ show("viewInvest"); renderInvest(); return; }
   if(location.hash==="#lists"){ show("viewLists"); renderLists(); return; }
+  if(location.hash==="#cal"){ show("viewCal"); syncCalEvents(); renderCal(); return; }
   if(location.hash==="#settings"){ show("viewSettings"); renderGlobalSettings(); return; }
   show("viewHome"); renderHome();
 }
@@ -1159,6 +1160,7 @@ function watchLoans(){
     if(S.editingLoan && $("dlgLoan").open){ const f=S.loans.find(x=>x.id===S.editingLoan.id); if(f){ S.editingLoan=f; renderLoanGrid(f); renderAdjNow(f); } }
     if(S.payLoan){ const f=S.loans.find(x=>x.id===S.payLoan.lo.id); if(f) S.payLoan.lo=f; }
     if(location.hash==="#repay") renderRepay(false);
+    if(location.hash==="#cal") renderCal();
   }, e=>msg("repayMsg","讀取還款資料失敗："+errText(e),"err"));
 }
 function stopLoans(){ if(S.unsubLoans){ S.unsubLoans(); S.unsubLoans=null; } S.loans=[]; }
@@ -1834,6 +1836,7 @@ function watchPrefs(){
     S.prefs = s.exists() ? s.data() : {};
     if(!S.startApplied){ S.startApplied=true; const sp=P().startPage; if(sp && !location.hash) location.hash=sp; }
     if(location.hash==="#settings") renderGlobalSettings(false);
+    if(location.hash==="#cal") renderCal();
     if(!location.hash){ renderBackupReminder(); maybeStartTour(); }
     refreshTips();
   }, ()=>{ S.prefs={}; S.startApplied=true; });
@@ -1855,7 +1858,7 @@ function renderGlobalSettings(reset=true){
     fillPayOptions("gsPay", p.defaultPay||"現金");
     $("gsPayer").value=p.defaultPayer; $("gsCard").value=p.defaultCard;
     const st=$("gsStart"); st.textContent="";
-    [["","帳本列表"],["#repay","還款與分期"],["#invest","資產"],["#lists","清單"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; st.appendChild(o); });
+    [["","帳本列表"],["#repay","還款與分期"],["#invest","資產"],["#lists","清單"],["#cal","行事曆"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; st.appendChild(o); });
     [...S.ledgers.values()].forEach(l=>{ const o=el("option",null,"帳本："+l.name); o.value="#l/"+l.id; st.appendChild(o); });
     st.value=p.startPage; if(st.value!==p.startPage) st.value="";
     const il=$("imLedger"), cur=il.value; il.textContent="";
@@ -2051,7 +2054,7 @@ async function buildBackup(){
   }
   const {lastBackup, ...prefs}=P();
   return { app:"記帳本", version:1, exportedAt:new Date().toISOString(), email:S.email,
-    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), snaps:S.snaps.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), prefs };
+    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), snaps:S.snaps.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), cals:await backupCals(), prefs };
 }
 const bkName = () => { const d=new Date(); return `記帳本備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
 const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款` + ((b.holdings||[]).length ? `、${b.holdings.length} 檔持股` : "") + ((b.lists||[]).length ? `、${b.lists.length} 個清單` : "");
@@ -2164,6 +2167,8 @@ function showRestore(b){
   const missS=(b.snaps||[]).filter(x=>!S.snaps.some(y=>y.id===x.id));
   $("bkHolds").checked=missH.length>0||missS.length>0; $("bkHolds").disabled=!missH.length && !missS.length;
   $("bkHoldsText").textContent = ((b.holdings||[]).length || (b.snaps||[]).length) ? `資產與投資：還原目前沒有的 ${missH.length} 檔持股、${missS.length} 筆資產紀錄（已存在的會略過）` : "資產與投資：這份備份沒有資料";
+  const nCs=(b.cals||[]).length; $("bkCals").checked=nCs>0; $("bkCals").disabled=!nCs;
+  $("bkCalsText").textContent = nCs ? `行事曆：${nCs} 本，會建立成新的行事曆（不會覆蓋現有的）` : "行事曆：這份備份沒有行事曆";
   const nLs=(b.lists||[]).length; $("bkLists").checked=nLs>0; $("bkLists").disabled=!nLs;
   $("bkListsText").textContent = nLs ? `清單：${nLs} 個，會建立成新的清單（不會覆蓋現有的）` : "清單：這份備份沒有清單";
   $("bkPrefs").checked=false; $("bkPrefs").disabled=!b.prefs;
@@ -2172,8 +2177,8 @@ const EF=["type","amount","categoryId","categoryName","date","note","pay","card"
 $("bkRestore").onclick=async()=>{
   if(!BK) return;
   const picks=[...document.querySelectorAll("#bkLedgers input:checked")].map(i=>BK.ledgers[Number(i.value)]);
-  const doLoans=$("bkLoans").checked && !$("bkLoans").disabled, doPrefs=$("bkPrefs").checked, doHolds=$("bkHolds").checked && !$("bkHolds").disabled, doLists=$("bkLists").checked && !$("bkLists").disabled;
-  if(!picks.length && !doLoans && !doPrefs && !doHolds && !doLists){ msg("bkRMsg","請勾選要還原的項目。","err"); return; }
+  const doLoans=$("bkLoans").checked && !$("bkLoans").disabled, doPrefs=$("bkPrefs").checked, doHolds=$("bkHolds").checked && !$("bkHolds").disabled, doLists=$("bkLists").checked && !$("bkLists").disabled, doCals=$("bkCals").checked && !$("bkCals").disabled;
+  if(!picks.length && !doLoans && !doPrefs && !doHolds && !doLists && !doCals){ msg("bkRMsg","請勾選要還原的項目。","err"); return; }
   $("bkRestore").disabled=true; msg("bkRMsg","還原中…");
   try{
     const d=new Date(), tag=`（還原 ${d.getMonth()+1}/${d.getDate()}）`; let nE=0;
@@ -2217,6 +2222,18 @@ $("bkRestore").onclick=async()=>{
             createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }));
           await b.commit(); }
         nLs++; } }
+    let nCs=0;
+    if(doCals){ const d=new Date(), tg=`（還原 ${d.getMonth()+1}/${d.getDate()}）`;
+      for(const cs of (BK.cals||[])){ const x=cs.data||{};
+        const ref=await addDoc(collection(db,"cals"), { name:(String(x.name||"行事曆")+tg).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20), ownerUid:S.user.uid, ownerEmail:S.email,
+          editors:[], viewers:[], members:[S.email], createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+        const evs=(cs.events||[]).filter(e=>/^\d{4}-\d{2}-\d{2}$/.test(String(e.date||"")));
+        for(let k=0;k<evs.length;k+=400){ const b=writeBatch(db);
+          evs.slice(k,k+400).forEach(e=>b.set(doc(collection(db,"cals",ref.id,"events")), { title:String(e.title||"行程").slice(0,60), date:String(e.date), end:/^\d{4}-\d{2}-\d{2}$/.test(String(e.end||""))?String(e.end):"",
+            time:/^\d{2}:\d{2}$/.test(String(e.time||""))?String(e.time):"", place:String(e.place||"").slice(0,60), note:String(e.note||"").slice(0,300),
+            createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }));
+          await b.commit(); }
+        nCs++; } }
     let nH=0;
     if(doHolds){ const haveS=new Set(S.snaps.map(x=>x.id));
       for(const x of (BK.snaps||[]).filter(x=>!haveS.has(x.id))){ try{ await setDoc(doc(db,"snaps",x.id), { ownerUid:S.user.uid, date:String(x.date||todayStr()).slice(0,10),
@@ -2230,7 +2247,7 @@ $("bkRestore").onclick=async()=>{
     if(doPrefs && BK.prefs){ const p=BK.prefs; await savePrefs({ defaultPay:String(p.defaultPay||""), defaultPayer:String(p.defaultPayer||""), defaultCard:String(p.defaultCard||""),
       startPage:String(p.startPage||""), ...(p.inv&&typeof p.inv==="object"?{inv:{disc:numOr(p.inv.disc,10),min:numOr(p.inv.min,20),fx:numOr(p.inv.fx,32)}}:{}), payers:(p.payers||[]).slice(0,50), cards:(p.cards||[]).slice(0,50), pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS).slice(0,30),
       me:String(p.me||"").slice(0,20), cardSet:cleanCardSet(p.cardSet), xfer:cleanXfer(p.xfer) }); }
-    msg("bkRMsg",`還原完成：${picks.length} 本帳（${nE} 筆紀錄）、${nL} 筆貸款${nH?`、${nH} 檔持股`:""}${nLs?`、${nLs} 個清單`:""}${doPrefs?"、設定":""}。還原的帳本在「帳本」頁，分享設定需要重新設定。`,"ok");
+    msg("bkRMsg",`還原完成：${picks.length} 本帳（${nE} 筆紀錄）、${nL} 筆貸款${nH?`、${nH} 檔持股`:""}${nLs?`、${nLs} 個清單`:""}${nCs?`、${nCs} 本行事曆`:""}${doPrefs?"、設定":""}。還原的帳本在「帳本」頁，分享設定需要重新設定。`,"ok");
     toast("還原完成"); $("bkPreview").hidden=true; BK=null;
   }catch(e){ msg("bkRMsg","還原失敗："+errText(e),"err"); }
   finally{ $("bkRestore").disabled=false; }
@@ -2279,6 +2296,7 @@ const TOUR=[
   { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
   { sel:'#viewHome .tabs a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
+  { sel:'#viewHome .tabs a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
   { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
@@ -3395,6 +3413,259 @@ $("lsLeave").onclick=async()=>{
     $("dlgListSet").close(); S.listId=null; location.hash="#lists"; toast("已離開這個清單"); }
   catch(e){ S.listDeleting=false; msg("lsMsg","離開失敗："+errText(e),"err"); }
 };
+
+/* ================= 行事曆 ================= */
+/* 自己新增的家庭行程放在可以分享的行事曆（cals/{id}/events）；
+   繳費日、清單截止日是從貸款、信用卡設定、清單自動帶入，只有自己看得到，不另外存。 */
+S.cals=new Map(); S.calEvents=new Map(); S.calUnsubs=new Map(); S.calAutoItems=[]; S.calAutoFor="";
+S.calYM=thisYM(); S.calSel=todayStr();
+const calHide = () => { try{ return new Set(JSON.parse(store.get("ledger.calHide")||"[]")); }catch(e){ return new Set(); } };
+const setCalHide = s => store.set("ledger.calHide", JSON.stringify([...s]));
+const canEditCal = c => c && (c.ownerUid===S.user.uid || (c.editors||[]).includes(S.email));
+const calRole = c => c.ownerUid===S.user.uid ? "擁有者" : (c.editors||[]).includes(S.email) ? "可編輯" : "僅檢視";
+function watchCals(){
+  stopCals(); S.calsReady=false;
+  S.unsubCals=onSnapshot(query(collection(db,"cals"), where("members","array-contains", S.email)), snap=>{
+    S.cals=new Map(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.calsReady=true;
+    if(S.calSetId && !S.cals.has(S.calSetId) && $("dlgCalSet").open){ $("dlgCalSet").close(); }
+    if(S.calSetId && $("dlgCalSet").open) renderCalSet(false);
+    if(location.hash==="#cal"){ syncCalEvents(); renderCal(); }
+  }, e=>msg("calMsg","讀取行事曆失敗："+errText(e),"err"));
+}
+function stopCals(){ if(S.unsubCals){ S.unsubCals(); S.unsubCals=null; } S.cals=new Map(); stopCalEvents(); }
+function stopCalEvents(){ S.calUnsubs.forEach(u=>u()); S.calUnsubs=new Map(); S.calEvents=new Map(); S.calEvFor=""; }
+/* 只抓目前月份（含上個月開始、跨到這個月的多天行程） */
+function syncCalEvents(){
+  const key=S.calYM+"|"+[...S.cals.keys()].sort().join(",");
+  if(S.calEvFor===key) return;
+  stopCalEvents(); S.calEvFor=key;
+  const a=`${addMonths(S.calYM,-1)}-01`, b=`${S.calYM}-${pad(dim(S.calYM))}`;
+  S.cals.forEach(c=>{
+    const u=onSnapshot(query(collection(db,"cals",c.id,"events"), where("date",">=",a), where("date","<=",b)), snap=>{
+      if(S.calEvFor!==key) return;
+      S.calEvents.set(c.id, snap.docs.map(d=>({id:d.id, cal:c.id, ...d.data()}))); if(location.hash==="#cal") renderCal();
+    }, ()=>{});
+    S.calUnsubs.set(c.id,u);
+  });
+}
+/* 清單裡這個月有截止日的品項 */
+async function loadCalListItems(){
+  const ym=S.calYM, key=ym+"|"+[...S.lists.keys()].sort().join(",");
+  if(S.calAutoFor===key) return; S.calAutoFor=key;
+  const a=`${ym}-01`, b=`${ym}-${pad(dim(ym))}`, out=[];
+  for(const x of S.lists.values()){
+    try{ (await getDocs(query(collection(db,"lists",x.id,"items"), where("due",">=",a), where("due","<=",b)))).docs.forEach(d=>{ const i=d.data(); if(!i.done) out.push({...i, id:d.id, list:x}); }); }catch(e){}
+  }
+  if(S.calAutoFor!==key) return;
+  S.calAutoItems=out; if(location.hash==="#cal") renderCal();
+}
+/* 這個月自動帶入的日子 */
+function calAutoEvents(ym){
+  const out=[], day=d=>`${ym}-${pad(Math.min(d, dim(ym)))}`;
+  S.loans.forEach(lo=>{ if(!lo.day) return; const st=loanStats(lo), p=(lo.payments||{})[ym];
+    if(st.done && !p) return;
+    const amt = p ? p.a : dueAmt(lo, ym);
+    out.push({ auto:"loan", date:day(lo.day), title:`繳 ${[lo.bank,lo.name].filter(Boolean).join(" ")||lo.type||"貸款"}`, sub: amt ? (p?`已繳 ${fmt(amt)}`:`約 ${fmt(amt)}`) : "", done:!!p, go:"#repay" }); });
+  P().cards.forEach(card=>{ const c=cardCfg(card); if(!c.p) return;
+    const other=ownerOther(c.o) && c.m!=="o";
+    if(ownerOther(c.o) && c.m==="o") return;
+    const x=other ? P().xfer[xferKey(card, ym)] : null;
+    out.push({ auto:"card", date:day(c.p), title: other ? `轉帳給${c.o}繳 ${card} 卡費` : `${card} 卡費繳款截止`, sub: x ? `已轉 ${fmt(x.a)}` : "", done:!!x, go:"#repay" }); });
+  S.calAutoItems.forEach(i=>out.push({ auto:"list", date:i.due, title:`清單：${i.text}`, sub:i.list.name+(i.amount?`・約 ${fmt(i.amount)}`:""), done:false, go:"#list/"+i.list.id }));
+  return out;
+}
+/* 把行程攤到每一天（多天行程每天都顯示） */
+function calByDay(ym){
+  const hide=calHide(), m=new Map(), a=`${ym}-01`, b=`${ym}-${pad(dim(ym))}`;
+  const add=(d,e)=>{ if(d<a||d>b) return; if(!m.has(d)) m.set(d,[]); m.get(d).push(e); };
+  S.calEvents.forEach((list,cid)=>{ if(hide.has(cid) || !S.cals.has(cid)) return;
+    list.forEach(e=>{ const end = e.end && e.end>e.date ? e.end : e.date; let d=e.date, n=0;
+      while(d<=end && n<62){ add(d, e); d=addDays(d,1); n++; } }); });
+  if(!hide.has("auto")) calAutoEvents(ym).forEach(e=>add(e.date, e));
+  m.forEach(l=>l.sort((x,y)=>(x.auto?1:0)-(y.auto?1:0) || (x.time||"99").localeCompare(y.time||"99") || x.title.localeCompare(y.title,"zh-Hant")));
+  return m;
+}
+const addDays=(d,k)=>{ const t=new Date(d+"T00:00"); t.setDate(t.getDate()+k); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`; };
+const calColor = e => e.auto ? "var(--out)" : ((S.cals.get(e.cal)||{}).color || COLORS[0]);
+const WD=["日","一","二","三","四","五","六"];
+function renderCal(){
+  tipsFor("tipCal", [["cal","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入。家庭行程按「＋ 新增行程」，行事曆可以分享給家人一起看、一起編輯。"]]);
+  const ym=S.calYM; $("cTitle").textContent=ymLabel(ym); $("cNow").hidden = ym===thisYM();
+  if(S.calSel.slice(0,7)!==ym) S.calSel = ym===thisYM() ? todayStr() : `${ym}-01`;
+  loadCalListItems();
+  // 篩選與行事曆
+  const hide=calHide(), fb=$("calFilters"); fb.textContent="";
+  const chip=(label, color, id, extra)=>{ const w=el("span","cal-chip"+(hide.has(id)?" off":""));
+    const b=el("button","cal-chip-btn"); b.type="button"; b.setAttribute("aria-pressed", !hide.has(id)); const dot=el("i"); dot.style.background=color; b.append(dot, document.createTextNode(label));
+    b.onclick=()=>{ const h=calHide(); h.has(id)?h.delete(id):h.add(id); setCalHide(h); renderCal(); }; w.appendChild(b);
+    if(extra) w.appendChild(extra); fb.appendChild(w); };
+  [...S.cals.values()].sort((a,b)=>(a.ownerUid===S.user.uid?0:1)-(b.ownerUid===S.user.uid?0:1) || a.name.localeCompare(b.name,"zh-Hant")).forEach(c=>{
+    const st=el("button","cal-chip-set","設定"); st.type="button"; st.setAttribute("aria-label",`${c.name} 的設定`); st.onclick=()=>openCalSet(c.id);
+    chip(c.name + (c.ownerUid!==S.user.uid ? `（${c.ownerEmail.split("@")[0]} 分享）` : (c.members||[]).length>1 ? `（${c.members.length} 人）` : ""), c.color||COLORS[0], c.id, st); });
+  chip("繳費日和截止日", "var(--out)", "auto");
+  const nb=el("button","chip add", S.cals.size ? "＋ 新行事曆" : "＋ 建立家庭行事曆"); nb.type="button"; nb.onclick=()=>createCal(); fb.appendChild(nb);
+  // 月曆
+  const byDay=calByDay(ym), g=$("calGrid"); g.textContent="";
+  WD.forEach((w,k)=>g.appendChild(el("div","cal-wd"+(k===0||k===6?" we":""),w)));
+  const first=new Date(ym+"-01T00:00").getDay(), n=dim(ym), today=todayStr();
+  for(let k=0;k<first;k++) g.appendChild(el("div","cal-cell blank"));
+  for(let d=1; d<=n; d++){
+    const ds=`${ym}-${pad(d)}`, evs=byDay.get(ds)||[];
+    const c=el("button","cal-cell"+(ds===today?" today":"")+(ds===S.calSel?" sel":"")); c.type="button";
+    c.setAttribute("aria-label", `${Number(ym.slice(5))} 月 ${d} 日${evs.length?`，${evs.length} 項`:""}`);
+    c.appendChild(el("span","cal-d",String(d)));
+    evs.slice(0,3).forEach(e=>{ const p=el("span","cal-pill"+(e.auto?" auto":"")+(e.done?" done":""), (e.time?e.time+" ":"")+e.title); p.style.setProperty("--c", calColor(e)); c.appendChild(p); });
+    if(evs.length>3) c.appendChild(el("span","cal-more",`+${evs.length-3}`));
+    if(evs.length) c.appendChild(el("span","cal-dots", "")); // 手機版用小點表示
+    c.onclick=()=>{ S.calSel=ds; renderCal(); };
+    g.appendChild(c);
+  }
+  // 選到的那天
+  const sel=S.calSel, dEv=byDay.get(sel)||[];
+  $("calDayTitle").textContent = `${Number(sel.slice(5,7))} 月 ${Number(sel.slice(8))} 日（${WD[new Date(sel+"T00:00").getDay()]}）` + (sel===today?"・今天":"");
+  const dayBox=$("calDay"); dayBox.textContent="";
+  if(!dEv.length) dayBox.appendChild(el("p","small muted","這天沒有行程。"));
+  dEv.forEach(e=>dayBox.appendChild(calRow(e, false)));
+  // 這個月
+  const mb=$("calMonth"); mb.textContent="";
+  const days=[...byDay.keys()].sort();
+  if(!days.length) mb.appendChild(el("p","small muted", S.cals.size ? "這個月還沒有行程。" : "按「＋ 新增行程」就會自動建立一本「家庭行事曆」，之後可以在「設定」分享給家人。"));
+  days.forEach(d=>{ const h=el("div","cal-date"+(d===today?" today":""), `${Number(d.slice(5,7))}/${Number(d.slice(8))}（${WD[new Date(d+"T00:00").getDay()]}）`); mb.appendChild(h);
+    byDay.get(d).forEach(e=>mb.appendChild(calRow(e, true))); });
+}
+function calRow(e){
+  const r=el("button","cal-row"+(e.done?" done":"")); r.type="button";
+  const bar=el("i","cal-bar"); bar.style.background=calColor(e); r.appendChild(bar);
+  const main=el("div","cal-main");
+  main.appendChild(el("div","cal-t", e.title));
+  const meta=[];
+  if(e.auto){ if(e.sub) meta.push(e.sub); meta.push(e.auto==="list"?"清單截止日":"自動帶入"); }
+  else { if(e.time) meta.push(e.time); if(e.end && e.end>e.date) meta.push(`${e.date.slice(5).replace("-","/")}–${e.end.slice(5).replace("-","/")}`); if(e.place) meta.push(e.place);
+    const c=S.cals.get(e.cal); if(c && S.cals.size>1) meta.push(c.name); if(e.note) meta.push(e.note); }
+  if(meta.length) main.appendChild(el("div","cal-m", meta.join("・")));
+  r.appendChild(main);
+  if(e.done) r.appendChild(el("span","cal-ok","✓"));
+  r.onclick=()=>{ if(e.auto) location.hash=e.go; else openEvent(e); };
+  return r;
+}
+$("cPrev").onclick=()=>{ S.calYM=addMonths(S.calYM,-1); syncCalEvents(); renderCal(); };
+$("cNext").onclick=()=>{ S.calYM=addMonths(S.calYM,1); syncCalEvents(); renderCal(); };
+$("cNow").onclick=()=>{ S.calYM=thisYM(); S.calSel=todayStr(); syncCalEvents(); renderCal(); };
+$("cAdd").onclick=()=>openEvent(null, S.calSel);
+$("cAddDay").onclick=()=>openEvent(null, S.calSel);
+
+async function createCal(name){
+  const n=S.cals.size, nm = name || (n ? `行事曆 ${n+1}` : "家庭行事曆");
+  const ref=await addDoc(collection(db,"cals"), { name:nm, color:COLORS[n%COLORS.length], ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email], createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+  S.cals.set(ref.id, {id:ref.id, name:nm, color:COLORS[n%COLORS.length], ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email]});
+  if(!name){ toast(`已建立「${nm}」`); openCalSet(ref.id); }
+  return ref.id;
+}
+
+/* 新增／修改行程 */
+function openEvent(e, date){
+  const editable=[...S.cals.values()].filter(canEditCal);
+  if(e && !canEditCal(S.cals.get(e.cal))){ toast("這本行事曆你只能檢視"); return; }
+  S.evEdit=e||null; msg("evMsg","");
+  $("evTitle").textContent = e ? "修改行程" : "新增行程";
+  $("evName").value = e ? e.title : ""; $("evDate").value = e ? e.date : (date||todayStr()); $("evEnd").value = e ? (e.end||"") : "";
+  $("evTime").value = e ? (e.time||"") : ""; $("evPlace").value = e ? (e.place||"") : ""; $("evNote").value = e ? (e.note||"") : "";
+  const sel=$("evCal"); sel.textContent="";
+  if(!editable.length){ const o=el("option",null,"家庭行事曆（儲存時自動建立）"); o.value=""; sel.appendChild(o); }
+  editable.forEach(c=>{ const o=el("option",null,c.name); o.value=c.id; sel.appendChild(o); });
+  sel.value = e ? e.cal : (store.get("ledger.calLast") && editable.some(c=>c.id===store.get("ledger.calLast")) ? store.get("ledger.calLast") : (editable[0]||{}).id||"");
+  sel.disabled = !!e;
+  $("evDelete").hidden=!e; $("evDelete").dataset.armed=""; $("evDelete").textContent="刪除";
+  $("evBy").hidden = !(e && e.createdByEmail && e.createdByEmail!==S.email); if(e) $("evBy").textContent=`由 ${e.createdByEmail} 新增`;
+  $("dlgEvent").showModal(); setTimeout(()=>{ if(!e) $("evName").focus(); },50);
+}
+$("formEvent").addEventListener("submit", async ev=>{
+  if(ev.submitter && ev.submitter.value!=="save") return;
+  ev.preventDefault();
+  const title=$("evName").value.trim().slice(0,60), date=$("evDate").value, end=$("evEnd").value||"", time=$("evTime").value||"";
+  if(!title){ msg("evMsg","請填行程名稱。","err"); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ msg("evMsg","請選日期。","err"); return; }
+  if(end && end<date){ msg("evMsg","結束日期不能早於開始日期。","err"); return; }
+  if(end && (new Date(end)-new Date(date))/864e5>31){ msg("evMsg","多天的行程最長 31 天。","err"); return; }
+  const data={ title, date, end: end===date?"":end, time, place:$("evPlace").value.trim().slice(0,60), note:$("evNote").value.trim().slice(0,300), updatedAt:serverTimestamp() };
+  $("evSave").disabled=true;
+  try{
+    if(S.evEdit) await updateDoc(doc(db,"cals",S.evEdit.cal,"events",S.evEdit.id), data);
+    else { let cid=$("evCal").value; if(!cid) cid=await createCal("家庭行事曆"); store.set("ledger.calLast", cid);
+      await addDoc(collection(db,"cals",cid,"events"), {...data, createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp()}); }
+    $("dlgEvent").close(); S.calSel=date; if(date.slice(0,7)!==S.calYM){ S.calYM=date.slice(0,7); syncCalEvents(); } S.calEvFor=""; syncCalEvents(); renderCal(); toast("已儲存行程");
+  }catch(e){ msg("evMsg","儲存失敗："+errText(e),"err"); }
+  finally{ $("evSave").disabled=false; }
+});
+$("evDelete").onclick=async()=>{
+  const b=$("evDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？"; return; }
+  try{ await deleteDoc(doc(db,"cals",S.evEdit.cal,"events",S.evEdit.id)); $("dlgEvent").close(); toast("已刪除"); }
+  catch(e){ msg("evMsg","刪除失敗："+errText(e),"err"); }
+};
+
+/* 行事曆設定：名稱、顏色、分享 */
+let csColor=COLORS[0];
+function openCalSet(id){ S.calSetId=id; renderCalSet(true); $("dlgCalSet").showModal(); }
+function renderCalSet(reset){
+  const c=S.cals.get(S.calSetId); if(!c) return; const owner=c.ownerUid===S.user.uid;
+  $("csOwnerBox").hidden=!owner; $("csDelete").hidden=!owner; $("csLeave").hidden=owner;
+  $("csSharedNote").hidden=owner; if(!owner) $("csSharedNote").textContent=`「${c.name}」是 ${c.ownerEmail} 分享給你的（${calRole(c)}）。`;
+  if(reset){ msg("csMsg",""); $("csName").value=c.name; csColor=c.color||COLORS[0]; swatches("csColors", csColor, x=>{ csColor=x; });
+    $("csDelete").dataset.armed=""; $("csDelete").textContent="刪除這本行事曆"; $("csLeave").dataset.armed=""; $("csLeave").textContent="離開這本行事曆"; }
+  if(!owner) return;
+  const mb=$("csMembers"); mb.textContent="";
+  const me=el("div","member"); me.append(el("span","em",c.ownerEmail+"（你）"), el("span","badge","擁有者")); mb.appendChild(me);
+  [...(c.editors||[]).map(e=>[e,"editor"]), ...(c.viewers||[]).map(e=>[e,"viewer"])].forEach(([em,role])=>{
+    const r=el("div","member"); const sel=el("select"); sel.setAttribute("aria-label",em+" 的權限");
+    [["editor","可編輯"],["viewer","僅檢視"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; o.selected=v===role; sel.appendChild(o); });
+    sel.onchange=()=>setCalMember(em, sel.value);
+    const rm=el("button","btn","移除"); rm.type="button";
+    rm.onclick=()=>{ if(!rm.dataset.armed){ rm.dataset.armed="1"; rm.textContent="確定移除？"; rm.classList.add("danger"); return; } setCalMember(em,null); };
+    r.append(el("span","em",em), sel, rm); mb.appendChild(r); });
+  if(!(c.editors||[]).length && !(c.viewers||[]).length) mb.appendChild(el("p","small muted","目前只有你看得到這本行事曆。"));
+}
+async function setCalMember(email, role){
+  const c=S.cals.get(S.calSetId);
+  const editors=(c.editors||[]).filter(e=>e!==email), viewers=(c.viewers||[]).filter(e=>e!==email);
+  if(role==="editor") editors.push(email); if(role==="viewer") viewers.push(email);
+  try{ await updateDoc(doc(db,"cals",c.id), { editors, viewers, members:[c.ownerEmail, ...editors, ...viewers], updatedAt:serverTimestamp() });
+    msg("csMsg", role ? `已分享給 ${email}（${role==="editor"?"可編輯":"僅檢視"}）` : `已移除 ${email}`, "ok"); }
+  catch(e){ msg("csMsg","更新失敗："+errText(e),"err"); }
+}
+$("csInvite").onclick=()=>{
+  const em=$("csEmail").value.trim().toLowerCase(), c=S.cals.get(S.calSetId);
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ msg("csMsg","請輸入正確的 Email。","err"); return; }
+  if(em===c.ownerEmail){ msg("csMsg","這是你自己的 Email。","err"); return; }
+  $("csEmail").value=""; setCalMember(em, $("csRole").value);
+};
+$("csEmail").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("csInvite").click(); } });
+$("csSaveName").onclick=async()=>{
+  const c=S.cals.get(S.calSetId), name=$("csName").value.trim().slice(0,40); if(!name){ msg("csMsg","請輸入名稱。","err"); return; }
+  try{ await updateDoc(doc(db,"cals",c.id), { name, color:csColor, updatedAt:serverTimestamp() }); msg("csMsg","已儲存。","ok"); }
+  catch(e){ msg("csMsg","儲存失敗："+errText(e),"err"); }
+};
+$("csClose").onclick=()=>$("dlgCalSet").close();
+$("csDelete").onclick=async()=>{
+  const b=$("csDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？裡面的行程都會刪掉"; return; }
+  const c=S.cals.get(S.calSetId);
+  try{ const snap=await getDocs(collection(db,"cals",c.id,"events"));
+    for(let k=0;k<snap.docs.length;k+=400){ const bt=writeBatch(db); snap.docs.slice(k,k+400).forEach(d=>bt.delete(d.ref)); await bt.commit(); }
+    await deleteDoc(doc(db,"cals",c.id)); $("dlgCalSet").close(); toast("行事曆已刪除"); }
+  catch(e){ msg("csMsg","刪除失敗："+errText(e),"err"); }
+};
+$("csLeave").onclick=async()=>{
+  const b=$("csLeave"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定要離開？"; return; }
+  const c=S.cals.get(S.calSetId);
+  try{ await updateDoc(doc(db,"cals",c.id), { members:(c.members||[]).filter(e=>e!==S.email), editors:(c.editors||[]).filter(e=>e!==S.email), viewers:(c.viewers||[]).filter(e=>e!==S.email), updatedAt:serverTimestamp() });
+    $("dlgCalSet").close(); toast("已離開這本行事曆"); }
+  catch(e){ msg("csMsg","離開失敗："+errText(e),"err"); }
+};
+async function backupCals(){
+  const out=[];
+  for(const c of S.cals.values()){ if(c.ownerUid!==S.user.uid) continue; let events=[]; try{ events=(await getDocs(collection(db,"cals",c.id,"events"))).docs.map(d=>cleanOut(d.data())); }catch(e){}
+    const {id,...data}=c; out.push({id, data:cleanOut(data), events}); }
+  return out;
+}
 
 /* ================= 資產快照（淨資產） ================= */
 /* 不追蹤每一筆轉帳：想到的時候（例如月底）把各戶頭、現金的金額填一次，
