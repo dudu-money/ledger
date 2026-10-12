@@ -142,7 +142,7 @@ function route(){
   if(location.hash==="#repay"){ show("viewRepay"); renderRepay(); return; }
   if(location.hash==="#invest"){ show("viewInvest"); renderInvest(); return; }
   if(location.hash==="#lists"){ show("viewLists"); renderLists(); return; }
-  if(location.hash==="#cal"){ show("viewCal"); syncCalEvents(); renderCal(); return; }
+  if(location.hash==="#cal"){ show("viewCal"); S.calCardsFor=""; S.calAutoFor=""; syncCalEvents(); renderCal(); return; }
   if(location.hash==="#settings"){ show("viewSettings"); renderGlobalSettings(); return; }
   show("viewHome"); renderHome();
 }
@@ -1590,24 +1590,21 @@ function cleanXfer(x){ const out={}; if(x && typeof x==="object") Object.entries
 const xferKey = (card, ym) => `${card}|${ym}`;
 const mdLabel = d => `${Number(d.slice(5,7))}/${pad(Number(d.slice(8,10)))}`;
 
-async function loadCardBill(ym){
-  const box=$("cardBill"); const token=billToken={}; S.rCardTotal=0; S.rXferTotal=0; $("rCard").textContent="…"; $("rXfer").textContent="…";
-  box.textContent=""; box.appendChild(el("p","small muted","讀取中…"));
+/* 讀取某個月要繳的信用卡消費，分成：我的卡、要轉給持卡人、其他 */
+async function fetchCardRaw(ym){
   const a=`${addMonths(ym,-2)}-01`, b=`${ym}-${pad(dim(ym))}`, raw=[];
-  try{
-    for(const l of S.ledgers.values()){
-      const snap=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("date",">=",a), where("date","<=",b)));
-      const seenId=new Set();
-      snap.docs.forEach(d=>{ const e=d.data(); seenId.add(d.id); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
-      // 手動改到這個月帳單、但消費日期比較早的
-      const moved=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("bill","==",ym)));
-      moved.docs.forEach(d=>{ if(seenId.has(d.id)) return; const e=d.data(); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
-    }
-  }catch(e){ if(token!==billToken) return; box.textContent=""; box.appendChild(el("p","msg err","讀取信用卡紀錄失敗："+errText(e))); return; }
-  if(token!==billToken) return;
-  // 照每張卡的帳單區間過濾
-  // 分期的每一期已經指定「帳單月份」，直接照月份；一般消費照每張卡的帳單區間
-  // 手動指定帳單月份的照指定
+  for(const l of S.ledgers.values()){
+    const snap=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("date",">=",a), where("date","<=",b)));
+    const seenId=new Set();
+    snap.docs.forEach(d=>{ const e=d.data(); seenId.add(d.id); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
+    // 手動改到這個月帳單、但消費日期比較早的
+    const moved=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("bill","==",ym)));
+    moved.docs.forEach(d=>{ if(seenId.has(d.id)) return; const e=d.data(); if(e.pay==="信用卡" && e.type==="out") raw.push({...e, id:d.id, ledger:l}); });
+  }
+  return raw;
+}
+function classifyCard(raw, ym){
+  // 分期的每一期已經指定「帳單月份」，直接照月份；手動指定帳單月份的照指定；一般消費照每張卡的帳單區間
   const rows=raw.filter(e=>{ if(e.inst) return e.date.slice(0,7)===ym; if(e.bill) return e.bill===ym; const [s0,e0]=cardRange(e.card||"", ym); return e.date>=s0 && e.date<=e0; });
   // 分期手續費併進同一期的商品那一行
   const merged=[], seen=new Map();
@@ -1616,7 +1613,6 @@ async function loadCardBill(ym){
       if(m){ m.amount+=e.amount; m.fee=(m.fee||0)+(isFee(e)?e.amount:0); return; }
       const c={...e}; if(isFee(e)) c.fee=e.amount; seen.set(k,c); merged.push(c); }
     else merged.push(e); });
-  // 分成：我的卡、要轉給卡主、其他（付款人不是我，或卡主自己繳）
   const mine=new Map(), xfer=new Map(), other=[];
   const push=(map,card,e)=>{ if(!map.has(card)) map.set(card,[]); map.get(card).push(e); };
   merged.forEach(e=>{
@@ -1631,6 +1627,16 @@ async function loadCardBill(ym){
     if(ownerOther(cfg.o)){ if(cfg.m==="o") other.push({...me, who:cfg.o+"（持卡人自己繳）"}); else push(xfer,card,me); }
     else push(mine,card,me);
   });
+  return { merged, mine, xfer, other };
+}
+async function loadCardBill(ym){
+  const box=$("cardBill"); const token=billToken={}; S.rCardTotal=0; S.rXferTotal=0; $("rCard").textContent="…"; $("rXfer").textContent="…";
+  box.textContent=""; box.appendChild(el("p","small muted","讀取中…"));
+  let raw;
+  try{ raw=await fetchCardRaw(ym); }
+  catch(e){ if(token!==billToken) return; box.textContent=""; box.appendChild(el("p","msg err","讀取信用卡紀錄失敗："+errText(e))); return; }
+  if(token!==billToken) return;
+  const { merged, mine, xfer, other }=classifyCard(raw, ym);
   box.textContent="";
   const sum=list=>list.reduce((t,e)=>t+e.amount,0);
   const mineTotal=[...mine.values()].reduce((t,l)=>t+sum(l),0), xferTotal=[...xfer.values()].reduce((t,l)=>t+sum(l),0);
@@ -3463,6 +3469,17 @@ async function loadCalListItems(){
   if(S.calAutoFor!==key) return;
   S.calAutoItems=out; if(location.hash==="#cal") renderCal();
 }
+/* 這個月每張卡要繳多少（行事曆只提醒有金額的卡） */
+async function loadCalCards(){
+  const ym=S.calYM, key=ym+"|"+[...S.ledgers.keys()].sort().join(",")+"|"+JSON.stringify(P().cardSet||{})+"|"+P().me;
+  if(S.calCardsFor===key) return; S.calCardsFor=key;
+  if(!P().cards.some(c=>cardCfg(c).p)){ S.calCards={ym, t:{mine:new Map(), xfer:new Map()}}; return; }
+  try{ const {mine, xfer}=classifyCard(await fetchCardRaw(ym), ym);
+    const tot=m=>new Map([...m.entries()].map(([k,l])=>[k, l.reduce((t,e)=>t+e.amount,0)]));
+    if(S.calCardsFor!==key) return;
+    S.calCards={ym, t:{mine:tot(mine), xfer:tot(xfer)}}; if(location.hash==="#cal") renderCal();
+  }catch(e){ S.calCardsFor=""; }
+}
 /* 這個月自動帶入的日子 */
 function calAutoEvents(ym){
   const out=[], day=d=>`${ym}-${pad(Math.min(d, dim(ym)))}`;
@@ -3470,11 +3487,14 @@ function calAutoEvents(ym){
     if(st.done && !p) return;
     const amt = p ? p.a : dueAmt(lo, ym);
     out.push({ auto:"loan", date:day(lo.day), title:`繳 ${[lo.bank,lo.name].filter(Boolean).join(" ")||lo.type||"貸款"}`, sub: amt ? (p?`已繳 ${fmt(amt)}`:`約 ${fmt(amt)}`) : "", done:!!p, go:"#repay" }); });
-  P().cards.forEach(card=>{ const c=cardCfg(card); if(!c.p) return;
+  // 信用卡：這個月有要繳（或要轉給持卡人）的金額才提醒
+  const ct=S.calCards && S.calCards.ym===ym ? S.calCards.t : null;
+  if(ct) P().cards.forEach(card=>{ const c=cardCfg(card); if(!c.p) return;
     const other=ownerOther(c.o) && c.m!=="o";
     if(ownerOther(c.o) && c.m==="o") return;
+    const amt=(other ? ct.xfer : ct.mine).get(card)||0; if(amt<=0) return;
     const x=other ? P().xfer[xferKey(card, ym)] : null;
-    out.push({ auto:"card", date:day(c.p), title: other ? `轉帳給${c.o}繳 ${card} 卡費` : `${card} 卡費繳款截止`, sub: x ? `已轉 ${fmt(x.a)}` : "", done:!!x, go:"#repay" }); });
+    out.push({ auto:"card", date:day(c.p), title: other ? `轉帳給${c.o}繳 ${card} 卡費` : `${card} 卡費繳款截止`, sub: x ? `已轉 ${fmt(x.a)}` : `${fmt(amt)}`, done:!!x, go:"#repay" }); });
   S.calAutoItems.forEach(i=>out.push({ auto:"list", date:i.due, title:`清單：${i.text}`, sub:i.list.name+(i.amount?`・約 ${fmt(i.amount)}`:""), done:false, go:"#list/"+i.list.id }));
   return out;
 }
@@ -3496,7 +3516,7 @@ function renderCal(){
   tipsFor("tipCal", [["cal","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入。家庭行程按「＋ 新增行程」，行事曆可以分享給家人一起看、一起編輯。"]]);
   const ym=S.calYM; $("cTitle").textContent=ymLabel(ym); $("cNow").hidden = ym===thisYM();
   if(S.calSel.slice(0,7)!==ym) S.calSel = ym===thisYM() ? todayStr() : `${ym}-01`;
-  loadCalListItems();
+  loadCalListItems(); loadCalCards();
   // 篩選與行事曆
   const hide=calHide(), fb=$("calFilters"); fb.textContent="";
   const chip=(label, color, id, extra)=>{ const w=el("span","cal-chip"+(hide.has(id)?" off":""));
