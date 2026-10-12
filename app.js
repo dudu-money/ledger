@@ -3390,12 +3390,16 @@ $("lsInvite").onclick=()=>{
   $("lsEmail").value=""; setListMember(em, $("lsRole").value);
 };
 $("lsEmail").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("lsInvite").click(); } });
-$("lsSaveName").onclick=async()=>{
-  const x=LI(), name=$("lsName").value.trim().slice(0,40); if(!name){ msg("lsMsg","請輸入名稱。","err"); return; }
-  try{ await updateDoc(doc(db,"lists",x.id), { name, color:lsColor, updatedAt:serverTimestamp() }); msg("lsMsg","已儲存。","ok"); }
-  catch(e){ msg("lsMsg","儲存失敗："+errText(e),"err"); }
-};
 $("lsClose").onclick=()=>$("dlgListSet").close();
+$("lsDone").onclick=async()=>{
+  const x=LI(); if(!x){ $("dlgListSet").close(); return; }
+  if(x.ownerUid===S.user.uid){
+    const name=$("lsName").value.trim().slice(0,40); if(!name){ msg("lsMsg","請輸入名稱。","err"); return; }
+    if(name!==x.name || lsColor!==(x.color||COLORS[0])){
+      try{ await updateDoc(doc(db,"lists",x.id), { name, color:lsColor, updatedAt:serverTimestamp() }); toast(`已儲存「${name}」`); }
+      catch(e){ msg("lsMsg","儲存失敗："+errText(e),"err"); return; } } }
+  $("dlgListSet").close();
+};
 $("lsDelete").onclick=async()=>{
   const b=$("lsDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？所有項目和記事都會刪掉（已記到帳本的不受影響）"; return; }
   const x=LI();
@@ -3639,12 +3643,17 @@ $("csInvite").onclick=()=>{
   $("csEmail").value=""; setCalMember(em, $("csRole").value);
 };
 $("csEmail").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); $("csInvite").click(); } });
-$("csSaveName").onclick=async()=>{
-  const c=S.cals.get(S.calSetId), name=$("csName").value.trim().slice(0,40); if(!name){ msg("csMsg","請輸入名稱。","err"); return; }
-  try{ await updateDoc(doc(db,"cals",c.id), { name, color:csColor, updatedAt:serverTimestamp() }); msg("csMsg","已儲存。","ok"); }
-  catch(e){ msg("csMsg","儲存失敗："+errText(e),"err"); }
-};
 $("csClose").onclick=()=>$("dlgCalSet").close();
+/* 完成：名稱或顏色有改就先存，再關閉 */
+$("csDone").onclick=async()=>{
+  const c=S.cals.get(S.calSetId); if(!c){ $("dlgCalSet").close(); return; }
+  if(c.ownerUid===S.user.uid){
+    const name=$("csName").value.trim().slice(0,40); if(!name){ msg("csMsg","請輸入名稱。","err"); return; }
+    if(name!==c.name || csColor!==(c.color||COLORS[0])){
+      try{ await updateDoc(doc(db,"cals",c.id), { name, color:csColor, updatedAt:serverTimestamp() }); toast(`已儲存「${name}」`); }
+      catch(e){ msg("csMsg","儲存失敗："+errText(e),"err"); return; } } }
+  $("dlgCalSet").close();
+};
 $("csDelete").onclick=async()=>{
   const b=$("csDelete"); if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="確定刪除？裡面的行程都會刪掉"; return; }
   const c=S.cals.get(S.calSetId);
