@@ -2582,7 +2582,7 @@ function watchHoldings(){
     if(S.hdId && $("dlgHold").open) renderHoldDialog(false);
   }, e=>msg("investMsg","讀取投資資料失敗："+errText(e),"err"));
 }
-function stopHoldings(){ if(S.unsubHoldings){ S.unsubHoldings(); S.unsubHoldings=null; } S.holdings=[]; }
+function stopHoldings(){ if(S.unsubHoldings){ S.unsubHoldings(); S.unsubHoldings=null; } S.holdings=[]; S.autoQuotesDone=false; }
 
 function holdStats(h, skipId){
   let q=0, cost=0, real=0, div=0, bought=0;
@@ -2602,7 +2602,7 @@ function renderInvestTips(){
   tipsFor("tipInvest", [["nw2","上面的「淨資產」：想到的時候（建議每月月底）把各戶頭和現金有多少填一次，系統會自動加上投資市值、扣掉每筆貸款，畫出資產變化。下方的比較表會列出每個戶頭、每筆貸款比上次多或少多少，點一列就能看那一項的曲線。不用記轉帳，也不用跟記帳對得上。"],["invest2","買進、賣出、股息都記在這裡，會自動算持有股數、平均成本和損益（和多數券商 App 一樣用平均成本法）。依台股習慣，紅色是賺、綠色是賠。現價可以按「更新台股收盤價」，或點持股自己填。在「手續費設定」填券商的折扣和最低手續費（零股常見 2.8 折、最低 1 元），市值下面就會算出跟券商 APP 一樣的參考現值。"]]);
 }
 function renderInvest(){
-  renderInvestTips(); renderNW();
+  renderInvestTips(); renderNW(); autoQuotes();
   const rows=S.holdings.map(h=>({h, st:holdStats(h), fx:fxOf(h)}));
   const act=rows.filter(r=>r.st.q>0).sort((a,b)=>b.st.mv*b.fx-a.st.mv*a.fx);
   const sold=rows.filter(r=>r.st.q<=0);
@@ -2684,7 +2684,7 @@ function tradeRow(h,t,showSym){
 }
 
 /* ---- 台股收盤價（證交所、櫃買中心開放資料）---- */
-let QUOTES=null, quotesAt=0, quotesLoading=null;
+let QUOTES=null, quotesAt=0, quotesLoading=null, QUOTES_SRC=null;
 const rocDate = s => { s=String(s||""); const m=s.match(/^(\d{3})(\d{2})(\d{2})$/) || s.match(/^(\d{3})\/(\d{2})\/(\d{2})$/); return m ? `${Number(m[1])+1911}-${m[2]}-${m[3]}` : ""; };
 async function loadQuotes(){
   if(QUOTES && Date.now()-quotesAt<10*60e3) return QUOTES;
@@ -2692,6 +2692,14 @@ async function loadQuotes(){
   quotesLoading=(async()=>{
     const map=new Map(); let ok=0;
     const get=async u=>{ const r=await fetch(u,{headers:{accept:"application/json"}}); if(!r.ok) throw new Error(r.status); return r.json(); };
+    // 1. 網站上的 quotes.json（GitHub 每個交易日自動抓好的，瀏覽器讀得到）
+    const fromFile=j=>{ if(!j || !j.q) return false; Object.entries(j.q).forEach(([c,v])=>{ const p=Number(v[0]); if(p>0) map.set(c.toUpperCase(),{p, name:v[1]||"", d:j.d||""}); }); QUOTES_SRC={at:j.at||"", d:j.d||""}; return map.size>0; };
+    const gh=location.hostname.match(/^([^.]+)\.github\.io$/), repo=location.pathname.split("/").filter(Boolean)[0];
+    for(const u of ["quotes.json?t="+Date.now(), ...(gh ? [`https://raw.githubusercontent.com/${gh[1]}/${repo||gh[1]+".github.io"}/main/quotes.json?t=${Date.now()}`] : [])]){
+      try{ if(fromFile(await get(u))){ QUOTES=map; quotesAt=Date.now(); return map; } }catch(e){}
+    }
+    QUOTES_SRC=null;
+    // 2. 直接連證交所、櫃買中心（有些瀏覽器會被擋）
     try{ (await get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL")).forEach(x=>{ const p=Number(x.ClosingPrice); if(x.Code && p>0) map.set(String(x.Code).toUpperCase(),{p, name:x.Name||"", d:rocDate(x.Date)}); }); ok++; }catch(e){}
     try{ (await get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes")).forEach(x=>{ const c=x.SecuritiesCompanyCode, p=Number(x.Close); if(c && p>0 && !map.has(c)) map.set(String(c).toUpperCase(),{p, name:x.CompanyName||"", d:rocDate(x.Date)}); }); ok++; }catch(e){}
     if(!ok) throw new Error("quotes");
@@ -2699,20 +2707,30 @@ async function loadQuotes(){
   })();
   try{ return await quotesLoading; } finally{ quotesLoading=null; }
 }
-$("ivRefresh").onclick=async()=>{
+async function applyQuotes(silent){
   const tw=S.holdings.filter(h=>h.cur==="TWD" && holdStats(h).q>0);
-  if(!tw.length){ msg("ivPriceMsg","目前沒有台股持股需要更新。"); return; }
+  if(!tw.length){ if(!silent) msg("ivPriceMsg","目前沒有台股持股需要更新。"); return; }
+  const map=await loadQuotes(); let n=0; const miss=[];
+  for(const h of tw){ const q=map.get(h.sym.toUpperCase());
+    if(!q){ miss.push(h.sym); continue; }
+    const at=q.d||todayStr();
+    if(h.price===q.p && h.priceAt===at) continue;
+    if(silent && h.priceAt && h.priceAt>at) continue; // 手動填的比較新就不蓋掉
+    await updateDoc(doc(db,"holdings",h.id), { price:q.p, priceAt:at, ...(h.name?{}:{name:String(q.name).slice(0,30)}), updatedAt:serverTimestamp() }); n++; }
+  const src=QUOTES_SRC && QUOTES_SRC.d ? `（${QUOTES_SRC.d.slice(5).replace("-","/")} 收盤價）` : "";
+  if(!silent || n) msg("ivPriceMsg", (n?`已更新 ${n} 檔的收盤價${src}。`:`收盤價已經是最新的${src}。`) + (miss.length?`找不到：${miss.join("、")}（請點那一檔自己填現價）。`:""), "ok");
+}
+$("ivRefresh").onclick=async()=>{
   $("ivRefresh").disabled=true; msg("ivPriceMsg","正在取得收盤價…");
-  try{
-    const map=await loadQuotes(); let n=0; const miss=[];
-    for(const h of tw){ const q=map.get(h.sym.toUpperCase());
-      if(!q){ miss.push(h.sym); continue; }
-      await updateDoc(doc(db,"holdings",h.id), { price:q.p, priceAt:(q.d||todayStr()), ...(h.name?{}:{name:String(q.name).slice(0,30)}), updatedAt:serverTimestamp() }); n++; }
-    msg("ivPriceMsg", `已更新 ${n} 檔的收盤價。` + (miss.length?`找不到：${miss.join("、")}（請點那一檔自己填現價）。`:""), "ok");
-  }catch(e){
-    msg("ivPriceMsg","現在沒辦法自動取得股價（證交所網站沒有回應或不允許），請點每一檔持股自己填現價。","err");
-  }finally{ $("ivRefresh").disabled=false; }
+  try{ quotesAt=0; await applyQuotes(false); }
+  catch(e){ msg("ivPriceMsg","現在沒辦法自動取得股價：瀏覽器不能直接連證交所。照說明在 GitHub 加上「每天自動抓收盤價」後就能用；在那之前請點每一檔持股自己填現價。","err"); }
+  finally{ $("ivRefresh").disabled=false; }
 };
+/* 打開資產頁時，如果網站上有比較新的收盤價就自動帶入（一次登入只做一次） */
+async function autoQuotes(){
+  if(S.autoQuotesDone || !S.holdingsReady || !S.holdings.some(h=>h.cur==="TWD")) return; S.autoQuotesDone=true;
+  try{ await loadQuotes(); if(QUOTES_SRC) await applyQuotes(true); }catch(e){}
+}
 
 /* ---- 手續費設定 ---- */
 $("ivFeeBtn").onclick=()=>{ const v=P().inv; $("feDisc").value=v.disc; $("feMin").value=v.min; $("feFx").value=v.fx; msg("feMsg",""); $("dlgFee").showModal(); };
