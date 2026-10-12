@@ -3,7 +3,7 @@
 name: 更新台股收盤價
 on:
   schedule:
-    - cron: "10 6,9 * * 1-5"   # 台灣時間週一到週五 14:10、17:10
+    - cron: "40 6,10 * * 1-5"  # 台灣時間週一到週五 14:40、18:40
   workflow_dispatch:            # 也可以在 Actions 頁面手動按「Run workflow」
 permissions:
   contents: write
@@ -11,7 +11,7 @@ jobs:
   quotes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 下載收盤價
         run: |
           python3 - <<'PY'
@@ -20,29 +20,52 @@ jobs:
               req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
               with urllib.request.urlopen(req, timeout=60) as r:
                   return json.load(r)
+          def num(v):
+              try: return float(str(v).replace(",", ""))
+              except ValueError: return 0
           def roc(s):
               s = str(s or "").replace("/", "")
               return f"{int(s[:3]) + 1911}-{s[3:5]}-{s[5:7]}" if len(s) == 7 and s.isdigit() else ""
           q, d = {}, ""
-          try:
-              for x in get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"):
-                  try: p = float(x.get("ClosingPrice") or 0)
-                  except ValueError: p = 0
-                  if x.get("Code") and p > 0:
-                      q[x["Code"].upper()] = [p, x.get("Name", "")]; d = d or roc(x.get("Date"))
-          except Exception as e: print("TWSE 失敗：", e)
+          tw = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+          # 1. 證交所「每日收盤行情」：收盤後就有當天的資料（往回找最近一個交易日）
+          for k in range(0, 8):
+              day = tw - datetime.timedelta(days=k)
+              try:
+                  j = get(f"https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={day:%Y%m%d}&type=ALLBUT0999")
+              except Exception as e:
+                  print("證交所", f"{day:%Y-%m-%d}", "失敗：", e); continue
+              if j.get("stat") != "OK": continue
+              for t in j.get("tables", []):
+                  f = t.get("fields") or []
+                  if "證券代號" in f and "收盤價" in f:
+                      ic, iname, ip = f.index("證券代號"), f.index("證券名稱"), f.index("收盤價")
+                      for row in t.get("data", []):
+                          p = num(row[ip])
+                          if p > 0: q[str(row[ic]).strip().upper()] = [p, str(row[iname]).strip()]
+              if q:
+                  d = f"{day:%Y-%m-%d}"; print("證交所每日收盤行情：", len(q), "檔，", d); break
+          # 2. 抓不到的話改用證交所開放資料（有時候會晚一天）
+          if not q:
+              try:
+                  for x in get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"):
+                      p = num(x.get("ClosingPrice"))
+                      if x.get("Code") and p > 0:
+                          q[x["Code"].upper()] = [p, x.get("Name", "")]; d = d or roc(x.get("Date"))
+                  print("證交所開放資料：", len(q), "檔，", d)
+              except Exception as e: print("證交所開放資料失敗：", e)
+          # 3. 上櫃股票
+          n = 0
           try:
               for x in get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"):
-                  c = str(x.get("SecuritiesCompanyCode") or "").upper()
-                  try: p = float(x.get("Close") or 0)
-                  except ValueError: p = 0
+                  c = str(x.get("SecuritiesCompanyCode") or "").upper(); p = num(x.get("Close"))
                   if c and p > 0 and c not in q:
-                      q[c] = [p, x.get("CompanyName", "")]; d = d or roc(x.get("Date"))
-          except Exception as e: print("TPEx 失敗：", e)
+                      q[c] = [p, x.get("CompanyName", "")]; n += 1; d = d or roc(x.get("Date"))
+              print("櫃買中心：", n, "檔")
+          except Exception as e: print("櫃買中心失敗：", e)
           if len(q) < 100: raise SystemExit("抓到的股價太少，這次先不更新")
-          now = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
           with open("quotes.json", "w", encoding="utf-8") as f:
-              json.dump({"at": now, "d": d, "q": q}, f, ensure_ascii=False, separators=(",", ":"))
+              json.dump({"at": tw.strftime("%Y-%m-%d %H:%M"), "d": d, "q": q}, f, ensure_ascii=False, separators=(",", ":"))
           print("共", len(q), "檔，收盤日", d)
           PY
       - name: 存到網站
