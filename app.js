@@ -2449,7 +2449,7 @@ $("bkRestore").onclick=async()=>{
         const evs=(cs.events||[]).filter(e=>/^\d{4}-\d{2}-\d{2}$/.test(String(e.date||"")));
         for(let k=0;k<evs.length;k+=400){ const b=writeBatch(db);
           evs.slice(k,k+400).forEach(e=>b.set(doc(collection(db,"cals",ref.id,"events")), { title:String(e.title||"行程").slice(0,60), date:String(e.date), end:/^\d{4}-\d{2}-\d{2}$/.test(String(e.end||""))?String(e.end):"",
-            time:/^\d{2}:\d{2}$/.test(String(e.time||""))?String(e.time):"", place:String(e.place||"").slice(0,60), note:String(e.note||"").slice(0,300),
+            time:/^\d{2}:\d{2}$/.test(String(e.time||""))?String(e.time):"", place:String(e.place||"").slice(0,60), note:String(e.note||"").slice(0,300), kind:EV_KINDS[e.kind]?e.kind:"personal",
             createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }));
           await b.commit(); }
         nCs++; } }
@@ -3748,11 +3748,15 @@ function calByDay(ym){
   return m;
 }
 const addDays=(d,k)=>{ const t=new Date(d+"T00:00"); t.setDate(t.getDate()+k); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`; };
-const calColor = e => e.auto ? "var(--out)" : ((S.cals.get(e.cal)||{}).color || COLORS[0]);
+/* 行程類型：決定顏色和圖示。自動帶入的繳款日算「還款」、清單截止日算「清單待辦」；舊行程沒有 kind 就是個人行程 */
+const EV_KINDS = { personal:["個人行程","#3f7fe0","📅"], list:["清單待辦","#ee6c1f","🛒"], repay:["還款提醒","#d99a16","💳"], money:["收支提醒","#2fa38a","💰"] };
+const calKind = e => e.auto ? (e.auto==="list" ? "list" : "repay") : (EV_KINDS[e.kind] ? e.kind : "personal");
+const calColor = e => EV_KINDS[calKind(e)][1];
+const calIcon = e => e.auto==="loan" ? "🏦" : e.auto==="card" ? "💳" : e.auto==="list" ? "📝" : EV_KINDS[calKind(e)][2];
 const WD=["日","一","二","三","四","五","六"];
 function renderCal(){
-  tipsFor("tipCal", [["cal2","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入。家庭行程按「＋ 新增行程」，行事曆可以分享給家人一起看、一起編輯。7 天內要繳的錢、快到期的清單項目和今明兩天的行程，也會出現在上方的鈴鐺裡。"]]);
-  const ym=S.calYM; $("cTitle").textContent=ymLabel(ym); $("cNow").hidden = ym===thisYM();
+  tipsFor("tipCal", [["cal3","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入。點月曆上的日子，旁邊會列出那天的事；按「＋ 新增行程／提醒」可以選個人行程、清單待辦、還款提醒或收支提醒，顏色會跟著類型。行事曆可以分享給家人一起看、一起編輯。7 天內要繳的錢、快到期的清單項目和今明兩天的行程，也會出現在上方的鈴鐺裡。"]]);
+  const ym=S.calYM; $("cTitle").textContent=ymLabel(ym);
   if(S.calSel.slice(0,7)!==ym) S.calSel = ym===thisYM() ? todayStr() : `${ym}-01`;
   loadCalListItems(); loadCalCards();
   // 篩選與行事曆
@@ -3764,7 +3768,7 @@ function renderCal(){
   [...S.cals.values()].sort((a,b)=>(a.ownerUid===S.user.uid?0:1)-(b.ownerUid===S.user.uid?0:1) || a.name.localeCompare(b.name,"zh-Hant")).forEach(c=>{
     const st=el("button","cal-chip-set","設定"); st.type="button"; st.setAttribute("aria-label",`${c.name} 的設定`); st.onclick=()=>openCalSet(c.id);
     chip(c.name + (c.ownerUid!==S.user.uid ? `（${c.ownerEmail.split("@")[0]} 分享）` : (c.members||[]).length>1 ? `（${c.members.length} 人）` : ""), c.color||COLORS[0], c.id, st); });
-  chip("繳費日和截止日", "var(--out)", "auto");
+  chip("繳費日和截止日", EV_KINDS.repay[1], "auto");
   const nb=el("button","chip add", S.cals.size ? "＋ 新行事曆" : "＋ 建立家庭行事曆"); nb.type="button"; nb.onclick=()=>createCal(); fb.appendChild(nb);
   // 月曆
   const byDay=calByDay(ym), g=$("calGrid"); g.textContent="";
@@ -3776,24 +3780,49 @@ function renderCal(){
     const c=el("button","cal-cell"+(ds===today?" today":"")+(ds===S.calSel?" sel":"")); c.type="button";
     c.setAttribute("aria-label", `${Number(ym.slice(5))} 月 ${d} 日${evs.length?`，${evs.length} 項`:""}`);
     c.appendChild(el("span","cal-d",String(d)));
-    evs.slice(0,3).forEach(e=>{ const p=el("span","cal-pill"+(e.auto?" auto":"")+(e.done?" done":""), (e.time?e.time+" ":"")+e.title); p.style.setProperty("--c", calColor(e)); c.appendChild(p); });
-    if(evs.length>3) c.appendChild(el("span","cal-more",`+${evs.length-3}`));
-    if(evs.length) c.appendChild(el("span","cal-dots", "")); // 手機版用小點表示
+    const kinds=Object.keys(EV_KINDS).filter(k=>evs.some(e=>calKind(e)===k && !e.done));
+    if(kinds.length){ const dots=el("span","cal-dots"); kinds.forEach(k=>{ const i=el("i"); i.style.background=EV_KINDS[k][1]; dots.appendChild(i); }); c.appendChild(dots); }
     c.onclick=()=>{ S.calSel=ds; renderCal(); };
     g.appendChild(c);
   }
   // 選到的那天
   const sel=S.calSel, dEv=byDay.get(sel)||[];
-  $("calDayTitle").textContent = `${Number(sel.slice(5,7))} 月 ${Number(sel.slice(8))} 日（${WD[new Date(sel+"T00:00").getDay()]}）` + (sel===today?"・今天":"");
+  $("calDayTitle").textContent = `${Number(sel.slice(5,7))} 月 ${Number(sel.slice(8))} 日（週${WD[new Date(sel+"T00:00").getDay()]}）`;
+  $("cNow").hidden = sel===today;
   const dayBox=$("calDay"); dayBox.textContent="";
-  if(!dEv.length) dayBox.appendChild(el("p","small muted","這天沒有行程。"));
-  dEv.forEach(e=>dayBox.appendChild(calRow(e, false)));
+  if(!dEv.length){ const e=el("div","cal-day-empty"); e.appendChild(myCatImg("sleep","cal-day-cat")); e.appendChild(el("p",null,"這天沒有行程，可以放鬆一下。")); dayBox.appendChild(e); }
+  dEv.forEach(e=>dayBox.appendChild(calItem(e)));
+  // 顏色說明
+  const lg=$("calLegend"); lg.textContent="";
+  Object.values(EV_KINDS).forEach(([label,color])=>{ const t=el("span","cal-lg"); const i=el("i"); i.style.background=color; t.append(i, document.createTextNode(label)); lg.appendChild(t); });
   // 這個月
   const mb=$("calMonth"); mb.textContent="";
   const days=[...byDay.keys()].sort();
   if(!days.length) mb.appendChild(el("p","small muted", S.cals.size ? "這個月還沒有行程。" : "按「＋ 新增行程」就會自動建立一本「家庭行事曆」，之後可以在「設定」分享給家人。"));
   days.forEach(d=>{ const h=el("div","cal-date"+(d===today?" today":""), `${Number(d.slice(5,7))}/${Number(d.slice(8))}（${WD[new Date(d+"T00:00").getDay()]}）`); mb.appendChild(h);
     byDay.get(d).forEach(e=>mb.appendChild(calRow(e, true))); });
+}
+/* 右邊「這天」的一項：類型圖示、標題、說明，右邊放時間或金額 */
+function calItem(e){
+  const r=el("button","cal-item"+(e.done?" done":"")); r.type="button"; r.style.setProperty("--c", calColor(e));
+  r.appendChild(el("span","cal-ic",calIcon(e)));
+  const main=el("div","cal-main"); main.appendChild(el("div","cal-t", e.title));
+  const meta=[];
+  if(e.auto){ if(e.auto==="list") meta.push("清單截止日"); else meta.push(e.done ? "這期已處理" : "自動帶入的繳款日"); }
+  else {
+    const lst=e.listId && S.lists.get(e.listId); if(lst) meta.push(`來自清單：${lst.name}`);
+    if(e.end && e.end>e.date) meta.push(`${e.date.slice(5).replace("-","/")}–${e.end.slice(5).replace("-","/")}`);
+    if(e.place) meta.push(e.place);
+    const c=S.cals.get(e.cal); if(c && S.cals.size>1) meta.push(c.name);
+    if(e.note) meta.push(e.note);
+  }
+  if(meta.length) main.appendChild(el("div","cal-m", meta.join("・")));
+  r.appendChild(main);
+  const right = e.auto ? (e.auto==="list" ? (e.sub.split("・約 ")[1] ? "約 "+e.sub.split("・約 ")[1] : "") : e.sub) : (e.time||"");
+  if(right) r.appendChild(el("span","cal-r", right));
+  if(e.done) r.appendChild(el("span","cal-ok","✓"));
+  r.onclick=()=>{ if(e.auto) location.hash=e.go; else openEvent(e); };
+  return r;
 }
 function calRow(e){
   const r=el("button","cal-row"+(e.done?" done":"")); r.type="button";
@@ -3814,7 +3843,6 @@ $("cPrev").onclick=()=>{ S.calYM=addMonths(S.calYM,-1); syncCalEvents(); renderC
 $("cNext").onclick=()=>{ S.calYM=addMonths(S.calYM,1); syncCalEvents(); renderCal(); };
 $("cNow").onclick=()=>{ S.calYM=thisYM(); S.calSel=todayStr(); syncCalEvents(); renderCal(); };
 $("cAdd").onclick=()=>openEvent(null, S.calSel);
-$("cAddDay").onclick=()=>openEvent(null, S.calSel);
 
 async function createCal(name){
   const n=S.cals.size, nm = name || (n ? `行事曆 ${n+1}` : "家庭行事曆");
@@ -3829,7 +3857,11 @@ function openEvent(e, date){
   const editable=[...S.cals.values()].filter(canEditCal);
   if(e && !canEditCal(S.cals.get(e.cal))){ toast("這本行事曆你只能檢視"); return; }
   S.evEdit=e||null; msg("evMsg","");
-  $("evTitle").textContent = e ? "修改行程" : "新增行程";
+  $("evTitle").textContent = e ? "修改行程／提醒" : "新增行程／提醒";
+  S.evKind = e && EV_KINDS[e.kind] ? e.kind : "personal"; renderEvKinds();
+  const ls=$("evList"); ls.textContent=""; const o0=el("option",null,"不關聯"); o0.value=""; ls.appendChild(o0);
+  [...S.lists.values()].sort((a,b)=>(a.name||"").localeCompare(b.name||"","zh-Hant")).forEach(x=>{ const o=el("option",null,x.name); o.value=x.id; ls.appendChild(o); });
+  ls.value = e && e.listId && S.lists.has(e.listId) ? e.listId : "";
   $("evName").value = e ? e.title : ""; $("evDate").value = e ? e.date : (date||todayStr()); $("evEnd").value = e ? (e.end||"") : "";
   $("evTime").value = e ? (e.time||"") : ""; $("evPlace").value = e ? (e.place||"") : ""; $("evNote").value = e ? (e.note||"") : "";
   const sel=$("evCal"); sel.textContent="";
@@ -3841,6 +3873,12 @@ function openEvent(e, date){
   $("evBy").hidden = !(e && e.createdByEmail && e.createdByEmail!==S.email); if(e) $("evBy").textContent=`由 ${e.createdByEmail} 新增`;
   $("dlgEvent").showModal(); setTimeout(()=>{ if(!e) $("evName").focus(); },50);
 }
+function renderEvKinds(){
+  const box=$("evKinds"); box.textContent="";
+  Object.entries(EV_KINDS).forEach(([k,[label,color]])=>{ const b=el("button","ev-kind",label); b.type="button"; b.style.setProperty("--c",color);
+    b.setAttribute("aria-pressed", k===S.evKind); b.onclick=()=>{ S.evKind=k; renderEvKinds(); }; box.appendChild(b); });
+  $("evListWrap").hidden = S.evKind!=="list";
+}
 $("formEvent").addEventListener("submit", async ev=>{
   if(ev.submitter && ev.submitter.value!=="save") return;
   ev.preventDefault();
@@ -3849,7 +3887,8 @@ $("formEvent").addEventListener("submit", async ev=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ msg("evMsg","請選日期。","err"); return; }
   if(end && end<date){ msg("evMsg","結束日期不能早於開始日期。","err"); return; }
   if(end && (new Date(end)-new Date(date))/864e5>31){ msg("evMsg","多天的行程最長 31 天。","err"); return; }
-  const data={ title, date, end: end===date?"":end, time, place:$("evPlace").value.trim().slice(0,60), note:$("evNote").value.trim().slice(0,300), updatedAt:serverTimestamp() };
+  const data={ title, date, end: end===date?"":end, time, place:$("evPlace").value.trim().slice(0,60), note:$("evNote").value.trim().slice(0,300),
+    kind:S.evKind||"personal", listId: S.evKind==="list" ? ($("evList").value||"") : "", updatedAt:serverTimestamp() };
   $("evSave").disabled=true;
   try{
     if(S.evEdit) await updateDoc(doc(db,"cals",S.evEdit.cal,"events",S.evEdit.id), data);

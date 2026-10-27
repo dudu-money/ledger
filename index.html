@@ -243,27 +243,29 @@
   <main class="page">
     <nav class="tabs" aria-label="主要頁面"><a href="#" class="tab">帳本</a><a href="#repay" class="tab">還款與分期</a><a href="#invest" class="tab">資產</a><a href="#lists" class="tab">清單</a><a href="#cal" class="tab" aria-current="page">行事曆</a><a href="#settings" class="tab">設定</a></nav>
     <div class="tip-slot" id="tipCal"></div>
-    <div class="period">
-      <div class="period-nav">
-        <button class="icon-btn" id="cPrev" type="button" aria-label="上個月">‹</button>
-        <h2 id="cTitle">—</h2>
-        <button class="icon-btn" id="cNext" type="button" aria-label="下個月">›</button>
-      </div>
-      <button class="link" id="cNow" type="button">回到本月</button>
-      <button class="btn primary" id="cAdd" type="button">＋ 新增行程</button>
+    <div class="cal-layout">
+      <section class="panel cal-panel">
+        <div class="cal-head">
+          <div class="period-nav">
+            <button class="icon-btn" id="cPrev" type="button" aria-label="上個月">‹</button>
+            <h2 id="cTitle">—</h2>
+            <button class="icon-btn" id="cNext" type="button" aria-label="下個月">›</button>
+          </div>
+          <div class="cal-legend" id="calLegend" aria-label="顏色說明"></div>
+        </div>
+        <div class="cal-grid" id="calGrid" role="grid" aria-label="月曆"></div>
+      </section>
+      <section class="panel cal-side">
+        <div class="between"><h3 class="h3" id="calDayTitle">今天</h3><button class="btn sm" id="cNow" type="button">今天</button></div>
+        <div id="calDay" class="cal-day-list"></div>
+        <button class="btn primary cal-add" id="cAdd" type="button">＋ 新增行程／提醒</button>
+      </section>
     </div>
     <div class="cal-filters" id="calFilters"></div>
-    <section class="panel cal-panel">
-      <div class="cal-grid" id="calGrid" role="grid" aria-label="月曆"></div>
-    </section>
-    <section class="panel">
-      <div class="between wrap-gap"><h3 class="h3" id="calDayTitle">今天</h3><button class="btn" id="cAddDay" type="button">＋ 這天新增</button></div>
-      <div id="calDay" class="cal-agenda"></div>
-    </section>
-    <section class="panel">
-      <h3 class="h3">這個月</h3>
+    <details class="panel cal-month-wrap" id="calMonthWrap">
+      <summary><h3 class="h3">這個月全部行程</h3></summary>
       <div id="calMonth" class="cal-agenda"></div>
-    </section>
+    </details>
     <p class="msg" id="calMsg" role="status"></p>
   </main>
 </section>
@@ -1077,8 +1079,10 @@
 
 <dialog id="dlgEvent" aria-labelledby="evTitle">
   <form method="dialog" id="formEvent" class="stack" autocomplete="off">
-    <div class="between"><h2 class="h2" id="evTitle">新增行程</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
-    <label class="field"><span class="label">行程</span><input id="evName" type="text" maxlength="60" required placeholder="例如：產檢、打預防針、家族聚餐"></label>
+    <div class="between"><h2 class="h2" id="evTitle">新增行程／提醒</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="field"><span class="label">類型</span><div class="ev-kinds" id="evKinds" role="group" aria-label="類型"></div></div>
+    <label class="field"><span class="label">標題</span><input id="evName" type="text" maxlength="60" required placeholder="例如：產檢、採購奶瓶、信用卡繳款"></label>
+    <label class="field" id="evListWrap" hidden><span class="label">關聯清單（選填）</span><select id="evList"></select></label>
     <div class="grid2">
       <label class="field"><span class="label">日期</span><input id="evDate" type="date" required></label>
       <label class="field"><span class="label">時間（選填）</span><input id="evTime" type="time"></label>
