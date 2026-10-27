@@ -623,8 +623,6 @@ body.nav-on .page > .tabs{display:none}
   body.nav-on .page{padding-bottom:150px}
   body.nav-on .fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
   body.nav-on .toast{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
-  /* 手機版：設定放在右上角，底部只留 5 個 */
-  body.nav5 .appnav a[href="#settings"]{display:none}
 }
 @media (min-width:821px){
   body.nav-on{padding-left:224px}
