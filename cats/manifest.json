@@ -130,7 +130,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "blue": [
    "face",
@@ -139,7 +141,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "fold": [
    "face",
