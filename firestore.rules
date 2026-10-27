@@ -316,7 +316,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['defaultPay','defaultPayer','defaultCard','startPage','payers','cards','pays','lastBackup','tourDone','tips','inv','me','cardSet','xfer','myCat','catName','notiSeen','updatedAt'])
+        && request.resource.data.keys().hasOnly(['defaultPay','defaultPayer','defaultCard','startPage','payers','cards','pays','lastBackup','tourDone','tips','inv','me','cardSet','xfer','activeCat','notiSeen','updatedAt'])
         && (!('tourDone' in request.resource.data) || request.resource.data.tourDone is bool)
         && (!('tips' in request.resource.data) || (request.resource.data.tips is list && request.resource.data.tips.size() <= 50))
         && (!('inv' in request.resource.data) || (request.resource.data.inv is map && request.resource.data.inv.size() <= 6))
@@ -324,8 +324,7 @@ service cloud.firestore {
         && (!('me' in request.resource.data) || (request.resource.data.me is string && request.resource.data.me.size() <= 20))
         && (!('cardSet' in request.resource.data) || (request.resource.data.cardSet is map && request.resource.data.cardSet.size() <= 50))
         && (!('xfer' in request.resource.data) || (request.resource.data.xfer is map && request.resource.data.xfer.size() <= 600))
-        && (!('myCat' in request.resource.data) || (request.resource.data.myCat is string && request.resource.data.myCat.size() <= 20))
-        && (!('catName' in request.resource.data) || (request.resource.data.catName is string && request.resource.data.catName.size() <= 20))
+        && (!('activeCat' in request.resource.data) || (request.resource.data.activeCat is string && request.resource.data.activeCat.size() <= 40))
         && (!('notiSeen' in request.resource.data) || request.resource.data.notiSeen is number)
         && request.resource.data.defaultPay is string && request.resource.data.defaultPay.size() <= 20
         && request.resource.data.defaultPayer is string && request.resource.data.defaultPayer.size() <= 20
@@ -334,6 +333,17 @@ service cloud.firestore {
         && request.resource.data.payers is list && request.resource.data.payers.size() <= 50
         && request.resource.data.cards is list && request.resource.data.cards.size() <= 50
         && request.resource.data.pays is list && request.resource.data.pays.size() <= 30;
+
+      // ---- 我的貓咪（只有自己看得到；activeCat 記目前代表貓是哪一隻） ----
+      function validCat(d) {
+        return d.keys().hasOnly(['breed','name','createdAt','updatedAt'])
+          && d.breed in ['orange','orangewhite','tabby','calico','tortie','black','white','tux','cow','siamese','ragdoll','blue','fold']
+          && d.name is string && d.name.size() <= 20;
+      }
+      match /cats/{catId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid && validCat(request.resource.data);
+      }
     }
 
     // 其他路徑一律拒絕
