@@ -815,3 +815,8 @@ body.nav-on .page > .tabs{display:none}
 .nw-pv-body{min-width:0;padding-left:10px;border-left:3px solid var(--lc,var(--accent))}
 .nw-pv-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nw-pv-meta{font-size:12px;color:var(--muted)}
+
+/* 帳本、清單內頁：綠色橫幅下面固定一列「返回、名稱、設定」 */
+body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;top:58px;z-index:4;background:var(--paper);
+  padding:8px max(16px,calc((100% - 1120px)/2 + 16px))}
+@media (min-width:821px){ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{top:64px} }

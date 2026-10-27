@@ -175,10 +175,10 @@ function projItems(entries){
 /* ================= 畫面切換 ================= */
 const VIEWS = ["viewSetup","viewLoading","viewLogin","viewVerify","viewHome","viewRepay","viewInvest","viewLists","viewList","viewCal","viewSettings","viewLedger"];
 const NAV_OF = {viewHome:"#", viewLedger:"#", viewRepay:"#repay", viewInvest:"#invest", viewLists:"#lists", viewList:"#lists", viewCal:"#cal", viewSettings:"#settings"};
-const BAR_VIEWS = ["viewHome","viewRepay","viewInvest","viewLists","viewCal","viewSettings"];
+const BAR_VIEWS = ["viewHome","viewRepay","viewInvest","viewLists","viewCal","viewSettings","viewLedger","viewList"];
 function show(v){
   VIEWS.forEach(id=>$(id).hidden = id!==v);
-  /* 共用導覽：登入後的頁面才顯示；帳本、清單內頁有自己的返回列，不顯示上方標題列 */
+  /* 共用導覽：登入後的頁面才顯示；帳本、清單內頁另外在橫幅下面固定自己的返回列 */
   const nav=NAV_OF[v];
   document.body.classList.toggle("nav-on", !!nav);
   document.body.classList.toggle("bar-on", BAR_VIEWS.includes(v));
