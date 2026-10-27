@@ -198,6 +198,7 @@ else {
 }
 function signedInStart(){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user.email);
+  S.srch=null; S.bellAsync=null;
   S.startApplied = !!location.hash; // 網址已經指定頁面時，不套用「直接進入」
   watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchCals(); watchSnaps(); watchPrefs(); watchMyCats(); route();
 }
@@ -271,7 +272,7 @@ function watchLedgers(){
   S.ledgersReady = false;
   S.unsubLedgers = onSnapshot(q, snap => {
     S.ledgers = new Map(snap.docs.map(d=>[d.id, {id:d.id, ...d.data()}]));
-    S.ledgersReady = true;
+    S.ledgersReady = true; bellSoon();
     if(S.lid){
       if(!S.ledgers.has(S.lid)){ toast("你已經看不到這本帳了"); S.lid=null; stopEntries(); location.hash=""; return; }
       renderLedgerHead(); renderAll();
@@ -282,14 +283,18 @@ function watchLedgers(){
 }
 function stopLedgers(){ if(S.unsubLedgers){ S.unsubLedgers(); S.unsubLedgers=null; } S.ledgers=new Map(); }
 
-function renderBackupReminder(){
-  const b=$("bkReminder"); if(!b) return;
-  if(!S.prefs || !S.ledgersReady || !S.ledgers.size){ b.hidden=true; return; }
+/* 要不要提醒備份（首頁和鈴鐺共用） */
+function backupState(){
+  if(!S.prefs || !S.ledgersReady || !S.ledgers.size) return null;
   const last=P().lastBackup, days=last ? Math.floor((Date.now()-last)/864e5) : null;
   const oldest=Math.min(...[...S.ledgers.values()].map(l=>l.createdAt&&l.createdAt.toMillis ? l.createdAt.toMillis() : l.createdAt&&l.createdAt.seconds ? l.createdAt.seconds*1000 : Date.now()));
   const show = last ? days>=30 : (Date.now()-oldest) > 3*864e5;
-  b.hidden=!show;
-  $("bkReminderText").textContent = last ? `已經 ${days} 天沒有備份了，建議備份一次到 Google 雲端硬碟。` : "還沒有備份過資料，建議備份一次到 Google 雲端硬碟。";
+  return show ? { last, text: last ? `已經 ${days} 天沒有備份了，建議備份一次到 Google 雲端硬碟。` : "還沒有備份過資料，建議備份一次到 Google 雲端硬碟。" } : null;
+}
+function renderBackupReminder(){
+  const b=$("bkReminder"); if(!b) return;
+  const st=backupState(); b.hidden=!st;
+  if(st) $("bkReminderText").textContent=st.text;
 }
 function renderHome(){
   renderBackupReminder(); setTimeout(maybeStartTour, 50);
@@ -447,7 +452,7 @@ function initLedgerView(){
 }
 function renderLedgerHead(){
   const l=L(); if(!l) return;
-  initLedgerView();
+  initLedgerView(); applyJump();
   $("lName").textContent=l.name; const lc=ledgerCat(l);
   if($("lCat").dataset.k!==lc){ $("lCat").replaceWith(Object.assign(catImg(lc,"cat-av l-cat"),{id:"lCat"})); $("lCat").dataset.k=lc; }
   $("lRole").textContent=roleText(l); document.title=l.name+"｜記帳本";
@@ -1267,7 +1272,7 @@ function watchLoans(){
   stopLoans();
   S.loansReady=false;
   S.unsubLoans=onSnapshot(query(collection(db,"loans"), where("ownerUid","==",S.user.uid)), snap=>{
-    S.loans=snap.docs.map(d=>({id:d.id, ...d.data()})); S.loansReady=true;
+    S.loans=snap.docs.map(d=>({id:d.id, ...d.data()})); S.loansReady=true; bellSoon();
     if(S.editingLoan && $("dlgLoan").open){ const f=S.loans.find(x=>x.id===S.editingLoan.id); if(f){ S.editingLoan=f; renderLoanGrid(f); renderAdjNow(f); } }
     if(S.payLoan){ const f=S.loans.find(x=>x.id===S.payLoan.lo.id); if(f) S.payLoan.lo=f; }
     if(location.hash==="#repay") renderRepay(false);
@@ -1955,7 +1960,7 @@ function watchPrefs(){
     if(location.hash==="#settings") renderGlobalSettings(false);
     if(location.hash==="#cal") renderCal();
     if(!location.hash){ renderBackupReminder(); maybeStartTour(); }
-    refreshTips(); onMyCatChange();
+    refreshTips(); onMyCatChange(); bellSoon();
   }, ()=>{ S.prefs={}; S.startApplied=true; });
 }
 function stopPrefs(){ if(S.unsubPrefs){ S.unsubPrefs(); S.unsubPrefs=null; } S.prefs=null; }
@@ -2491,6 +2496,7 @@ const TOUR=[
   { sel:'#appNav a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#appNav a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#appNav a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
+  { sel:"#btnSearch", title:"搜尋與提醒", text:"上方的搜尋可以一次找帳本、紀錄（備註、分類、卡片、金額都可以）、清單項目和行程，電腦上按 Ctrl＋K 也能打開。旁邊的鈴鐺會集中提醒：7 天內要繳的貸款和信用卡、快到期的清單項目、今明兩天的行程，還有該備份的時候，紅點是還沒看過的提醒。" },
   { sel:'#appNav a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。在「我的貓咪」挑一隻代表貓、幫牠取名字，首頁和記完一筆時都會由牠陪你。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
@@ -3176,7 +3182,7 @@ S.lists=new Map(); S.listItems=[];
 function watchLists(){
   stopLists(); S.listsReady=false;
   S.unsubLists=onSnapshot(query(collection(db,"lists"), where("members","array-contains", S.email)), snap=>{
-    S.lists=new Map(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.listsReady=true;
+    S.lists=new Map(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.listsReady=true; bellSoon();
     if(S.listId){
       if(!S.lists.has(S.listId)){ if(!S.listDeleting) toast("你已經看不到這個清單了"); S.listDeleting=false; stopItems(); S.listId=null; location.hash="#lists"; return; }
       renderListHead(); renderListItems(); if($("dlgListSet").open) renderListSet(false);
@@ -3643,7 +3649,7 @@ const calRole = c => c.ownerUid===S.user.uid ? "擁有者" : (c.editors||[]).inc
 function watchCals(){
   stopCals(); S.calsReady=false;
   S.unsubCals=onSnapshot(query(collection(db,"cals"), where("members","array-contains", S.email)), snap=>{
-    S.cals=new Map(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.calsReady=true;
+    S.cals=new Map(snap.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.calsReady=true; bellSoon();
     if(S.calSetId && !S.cals.has(S.calSetId) && $("dlgCalSet").open){ $("dlgCalSet").close(); }
     if(S.calSetId && $("dlgCalSet").open) renderCalSet(false);
     if(location.hash==="#cal"){ syncCalEvents(); renderCal(); }
@@ -3720,7 +3726,7 @@ const addDays=(d,k)=>{ const t=new Date(d+"T00:00"); t.setDate(t.getDate()+k); r
 const calColor = e => e.auto ? "var(--out)" : ((S.cals.get(e.cal)||{}).color || COLORS[0]);
 const WD=["日","一","二","三","四","五","六"];
 function renderCal(){
-  tipsFor("tipCal", [["cal","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入。家庭行程按「＋ 新增行程」，行事曆可以分享給家人一起看、一起編輯。"]]);
+  tipsFor("tipCal", [["cal2","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入。家庭行程按「＋ 新增行程」，行事曆可以分享給家人一起看、一起編輯。7 天內要繳的錢、快到期的清單項目和今明兩天的行程，也會出現在上方的鈴鐺裡。"]]);
   const ym=S.calYM; $("cTitle").textContent=ymLabel(ym); $("cNow").hidden = ym===thisYM();
   if(S.calSel.slice(0,7)!==ym) S.calSel = ym===thisYM() ? todayStr() : `${ym}-01`;
   loadCalListItems(); loadCalCards();
@@ -4101,3 +4107,201 @@ function syncSplitLabels(){
   const b=document.querySelector('#eSplitMode button[data-m="s"]'); if(!b) return;
   b.textContent = $("eMultiPay").checked ? "各付各的" : "只算付款人";
 }
+
+/* ================= 搜尋 ================= */
+/* 帳本、清單名稱直接從記憶體找；紀錄、清單項目、行程第一次搜尋時才去讀，5 分鐘內重複搜尋不再讀 */
+S.srch=null; S.srchOpen={};
+const SRCH_TTL=5*60*1000, SRCH_MAX=8;
+async function srchLoad(){
+  if(S.srch && Date.now()-S.srch.at<SRCH_TTL) return S.srch.p;
+  const p=(async()=>{
+    const entries=[], items=[], events=[];
+    await Promise.all([
+      ...[...S.ledgers.values()].map(async l=>{ try{ (await getDocs(collection(db,"ledgers",l.id,"entries"))).docs.forEach(d=>entries.push({id:d.id, ...d.data(), ledger:l})); }catch(e){} }),
+      ...[...S.lists.values()].map(async x=>{ try{ (await getDocs(collection(db,"lists",x.id,"items"))).docs.forEach(d=>items.push({id:d.id, ...d.data(), list:x})); }catch(e){} }),
+      ...[...S.cals.values()].map(async c=>{ try{ (await getDocs(collection(db,"cals",c.id,"events"))).docs.forEach(d=>events.push({id:d.id, ...d.data(), cal:c.id})); }catch(e){} })
+    ]);
+    return { entries, items, events };
+  })();
+  S.srch={at:Date.now(), p, done:false}; const me=S.srch;
+  p.then(()=>{ me.done=true; }, ()=>{ if(S.srch===me) S.srch=null; });
+  return p;
+}
+const srchHit = (q, ...xs) => xs.some(x=>x!=null && String(x).toLowerCase().includes(q));
+/* 把關鍵字標出來 */
+function srchMark(text, q){
+  const t=String(text||""), i=t.toLowerCase().indexOf(q), f=document.createDocumentFragment();
+  if(!q || i<0){ f.appendChild(document.createTextNode(t)); return f; }
+  f.append(t.slice(0,i), el("mark",null,t.slice(i,i+q.length)), t.slice(i+q.length)); return f;
+}
+function srchRow(icon, title, sub, q, onGo, amt){
+  const b=el("button","srch-row"); b.type="button";
+  if(typeof icon==="string") b.appendChild(el("span","srch-ic",icon)); else b.appendChild(icon);
+  const m=el("div","srch-main"); const t=el("div","srch-t"); t.appendChild(srchMark(title,q)); m.appendChild(t);
+  if(sub){ const s2=el("div","srch-s"); s2.appendChild(srchMark(sub,q)); m.appendChild(s2); }
+  b.appendChild(m); if(amt) b.appendChild(amt);
+  b.onclick=()=>{ $("dlgSearch").close(); onGo(); }; return b;
+}
+function srchGroup(box, key, title, rows){
+  if(!rows.length) return;
+  const g=el("section","srch-group"); g.appendChild(el("h3",null,`${title}（${rows.length}）`));
+  const all=S.srchOpen[key]; rows.slice(0, all?rows.length:SRCH_MAX).forEach(r=>g.appendChild(r()));
+  if(!all && rows.length>SRCH_MAX){ const m=el("button","link srch-more",`顯示全部 ${rows.length} 筆`); m.type="button"; m.onclick=()=>{ S.srchOpen[key]=true; srchRender(); }; g.appendChild(m); }
+  box.appendChild(g);
+}
+let srchTok=0;
+async function srchRender(){
+  const q=$("srchIn").value.trim().toLowerCase(), box=$("srchBody"), tok=++srchTok;
+  box.textContent="";
+  if(!q){
+    const e=el("div","srch-empty"); e.appendChild(myCatImg("money"));
+    e.appendChild(el("p",null,"可以找帳本、紀錄（備註、分類、付款方式、卡片、付款人、金額）、清單和項目、行程。"));
+    box.appendChild(e); return;
+  }
+  const quick=[];
+  [...S.ledgers.values()].filter(l=>srchHit(q,l.name)).sort((a,b)=>a.name.localeCompare(b.name,"zh-Hant"))
+    .forEach(l=>quick.push(()=>srchRow(catImg(ledgerCat(l),"cat-av"), l.name, roleText(l), q, ()=>{ location.hash="#l/"+l.id; })));
+  const lists=[...S.lists.values()].filter(x=>srchHit(q,x.name)).map(x=>()=>srchRow("📝", x.name, "清單", q, ()=>{ location.hash="#list/"+x.id; }));
+  srchGroup(box,"ledger","帳本",quick);
+  const loading=!(S.srch && S.srch.done && Date.now()-S.srch.at<SRCH_TTL);
+  if(loading){ srchGroup(box,"list","清單",lists); box.appendChild(el("p","srch-note","正在找紀錄、清單項目和行程…")); }
+  let data; try{ data=await srchLoad(); }catch(e){ data={entries:[],items:[],events:[]}; }
+  if(tok!==srchTok) return;
+  box.textContent="";
+  const num=Number(q.replace(/[,，$＄]/g,""));
+  const ents=data.entries.filter(e=>srchHit(q, e.note, catName(e.ledger,e), e.pay, e.payer, e.card) || (num>0 && Math.abs(e.amount)===num))
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .map(e=>()=>{ const l=e.ledger, cn=catName(l,e), amt=el("span","srch-amt "+(e.type==="in"?"in":"out"), (e.type==="in"?"+":"−")+fmt(e.amount));
+      const sub=[l.name, e.date.replace(/-/g,"/"), e.note?cn:"", e.inst?`分期 ${e.inst.k}/${e.inst.n}`:"", e.card||e.pay||""].filter(Boolean).join("・");
+      return srchRow(catIcon(cn,e.type), e.note||cn, sub, q, ()=>jumpEntry(e, srchHit(q,e.note,cn,e.pay,e.payer,e.card) ? q : (e.note||cn)), amt); });
+  const its=data.items.filter(i=>srchHit(q, i.text, i.note)).sort((a,b)=>(a.done?1:0)-(b.done?1:0))
+    .map(i=>()=>srchRow(i.done?"✅":"⬜", i.text, [i.list.name, i.due?`截止 ${i.due.replace(/-/g,"/")}`:"", i.amount?`約 ${fmt(i.amount)}`:"", i.done?"已完成":""].filter(Boolean).join("・"), q, ()=>{ location.hash="#list/"+i.list.id; }));
+  const evs=data.events.filter(e=>S.cals.has(e.cal) && srchHit(q, e.title, e.place, e.note)).sort((a,b)=>b.date.localeCompare(a.date))
+    .map(e=>()=>srchRow("📅", e.title, [e.date.replace(/-/g,"/")+(e.time?` ${e.time}`:""), e.place, (S.cals.get(e.cal)||{}).name].filter(Boolean).join("・"), q, ()=>jumpCal(e.date)));
+  srchGroup(box,"ledger","帳本",quick); srchGroup(box,"entry","紀錄",ents); srchGroup(box,"list","清單",[...lists, ...its]); srchGroup(box,"ev","行程",evs);
+  if(!box.childElementCount){
+    const e=el("div","srch-empty"); e.appendChild(myCatImg("box"));
+    e.appendChild(el("p",null,`找不到「${$("srchIn").value.trim()}」，換個關鍵字試試看。`)); box.appendChild(e);
+  }
+}
+let srchTimer;
+$("srchIn").addEventListener("input", ()=>{ S.srchOpen={}; clearTimeout(srchTimer); srchTimer=setTimeout(srchRender, 180); });
+$("srchIn").addEventListener("keydown", ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); const r=$("srchBody").querySelector(".srch-row"); if(r) r.click(); } });
+$("srchClose").onclick=()=>$("dlgSearch").close();
+function openSearch(){
+  if(!S.user || $("dlgSearch").open) return;
+  document.querySelectorAll("dialog[open]").forEach(d=>d.close());
+  $("srchIn").value=""; S.srchOpen={}; srchRender(); $("dlgSearch").showModal(); $("srchIn").focus();
+  srchLoad().catch(()=>{});
+}
+$("btnSearch").onclick=openSearch;
+document.addEventListener("keydown", ev=>{
+  if(!S.user || !S.user.emailVerified || !$("tour").hidden) return;
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target||{}).tagName||"") || (ev.target||{}).isContentEditable;
+  if((ev.key==="k"||ev.key==="K") && (ev.ctrlKey||ev.metaKey)){ ev.preventDefault(); openSearch(); }
+  else if(ev.key==="/" && !typing && !document.querySelector("dialog[open]")){ ev.preventDefault(); openSearch(); }
+});
+/* 點搜尋到的紀錄：打開那本帳、切到那筆的月份，並用關鍵字篩出來 */
+function jumpEntry(e, q){
+  const l=e.ledger, d=instAtBuy(l) && e.inst && e.inst.purchase ? e.inst.purchase : e.date;
+  S.jump={ lid:l.id, ym:d.slice(0,7), q };
+  if(location.hash==="#l/"+l.id){ applyJump(); renderLedgerHead(); } else location.hash="#l/"+l.id;
+}
+function applyJump(){
+  const j=S.jump; if(!j || j.lid!==S.lid) return; S.jump=null;
+  if(!isProj(L())){ const [y,m]=j.ym.split("-").map(Number); S.period={mode:"month", y, m}; }
+  S.catFilter=null; S.stFilter="all"; $("search").value=j.q; stopEntries();
+  setTimeout(()=>$("search").scrollIntoView({block:"center"}), 400);
+}
+function jumpCal(date){
+  S.calYM=date.slice(0,7); S.calSel=date;
+  if(location.hash==="#cal") route(); else location.hash="#cal";
+}
+
+/* ================= 提醒（鈴鐺） ================= */
+/* 把散在各頁的提醒集中：備份、貸款繳款日、信用卡繳款日、清單截止日、今明兩天的行程。
+   清單項目和行程要另外讀，5 分鐘內不重讀；看過的提醒記在這台裝置，紅點只算沒看過的 */
+S.bellAsync=null;
+const BELL_DAYS=7;
+const bellSeen = () => { try{ return new Set(JSON.parse(store.get("ledger.bellSeen")||"[]")); }catch(e){ return new Set(); } };
+async function bellLoad(){
+  if(S.bellAsync && Date.now()-S.bellAsync.at<SRCH_TTL) return S.bellAsync.p;
+  const today=todayStr(), until=addDays(today,BELL_DAYS), tmr=addDays(today,1);
+  const p=(async()=>{
+    const items=[], events=[];
+    await Promise.all([
+      ...[...S.lists.values()].map(async x=>{ try{ (await getDocs(query(collection(db,"lists",x.id,"items"), where("due","<=",until)))).docs.forEach(d=>{ const i=d.data(); if(!i.done && i.due) items.push({...i, id:d.id, list:x}); }); }catch(e){} }),
+      ...[...S.cals.values()].map(async c=>{ try{ (await getDocs(query(collection(db,"cals",c.id,"events"), where("date",">=",addDays(today,-31)), where("date","<=",tmr)))).docs.forEach(d=>{ const e=d.data(); if((e.end||e.date)>=today) events.push({...e, id:d.id, cal:c.id}); }); }catch(e){} })
+    ]);
+    return { items, events };
+  })();
+  S.bellAsync={at:Date.now(), p, key:[...S.lists.keys(), ...S.cals.keys()].sort().join(",")};
+  return p;
+}
+function bellWhen(date, today){
+  const n=Math.round((new Date(date+"T00:00")-new Date(today+"T00:00"))/864e5);
+  if(n<0) return {t:`過了 ${-n} 天`, c:"late"};
+  if(n===0) return {t:"今天", c:"soon"};
+  if(n===1) return {t:"明天", c:"soon"};
+  return {t:`${n} 天後`, c:""};
+}
+async function bellItems(){
+  const today=todayStr(), until=addDays(today,BELL_DAYS), out=[];
+  const bk=backupState();
+  if(bk) out.push({ key:"backup|"+(bk.last||0), date:"", icon:"💾", title:"該備份了", sub:bk.text, go:()=>{ location.hash="#settings"; } });
+  const yms=[thisYM(), addMonths(thisYM(),1)];
+  const dayOf=(ym,d)=>`${ym}-${pad(Math.min(d, dim(ym)))}`;
+  (S.loans||[]).forEach(lo=>{ if(!lo.day || loanStats(lo).done) return;
+    yms.forEach(ym=>{ const date=dayOf(ym,lo.day); if((lo.payments||{})[ym] || date>until || (ym!==thisYM() && date<today)) return;
+      const amt=dueAmt(lo, ym);
+      out.push({ key:`loan|${lo.id}|${ym}`, date, icon:"🏦", title:`繳 ${[lo.bank,lo.name].filter(Boolean).join(" ")||lo.type||"貸款"}`, sub: amt?`約 ${fmt(amt)}`:"還沒標記已繳", go:()=>{ S.rYM=ym; if(location.hash==="#repay") renderRepay(); else location.hash="#repay"; } }); }); });
+  if(S.prefs) P().cards.forEach(card=>{ const c=cardCfg(card); if(!c.p) return;
+    const other=ownerOther(c.o); if(other && c.m==="o") return;
+    yms.forEach(ym=>{ const date=dayOf(ym,c.p); if(date<today || date>until) return;
+      if(other && P().xfer[xferKey(card, ym)]) return;
+      const ct=S.calCards && S.calCards.ym===ym ? (other ? S.calCards.t.xfer : S.calCards.t.mine).get(card)||0 : null;
+      if(ct===0) return;
+      out.push({ key:`card|${card}|${ym}`, date, icon:"💳", title: other ? `轉帳給${c.o}繳 ${card} 卡費` : `${card} 卡費繳款截止`, sub: ct ? fmt(ct) : "金額請到「還款與分期」看", go:()=>{ S.rYM=ym; if(location.hash==="#repay") renderRepay(); else location.hash="#repay"; } }); }); });
+  let a={items:[],events:[]}; try{ a=await bellLoad(); }catch(e){}
+  a.items.filter(i=>S.lists.has(i.list.id)).forEach(i=>out.push({ key:`list|${i.list.id}|${i.id}|${i.due}`, date:i.due, icon:"📝", title:i.text, sub:i.list.name+(i.amount?`・約 ${fmt(i.amount)}`:""), go:()=>{ location.hash="#list/"+i.list.id; } }));
+  const hide=calHide();
+  a.events.filter(e=>S.cals.has(e.cal) && !hide.has(e.cal)).forEach(e=>{ const d=e.date<today ? today : e.date;
+    out.push({ key:`ev|${e.cal}|${e.id}|${d}`, date:d, icon:"📅", title:e.title, sub:[e.time, e.place, (S.cals.get(e.cal)||{}).name].filter(Boolean).join("・"), go:()=>jumpCal(d), ev:true }); });
+  out.sort((x,y)=>(x.date||"0").localeCompare(y.date||"0") || (x.ev?1:0)-(y.ev?1:0));
+  return out;
+}
+let bellTimer=null, bellTok=0;
+function bellSoon(){ clearTimeout(bellTimer); bellTimer=setTimeout(bellRefresh, 800); }
+async function bellRefresh(){
+  if(!S.user || !S.ledgersReady || !S.prefs) return;
+  const tok=++bellTok, list=await bellItems(); if(tok!==bellTok) return;
+  const seen=bellSeen(), n=list.filter(x=>!seen.has(x.key)).length, b=$("bellBadge");
+  b.hidden=!n; b.textContent=n>9?"9+":String(n);
+  $("btnBell").setAttribute("aria-label", n ? `提醒，${n} 則新的` : "提醒");
+  if($("dlgBell").open) bellRender(list);
+}
+function bellRender(list){
+  const box=$("bellBody"), today=todayStr(), seen=bellSeen(); box.textContent="";
+  if(!list.length){
+    const e=el("div","srch-empty"); e.appendChild(myCatImg("sleep"));
+    e.appendChild(el("p",null,`最近 ${BELL_DAYS} 天沒有要繳的錢、要買的東西或行程，可以放心休息。`)); box.appendChild(e); return;
+  }
+  list.forEach(x=>{
+    const b=el("button","bell-row"+(seen.has(x.key)?"":" new")); b.type="button";
+    b.appendChild(el("span","srch-ic",x.icon));
+    const m=el("div","srch-main"); m.append(el("div","srch-t",x.title)); if(x.sub) m.appendChild(el("div","srch-s",x.sub)); b.appendChild(m);
+    if(x.date){ const w=bellWhen(x.date,today); b.appendChild(el("span","bell-when "+w.c,w.t)); }
+    b.onclick=()=>{ $("dlgBell").close(); x.go(); };
+    box.appendChild(b);
+  });
+  box.appendChild(el("p","srch-note",`顯示 ${BELL_DAYS} 天內和已經過期的提醒。繳完、勾完或行程過了就會自動消失。`));
+}
+$("btnBell").onclick=async()=>{
+  const box=$("bellBody"); box.textContent=""; box.appendChild(el("p","small muted","讀取中…"));
+  $("dlgBell").showModal();
+  const list=await bellItems(); bellRender(list);
+  store.set("ledger.bellSeen", JSON.stringify(list.map(x=>x.key).slice(-200)));
+  $("bellBadge").hidden=true; $("btnBell").setAttribute("aria-label","提醒");
+};
+$("bellClose").onclick=()=>$("dlgBell").close();
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") bellSoon(); });

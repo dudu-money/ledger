@@ -39,6 +39,8 @@
 <header class="appbar" id="appBar">
   <a class="appbar-brand" href="#"><img class="brand-logo" src="icon.svg" alt="">記帳本</a>
   <h1 class="appbar-title" id="appBarTitle">帳本</h1>
+  <button class="appbar-search" type="button" id="btnSearch" aria-label="搜尋（Ctrl＋K）" title="搜尋（Ctrl＋K）"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg><span>搜尋帳本、紀錄、清單、行程</span></button>
+  <button class="appbar-bell" type="button" id="btnBell" aria-label="提醒"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span class="bell-badge" id="bellBadge" hidden></span></button>
   <a class="appbar-me" href="#settings" id="appBarMe" aria-label="我的貓咪（設定）"><img class="appbar-cat" data-cat-scene="face" alt=""></a>
 </header>
 <nav class="appnav" id="appNav" aria-label="主要頁面">
@@ -1047,6 +1049,27 @@
 
 <!-- 清單設定 -->
 <!-- 行程 -->
+<!-- 搜尋 -->
+<dialog id="dlgSearch" aria-labelledby="srchTitle">
+  <div class="stack">
+    <h2 class="sr-only" id="srchTitle">搜尋</h2>
+    <div class="srch-bar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <input id="srchIn" type="search" placeholder="搜尋帳本、紀錄、清單、行程" aria-label="搜尋" enterkeyhint="search" autocomplete="off">
+      <button class="icon-btn" type="button" id="srchClose" aria-label="關閉">✕</button>
+    </div>
+    <div id="srchBody" class="srch-body" aria-live="polite"></div>
+  </div>
+</dialog>
+
+<!-- 提醒 -->
+<dialog id="dlgBell" aria-labelledby="bellTitle">
+  <div class="stack">
+    <div class="between"><h2 class="h2" id="bellTitle">提醒</h2><button class="icon-btn" type="button" id="bellClose" aria-label="關閉">✕</button></div>
+    <div id="bellBody" class="bell-list"></div>
+  </div>
+</dialog>
+
 <dialog id="dlgEvent" aria-labelledby="evTitle">
   <form method="dialog" id="formEvent" class="stack" autocomplete="off">
     <div class="between"><h2 class="h2" id="evTitle">新增行程</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
