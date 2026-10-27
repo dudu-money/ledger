@@ -3749,7 +3749,7 @@ function calByDay(ym){
 }
 const addDays=(d,k)=>{ const t=new Date(d+"T00:00"); t.setDate(t.getDate()+k); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`; };
 /* 行程類型：決定顏色和圖示。自動帶入的繳款日算「還款」、清單截止日算「清單待辦」；舊行程沒有 kind 就是個人行程 */
-const EV_KINDS = { personal:["個人行程","#3f7fe0","📅"], list:["清單待辦","#9a6440","🛒"], repay:["還款提醒","#d99a16","💳"], money:["收支提醒","#2fa38a","💰"] };
+const EV_KINDS = { personal:["個人行程","var(--ev-personal)","📅"], list:["清單待辦","var(--ev-list)","🛒"], repay:["還款提醒","var(--ev-repay)","💳"], money:["收支提醒","var(--ev-money)","💰"] };
 const calKind = e => e.auto ? (e.auto==="list" ? "list" : "repay") : (EV_KINDS[e.kind] ? e.kind : "personal");
 const calColor = e => EV_KINDS[calKind(e)][1];
 const calIcon = e => e.auto==="loan" ? "🏦" : e.auto==="card" ? "💳" : e.auto==="list" ? "📝" : EV_KINDS[calKind(e)][2];
