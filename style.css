@@ -690,3 +690,11 @@ body.nav-on .page > .tabs{display:none}
   .nav-cheer-text{margin:2px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
   .nav-cheer-name{display:block;font-size:12px}
 }
+
+/* 電腦版：上方橫幅整條橫跨，「記帳本」在橫幅左邊，左側選單從橫幅下面開始 */
+@media (min-width:821px){
+  body.nav-on.bar-on .appbar{box-sizing:border-box;height:64px;margin-left:-224px;padding:0 24px 0 0;z-index:8}
+  body.nav-on.bar-on .appbar-brand{display:flex;box-sizing:border-box;width:224px;padding-left:24px;flex:none;font-size:22px}
+  body.nav-on.bar-on .appnav{top:64px;padding-top:14px}
+  body.nav-on.bar-on .appnav-brand{display:none!important}
+}
