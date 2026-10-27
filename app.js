@@ -49,6 +49,26 @@ function catImg(key, cls){
   i.onerror=()=>{ i.onerror=null; if(k!==CAT_DEFAULT) i.src=`cats/${CAT_DEFAULT}/face.webp`; else i.style.visibility="hidden"; };
   return i;
 }
+/* 貓咪圖鑑：圖片一律是 cats/{品種}/{情境}.webp，cats/manifest.json 記每種貓有哪些圖。
+   情境：face 頭像、happy 開心、sleep 睡覺、content 滿足、box 調皮、money 記帳中、cheer 加油 */
+const CAT_SCENES = ["face","happy","sleep","content","box","money","cheer"];
+const MY_CAT_DEFAULT = "orangewhite";
+let CAT_MANIFEST = null;
+fetch("cats/manifest.json").then(r=>r.ok?r.json():null).then(m=>{ if(m && m.breeds){ CAT_MANIFEST=m; paintMyCat(true); } }).catch(()=>{});
+const catHas = (k, scene) => !CAT_MANIFEST || (CAT_MANIFEST.breeds[k]||[]).includes(scene);
+/* 缺圖時：這隻的同情境 → 這隻的開心 → 預設貓的同情境 → 預設貓的開心 */
+function catSrcs(k, scene){
+  const out=[];
+  for(const [b,s] of [[k,scene],[k,"happy"],[MY_CAT_DEFAULT,scene],[MY_CAT_DEFAULT,"happy"]])
+    if(CAT_KEYS.includes(b) && catHas(b,s)){ const u=`cats/${b}/${s}.webp`; if(!out.includes(u)) out.push(u); }
+  return out;
+}
+function setCatSrc(img, k, scene){
+  const list=catSrcs(k, scene); let i=0;
+  img.style.visibility="";
+  img.onerror=()=>{ i++; if(i<list.length) img.src=list[i]; else { img.onerror=null; img.style.visibility="hidden"; } };
+  if(list.length) img.src=list[0]; else img.style.visibility="hidden";
+}
 function catPicker(boxId, current, onPick, disabled){
   const box=$(boxId); box.textContent=""; const btns=[];
   CATS.forEach(([k,n])=>{ const b=el("button","cat-pick"); b.type="button"; b.dataset.k=k; b.disabled=!!disabled;
@@ -72,7 +92,12 @@ const dim = ym => { const [y,m]=ym.split("-").map(Number); return new Date(y,m,0
 const ymLabel = ym => { const [y,m]=ym.split("-").map(Number); return `${y} 年 ${m} 月`; };
 function msg(id, text, kind){ const m=$(id); m.textContent=text||""; m.className="msg"+(kind?" "+kind:""); }
 let toastTimer;
-function toast(text){ const t=$("toast"); t.textContent=text; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true,2600); }
+function toast(text, scene){
+  const t=$("toast"); t.textContent=""; t.classList.toggle("with-cat", !!scene);
+  if(scene) t.appendChild(myCatImg(scene,"toast-cat"));
+  t.appendChild(el("span",null,text)); t.hidden=false;
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true, scene?3200:2600);
+}
 const errText = e => {
   const c = e && e.code || "";
   const map = {
@@ -110,14 +135,15 @@ const S = {
   newTpl:"個人", newColor:COLORS[0], newCat:"orange", newStep:1, newCats:{out:[],in:[]}, newCatType:"out",
   sColor:COLORS[0], sCatType:"out",
   loans:[], unsubLoans:null, loansReady:false, rYM:thisYM(), editingLoan:null, payLoan:null,
-  prefs:null, unsubPrefs:null, startApplied:false,
+  prefs:null, unsubPrefs:null, startApplied:false, myCats:new Map(), unsubCats:null, mcBreed:"", mcDirty:false,
   holdings:[], unsubHoldings:null, holdingsReady:false, tdEdit:null, tdType:"b", hdId:null
 };
 const DEFAULT_PAYS=["現金","信用卡","悠遊卡","行動支付","轉帳","其他"];
 const P = () => { const p=S.prefs||{}; return { defaultPay:p.defaultPay||"", defaultPayer:p.defaultPayer||"", defaultCard:p.defaultCard||"", startPage:p.startPage||"", lastBackup:p.lastBackup||0, tourDone:!!p.tourDone, tips:Array.isArray(p.tips)?p.tips:[],
   payers:p.payers||[], cards:p.cards||[], pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS),
   inv:{ disc:numOr(p.inv&&p.inv.disc,10), min:numOr(p.inv&&p.inv.min,20), fx:numOr(p.inv&&p.inv.fx,32) },
-  me:typeof p.me==="string"?p.me:"", cardSet:p.cardSet&&typeof p.cardSet==="object"?p.cardSet:{}, xfer:p.xfer&&typeof p.xfer==="object"?p.xfer:{} }; };
+  me:typeof p.me==="string"?p.me:"", cardSet:p.cardSet&&typeof p.cardSet==="object"?p.cardSet:{}, xfer:p.xfer&&typeof p.xfer==="object"?p.xfer:{},
+  activeCat:typeof p.activeCat==="string"?p.activeCat:"" }; };
 function numOr(v,d){ return typeof v==="number" && isFinite(v) ? v : d; }
 const L = () => S.ledgers.get(S.lid);
 const isOwner = l => l && S.user && l.ownerUid === S.user.uid;
@@ -163,7 +189,7 @@ function show(v){
 if(!configured){ show("viewSetup"); }
 else {
   onAuthStateChanged(auth, async user => {
-    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopLists(); stopCals(); stopItems(); S.itemsFor=null; stopSnaps();
+    stopLedgers(); stopEntries(); stopLoans(); stopHoldings(); stopPrefs(); stopMyCats(); stopLists(); stopCals(); stopItems(); S.itemsFor=null; stopSnaps();
     S.user = user; S.email = user && user.email ? user.email.toLowerCase() : "";
     if(!user){ show("viewLogin"); return; }
     if(!user.emailVerified){ $("verifyEmail").textContent=user.email; show("viewVerify"); return; }
@@ -173,7 +199,7 @@ else {
 function signedInStart(){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user.email);
   S.startApplied = !!location.hash; // 網址已經指定頁面時，不套用「直接進入」
-  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchCals(); watchSnaps(); watchPrefs(); route();
+  watchLedgers(); watchLoans(); watchHoldings(); watchLists(); watchCals(); watchSnaps(); watchPrefs(); watchMyCats(); route();
 }
 window.addEventListener("hashchange", ()=>{ if(S.user && S.user.emailVerified) route(); });
 
@@ -270,9 +296,12 @@ function renderHome(){
   const mine=[], shared=[];
   [...S.ledgers.values()].sort((a,b)=>a.name.localeCompare(b.name,"zh-Hant")).forEach(l => (isOwner(l)?mine:shared).push(l));
   const box=$("myLedgers"); box.textContent="";
+  $("homeHero").hidden = !S.ledgersReady || (!mine.length && !shared.length);
   if(!S.ledgersReady){ box.appendChild(el("div","empty","讀取中…")); }
   else if(!mine.length){
-    const e=el("div","empty"); e.appendChild(el("strong",null,"還沒有帳本"));
+    const nm=activeCat().name;
+    const e=el("div","empty cat-empty"); e.appendChild(myCatImg("sleep","cat-empty-img"));
+    e.appendChild(el("strong",null, nm ? `${nm}睡著了，按「新增帳本」叫醒牠` : "還沒有帳本"));
     e.appendChild(document.createTextNode("按「新增帳本」，可以從個人、家庭、孕期、寶寶、搬家範本開始，也可以建一本空白的自己設計分類。"));
     box.appendChild(e);
   }
@@ -387,10 +416,19 @@ $("formNew").addEventListener("submit", async e => {
       mode: $("nProject").checked ? "project" : "normal", projectBudget:0, weekStart:"",
       createdAt:serverTimestamp(), updatedAt:serverTimestamp()
     });
-    $("dlgNew").close(); location.hash="#l/"+ref.id;
+    $("dlgNew").close(); location.hash="#l/"+ref.id; showCreated(name);
   }catch(err){ msg("nMsg","建立失敗："+errText(err),"err"); }
   finally{ $("nCreate").disabled=false; }
 });
+
+/* 建立帳本成功：代表貓（滿足）陪你記第一筆 */
+function showCreated(name){
+  const nm=activeCat().name;
+  $("cdTitle").textContent=`「${name}」建立好了！`;
+  $("cdText").textContent = nm ? `${nm}陪你記第一筆吧` : "要不要現在就記第一筆？";
+  paintMyCat(); $("dlgCreated").showModal(); $("cdAdd").focus();
+}
+$("dlgCreated").addEventListener("close", ()=>{ if($("dlgCreated").returnValue==="add" && S.lid && !$("btnAdd").hidden) $("btnAdd").click(); });
 
 /* ================= 帳本頁 ================= */
 function openLedger(id){
@@ -1080,7 +1118,7 @@ $("formEntry").addEventListener("submit", async ev=>{
           note:((common.note?common.note+" ":"")+"分期手續費").slice(0,100), ...(proj?{budget:0}:{})});
       });
       await b.commit();
-      toast(`已記下分期：${S.eCat.name} ${money(splitFee?amt:sum)}，分 ${n} 期` + (splitFee?`，手續費 ${money(sum-amt)} 另外記`:""));
+      toast(`${catSaid("分期")}：${S.eCat.name} ${money(splitFee?amt:sum)}，分 ${n} 期` + (splitFee?`，手續費 ${money(sum-amt)} 另外記`:""), "money");
     } else if(old && !old.inst){
       await b.commit();
       await updateDoc(doc(db,"ledgers",l.id,"entries",old.id), {...common, amount:amt, date});
@@ -1088,7 +1126,7 @@ $("formEntry").addEventListener("submit", async ev=>{
     } else {
       b.set(doc(col), {...common, ...creator, amount:amt, date});
       await b.commit();
-      const r=periodRange(); toast(`已記下：${S.eCat.name} ${money(amt)}` + (r && (date<r[0]||date>r[1]) ? `（記在 ${ymLabel(date.slice(0,7))}）`:""));
+      const r=periodRange(); toast(`${catSaid()}：${S.eCat.name} ${money(amt)}` + (r && (date<r[0]||date>r[1]) ? `（記在 ${ymLabel(date.slice(0,7))}）`:""), "money");
     }
     $("dlgEntry").close();
   }catch(err){ msg("eMsg","儲存失敗："+errText(err),"err"); }
@@ -1917,7 +1955,7 @@ function watchPrefs(){
     if(location.hash==="#settings") renderGlobalSettings(false);
     if(location.hash==="#cal") renderCal();
     if(!location.hash){ renderBackupReminder(); maybeStartTour(); }
-    refreshTips();
+    refreshTips(); onMyCatChange();
   }, ()=>{ S.prefs={}; S.startApplied=true; });
 }
 function stopPrefs(){ if(S.unsubPrefs){ S.unsubPrefs(); S.unsubPrefs=null; } S.prefs=null; }
@@ -1926,12 +1964,83 @@ async function savePrefs(patch){
   await setDoc(doc(db,"users",S.user.uid), {...next, updatedAt:serverTimestamp()});
 }
 
+/* ================= 我的貓咪 ================= */
+/* 資料：每隻貓存在 users/{uid}/cats/{catId}（品種、名字）；個人設定的 activeCat 記目前代表貓是哪一隻。
+   第一階段每人只有一隻，之後多貓收藏只要在 cats 底下多加幾隻、改 activeCat 就好。 */
+function watchMyCats(){
+  stopMyCats();
+  S.unsubCats=onSnapshot(collection(db,"users",S.user.uid,"cats"), snap=>{
+    S.myCats=new Map(snap.docs.map(d=>[d.id, {id:d.id, ...d.data()}])); onMyCatChange();
+  }, ()=>{ S.myCats=new Map(); onMyCatChange(); });
+}
+function stopMyCats(){ if(S.unsubCats){ S.unsubCats(); S.unsubCats=null; } S.myCats=new Map(); }
+/* 目前的代表貓；還沒選過就是預設的橘白、沒有名字（只顯示，不寫進資料庫） */
+function activeCat(){
+  const c=S.myCats.get(P().activeCat) || [...S.myCats.values()][0];
+  return c && CAT_KEYS.includes(c.breed) ? {id:c.id, breed:c.breed, name:String(c.name||"")} : {id:"", breed:MY_CAT_DEFAULT, name:""};
+}
+async function saveMyCat(breed, name){
+  const cur=activeCat();
+  if(cur.id){
+    await updateDoc(doc(db,"users",S.user.uid,"cats",cur.id), {breed, name, updatedAt:serverTimestamp()});
+    if(P().activeCat!==cur.id) await savePrefs({activeCat:cur.id});
+  } else {
+    const ref=await addDoc(collection(db,"users",S.user.uid,"cats"), {breed, name, createdAt:serverTimestamp(), updatedAt:serverTimestamp()});
+    await savePrefs({activeCat:ref.id});
+  }
+}
+const catSaid = what => { const nm=activeCat().name; return nm ? `${nm}幫你記下${what?what+"了":"來了"}` : `已記下${what||""}`; };
+
+/* 畫面：只指定要代表貓的哪個情境，例如 <img data-cat-scene="happy">，由上面決定是哪一張圖 */
+function myCatImg(scene, cls){
+  const i=el("img", cls); i.alt=""; i.decoding="async"; i.dataset.catScene=scene;
+  const b=S.user ? activeCat().breed : MY_CAT_DEFAULT; i.dataset.catNow=b+"/"+scene; setCatSrc(i, b, scene); return i;
+}
+const CHEERS=["記帳不用完美，有記就很棒","每一筆都是在照顧自己","今天也辛苦了","一點一點，存下安心","花錢開心，記帳安心"];
+function paintMyCat(force){
+  if(!S.user) return;
+  const c=activeCat();
+  document.querySelectorAll("img[data-cat-scene]").forEach(i=>{ const k=c.breed+"/"+i.dataset.catScene;
+    if(force || i.dataset.catNow!==k){ i.dataset.catNow=k; setCatSrc(i, c.breed, i.dataset.catScene); } });
+  const me=$("appBarMe"); me.title=c.name||"我的貓咪"; me.setAttribute("aria-label",`${c.name||"我的貓咪"}（設定）`);
+  $("homeHiName").textContent = c.name ? `${c.name}陪你一起記帳` : ""; $("homeHiName").hidden=!c.name;
+  const day=Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4)/864e5);
+  $("navCheerText").textContent=CHEERS[day % CHEERS.length]; $("navCheerName").textContent = c.name ? `— ${c.name}` : "";
+}
+function onMyCatChange(){
+  paintMyCat();
+  if(!$("viewHome").hidden) renderHome();
+  if(!$("viewLists").hidden) renderLists();
+  if(!$("viewSettings").hidden) renderMyCatPanel(false);
+}
+/* 設定 › 我的貓咪 */
+function renderMyCatPanel(reset=true){
+  const c=activeCat();
+  /* 還沒動過的話，跟著資料庫的代表貓；正在挑的時候不打斷 */
+  if(reset || !S.mcDirty){ S.mcBreed=c.breed; $("mcNameIn").value=c.name; S.mcDirty=false; if(reset) msg("mcMsg",""); }
+  catPicker("mcCats", S.mcBreed, k=>{ S.mcBreed=k; S.mcDirty=true; mcPreview(); });
+  mcPreview();
+}
+function mcPreview(){
+  setCatSrc($("mcImg"), S.mcBreed, "happy");
+  const nm=$("mcNameIn").value.trim(), bn=(CATS.find(x=>x[0]===S.mcBreed)||["",""])[1];
+  $("mcName").textContent = nm || bn; $("mcBreed").textContent = nm ? bn : "";
+}
+$("mcNameIn").addEventListener("input", ()=>{ S.mcDirty=true; mcPreview(); });
+$("mcSave").onclick=async()=>{
+  const name=$("mcNameIn").value.trim().slice(0,20);
+  $("mcSave").disabled=true;
+  try{ await saveMyCat(S.mcBreed, name); S.mcDirty=false; msg("mcMsg","已儲存。首頁、記完一筆和建立帳本時，會換成牠陪你。","ok"); paintMyCat(); }
+  catch(e){ msg("mcMsg","儲存失敗："+errText(e),"err"); }
+  finally{ $("mcSave").disabled=false; }
+};
+
 function renderGlobalSettings(reset=true){
   document.querySelectorAll(".who-email").forEach(s=>s.textContent=S.user?S.user.email:"");
-  tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
+  tipsFor("tipSettings", [["settings4","「我的貓咪」可以挑一隻代表貓、幫牠取名字，首頁和記完一筆時會由牠陪你。外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
   const lb=P().lastBackup;
   $("bkLast").textContent = lb ? `上次備份：${new Date(lb).toLocaleDateString("zh-TW")}（${Math.floor((Date.now()-lb)/864e5)} 天前）` : "還沒有備份過";
-  renderLook();
+  renderLook(); renderMyCatPanel(reset);
   const p=P();
   if(reset){
     fillPayOptions("gsPay", p.defaultPay||"現金");
@@ -2133,7 +2242,8 @@ async function buildBackup(){
   }
   const {lastBackup, ...prefs}=P();
   return { app:"記帳本", version:1, exportedAt:new Date().toISOString(), email:S.email,
-    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), snaps:S.snaps.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), cals:await backupCals(), prefs };
+    ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), snaps:S.snaps.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), cals:await backupCals(), prefs,
+    myCats:[...S.myCats.values()].map(c=>({id:c.id, breed:c.breed, name:String(c.name||"")})) };
 }
 const bkName = () => { const d=new Date(); return `記帳本備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
 const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款` + ((b.holdings||[]).length ? `、${b.holdings.length} 檔持股` : "") + ((b.lists||[]).length ? `、${b.lists.length} 個清單` : "");
@@ -2325,7 +2435,12 @@ $("bkRestore").onclick=async()=>{
           trades:Array.isArray(h.trades)?h.trades.slice(0,1000):[], note:String(h.note||"").slice(0,100), ownerUid:S.user.uid, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }); nH++; } }
     if(doPrefs && BK.prefs){ const p=BK.prefs; await savePrefs({ defaultPay:String(p.defaultPay||""), defaultPayer:String(p.defaultPayer||""), defaultCard:String(p.defaultCard||""),
       startPage:String(p.startPage||""), ...(p.inv&&typeof p.inv==="object"?{inv:{disc:numOr(p.inv.disc,10),min:numOr(p.inv.min,20),fx:numOr(p.inv.fx,32)}}:{}), payers:(p.payers||[]).slice(0,50), cards:(p.cards||[]).slice(0,50), pays:(p.pays&&p.pays.length?p.pays:DEFAULT_PAYS).slice(0,30),
-      me:String(p.me||"").slice(0,20), cardSet:cleanCardSet(p.cardSet), xfer:cleanXfer(p.xfer) }); }
+      me:String(p.me||"").slice(0,20), cardSet:cleanCardSet(p.cardSet), xfer:cleanXfer(p.xfer) });
+      /* 我的貓咪：舊備份沒有這一項就略過 */
+      const cats=(Array.isArray(BK.myCats)?BK.myCats:[]).filter(c=>c && typeof c.id==="string" && /^[A-Za-z0-9_-]{1,40}$/.test(c.id) && CAT_KEYS.includes(c.breed)).slice(0,50);
+      for(const c of cats) await setDoc(doc(db,"users",S.user.uid,"cats",c.id), {breed:c.breed, name:String(c.name||"").slice(0,20), createdAt:serverTimestamp(), updatedAt:serverTimestamp()});
+      const ac=cats.some(c=>c.id===p.activeCat) ? p.activeCat : (cats[0]&&cats[0].id);
+      if(ac) await savePrefs({activeCat:ac}); }
     msg("bkRMsg",`還原完成：${picks.length} 本帳（${nE} 筆紀錄）、${nL} 筆貸款${nH?`、${nH} 檔持股`:""}${nLs?`、${nLs} 個清單`:""}${nCs?`、${nCs} 本行事曆`:""}${doPrefs?"、設定":""}。還原的帳本在「帳本」頁，分享設定需要重新設定。`,"ok");
     toast("還原完成"); $("bkPreview").hidden=true; BK=null;
   }catch(e){ msg("bkRMsg","還原失敗："+errText(e),"err"); }
@@ -2363,7 +2478,7 @@ function refreshTips(){
   if(S.lid && L() && !$("viewLedger").hidden) renderLedgerTips(L());
   if(!$("viewRepay").hidden) tipsFor("tipRepay", [["repay9","貸款：填年利率會自動拆本金和利息；跟銀行對不起來就在「編輯」校正（銀行寫含利息的「剩餘費用」也可以），看不到已繳期數可以按「幫我推算」。信用卡：在「信用卡設定」填好持卡人、結帳日和繳款截止日；刷別人名下的卡，轉帳給持卡人繳費後按「標記已轉帳」；商家晚請款的消費可以按「移到下期」。"]]);
   if(!$("viewInvest").hidden) renderInvestTips();
-  if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings3","外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
+  if(!$("viewSettings").hidden) tipsFor("tipSettings", [["settings4","「我的貓咪」可以挑一隻代表貓、幫牠取名字，首頁和記完一筆時會由牠陪你。外觀只影響這台裝置；記帳預設值和常用清單會跟著帳號，換手機也一樣。如果會刷別人名下的卡、再轉帳給持卡人繳費，可以在「信用卡與持卡人」設定持卡人；填上結帳日和繳款截止日，帳單金額就會出現在真正要繳的那個月。建議每個月「備份到 Google 雲端硬碟」一次。"]]);
 }
 
 /* 歡迎導覽 */
@@ -2376,7 +2491,7 @@ const TOUR=[
   { sel:'#appNav a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#appNav a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#appNav a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
-  { sel:'#appNav a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
+  { sel:'#appNav a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。在「我的貓咪」挑一隻代表貓、幫牠取名字，首頁和記完一筆時都會由牠陪你。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
 const tourTarget = () => { const s=TOUR[tourI].sel; const t=s && document.querySelector(s); return t && t.offsetParent!==null ? t : null; };
@@ -3085,7 +3200,8 @@ function renderLists(){
   [...S.lists.values()].sort((a,b)=>(a.name||"").localeCompare(b.name||"","zh-Hant")).forEach(x=>(x.ownerUid===S.user.uid?mine:shared).push(x));
   const g=$("myLists"); g.textContent="";
   if(!S.listsReady) g.appendChild(el("p","small muted","讀取中…"));
-  else if(!mine.length){ const e=el("div","empty"); e.appendChild(el("strong",null,"還沒有清單"));
+  else if(!mine.length){ const nm=activeCat().name; const e=el("div","empty cat-empty"); e.appendChild(myCatImg("sleep","cat-empty-img"));
+    e.appendChild(el("strong",null, nm ? `${nm}睡著了，按「新增清單」叫醒牠` : "還沒有清單"));
     e.appendChild(document.createTextNode("按「＋ 新增清單」，可以從待產包、寶寶用品範本開始，常見項目會先幫你列好。")); g.appendChild(e); }
   mine.forEach(x=>g.appendChild(listCard(x)));
   $("sharedListsWrap").hidden=!shared.length; const sg=$("sharedLists"); sg.textContent=""; shared.forEach(x=>sg.appendChild(listCard(x)));
