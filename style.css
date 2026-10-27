@@ -550,3 +550,42 @@ button.pay-cell:hover{border-color:var(--accent)}
   .cal-dots{display:block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:2px}
   .cal-d{align-self:center}
 }
+
+/* ---------- 版面精修：圓角卡片、淡陰影、結餘大卡、分類圖示 ---------- */
+:root{--card-shadow:0 1px 2px rgba(20,40,32,.05),0 6px 18px rgba(20,40,32,.07);
+  --hero-a:var(--accent);--hero-b:color-mix(in srgb,var(--accent) 70%,#000);--on-hero:var(--on-accent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--card-shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+  --hero-a:color-mix(in srgb,var(--accent) 45%,#0b120f);--hero-b:color-mix(in srgb,var(--accent) 22%,#0b120f);--on-hero:#f2f7f4}}
+:root[data-theme="dark"]{--card-shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+  --hero-a:color-mix(in srgb,var(--accent) 45%,#0b120f);--hero-b:color-mix(in srgb,var(--accent) 22%,#0b120f);--on-hero:#f2f7f4}
+.panel,.lcard{border-color:transparent;border-radius:18px;box-shadow:var(--card-shadow)}
+.btn,.icon-btn{border-radius:11px}
+.seg{border:0;background:var(--paper);padding:3px;gap:3px;border-radius:11px}
+.seg button{border-radius:8px}
+.seg button+button{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.seg button[aria-pressed="true"].t-out{background:var(--out);color:var(--sheet)}
+.seg button[aria-pressed="true"].t-in{background:var(--in);color:var(--sheet)}
+.panel .seg{background:color-mix(in srgb,var(--ink) 6%,var(--sheet))}
+
+/* 本月結餘：主色漸層大卡 */
+.panel.totals{background:linear-gradient(135deg,var(--hero-a),var(--hero-b));color:var(--on-hero)}
+.panel.totals .label,.panel.totals .muted,.panel.totals .small,.panel.totals .rb-note{color:color-mix(in srgb,var(--on-hero) 80%,transparent)!important}
+.panel.totals .c-out,.panel.totals .c-in{color:var(--on-hero)}
+.panel.totals .pair,.panel.totals .budget,.panel.totals .proj{border-top:1px solid color-mix(in srgb,var(--on-hero) 25%,transparent)}
+.panel.totals .meter{background:color-mix(in srgb,var(--on-hero) 25%,transparent)}
+.panel.totals .meter i{background:var(--on-hero)}
+.panel.totals .meter.warn i{background:#ffd27a} .panel.totals .meter.over i{background:#ffb4a8}
+
+/* 分類統計：各分類自己的顏色和圖示 */
+.cat-bar{border-radius:5px}
+.cat-bar i{border-radius:5px;opacity:1}
+.cat-ic{margin-right:6px}
+
+/* 明細：圖示方塊取代分類文字標籤 */
+.day{border-top:0}
+.day-head{padding:14px 4px 6px;font-weight:500}
+.entry{border-bottom:0;padding:9px 6px}
+.tag{width:38px;height:38px;max-width:none;padding:0;border-radius:12px;display:grid;place-items:center;font-size:19px;
+  background:color-mix(in srgb,var(--tc,var(--out)) 15%,var(--sheet))}
+.tag.in{background:color-mix(in srgb,var(--tc,var(--in)) 15%,var(--sheet))}

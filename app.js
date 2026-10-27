@@ -23,6 +23,19 @@ const TEMPLATES = {
 };
 const WK = ["日","一","二","三","四","五","六"];
 
+/* 分類圖示和顏色：依分類名稱自動對應，不用另外存資料 */
+const CAT_ICONS = [
+  [/產檢|檢查|看診|疫苗|醫|藥/,"🩺"],[/餐|食|飯|飲|早午晚/,"🍜"],[/交通|車|油|停車|捷運|高鐵/,"🚌"],[/購物|網購/,"🛍️"],
+  [/娛樂|電影|遊戲|旅/,"🎬"],[/美容|保養|美髮/,"💄"],[/進修|學|書|課/,"📚"],[/人情|紅包|禮/,"🧧"],
+  [/房租|房貸|租金/,"🏠"],[/水電|瓦斯/,"💡"],[/網路|電話|手機/,"📶"],[/採買|日用|生活用品/,"🧴"],[/修繕|維修/,"🔧"],
+  [/保險|理賠/,"🛡️"],[/寵物|貓|狗/,"🐾"],[/孝親|爸媽|父母/,"👵"],[/保健|營養/,"🌿"],[/奶粉|尿布|副食品|寶寶|孕婦|待產|月子|生產/,"🍼"],
+  [/衣|鞋/,"👕"],[/玩具|繪本|托育|保母/,"🧸"],[/搬家|家具|家電|看屋|空間/,"📦"],[/薪資|薪水|獎金|家用/,"💰"],[/投資|股|息/,"📈"],
+  [/兼職|接案/,"💼"],[/補助|津貼/,"🎁"],[/不適/,"🤒"],[/媽媽教室/,"🤰"]
+];
+const catIcon = (name, type) => { const n=String(name||""); for(const [re,ic] of CAT_ICONS) if(re.test(n)) return ic; return type==="in" ? "💰" : "🏷️"; };
+const CAT_COLORS = ["#e07a3f","#3f7fe0","#9a5fd0","#d0458a","#2fa38a","#d4a017","#5b8c3a","#c2554b","#4a9fb5","#8a6d5a"];
+const catColor = name => { let h=0; for(const ch of String(name||"")) h=(h*31+ch.codePointAt(0))>>>0; return CAT_COLORS[h % CAT_COLORS.length]; };
+
 /* ================= 小工具 ================= */
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2,"0");
@@ -527,9 +540,10 @@ function renderCats(l){
   rows.forEach(([id,{name,v}])=>{
     const r=el(clickable?"button":"div","cat-row"); if(clickable){ r.type="button"; r.setAttribute("aria-pressed", S.catFilter===id); r.title="只看這個分類的明細";
       r.onclick=()=>{ S.catFilter = S.catFilter===id ? null : id; renderCats(l); renderList(); if($("listPanel").hidden){ /* 年檢視沒有明細 */ } }; }
-    const bar=el("div","cat-bar"+(S.catView==="in"?" in":"")); const i=el("i"); i.style.width=(v/max*100)+"%"; bar.appendChild(i);
+    const bar=el("div","cat-bar"+(S.catView==="in"?" in":"")); const i=el("i"); i.style.width=(v/max*100)+"%"; if(clickable) i.style.background=catColor(name); bar.appendChild(i);
     const n=el("span","num",fmt(v)); n.appendChild(el("span","pct",Math.round(v/tot*100)+"%"));
-    r.append(el("span","nm",name), bar, n); box.appendChild(r);
+    const nm=el("span","nm"); if(clickable) nm.appendChild(el("span","cat-ic",catIcon(name,S.catView))); nm.appendChild(document.createTextNode(name));
+    r.append(nm, bar, n); box.appendChild(r);
   });
   const t=el("div","between small muted"); t.style.padding="6px 6px 0"; t.append(el("span",null,"合計"), el("span","num",money(tot))); box.appendChild(t);
 }
@@ -648,7 +662,9 @@ function renderList(){
       if(proj && e.budget) right.appendChild(el("span","sub",`預算 ${fmt(e.budget)}`));
       if(isRb(e)) right.appendChild(el("span","sub rb-sub", e.rb.s==="pending" ? "不算支出" : own(e) ? `自付 ${fmt(own(e))}` : "已全額收回"));
       if(proj || isPending(e)) right.appendChild(statusChip(l,e,editable));
-      row.append(el("span","tag"+(e.type==="in"?" in":""), catName(l,e)), main, right);
+      const cn=catName(l,e), tag=el("span","tag"+(e.type==="in"?" in":""), catIcon(cn,e.type)); tag.title=cn; tag.style.setProperty("--tc", catColor(cn));
+      main.querySelector(".meta").prepend(document.createTextNode(cn+(main.querySelector(".meta").textContent?"・":"")));
+      row.append(tag, main, right);
       day.appendChild(row);
     });
     box.appendChild(day);
