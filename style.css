@@ -703,3 +703,9 @@ body.nav-on .page > .tabs{display:none}
 .cat-hero{padding:10px 8px 6px 20px;min-height:150px}
 .cat-hero-img{width:auto;max-width:55%;height:clamp(120px,30vw,190px)}
 @media (min-width:821px) and (min-height:700px){ .nav-cheer-img{width:auto;max-width:190px;height:auto;max-height:132px} }
+
+/* 首頁橫幅：貓咪旁邊的一句話 */
+.cat-hero-art{position:relative;display:flex;justify-content:flex-end;flex:0 1 auto;min-width:0;max-width:58%}
+.cat-hero-art .cat-hero-img{max-width:100%}
+.cat-hero-say{position:absolute;left:4%;top:4%;z-index:1;transform:rotate(-8deg);white-space:nowrap;
+  font-family:var(--f-display);font-weight:700;font-size:clamp(13px,3.4vw,17px);color:var(--accent)}
