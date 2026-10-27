@@ -126,7 +126,17 @@ function projItems(entries){
 
 /* ================= 畫面切換 ================= */
 const VIEWS = ["viewSetup","viewLoading","viewLogin","viewVerify","viewHome","viewRepay","viewInvest","viewLists","viewList","viewCal","viewSettings","viewLedger"];
-function show(v){ VIEWS.forEach(id=>$(id).hidden = id!==v); }
+const NAV_OF = {viewHome:"#", viewLedger:"#", viewRepay:"#repay", viewInvest:"#invest", viewLists:"#lists", viewList:"#lists", viewCal:"#cal", viewSettings:"#settings"};
+const BAR_VIEWS = ["viewHome","viewRepay","viewInvest","viewLists","viewCal","viewSettings"];
+function show(v){
+  VIEWS.forEach(id=>$(id).hidden = id!==v);
+  /* 共用導覽：登入後的頁面才顯示；帳本、清單內頁有自己的返回列，不顯示上方標題列 */
+  const nav=NAV_OF[v];
+  document.body.classList.toggle("nav-on", !!nav);
+  document.body.classList.toggle("bar-on", BAR_VIEWS.includes(v));
+  document.querySelectorAll("#appNav a[data-nav]").forEach(a=>{ if(a.dataset.nav===nav) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
+  const cur=document.querySelector(`#appNav a[data-nav="${nav}"] span`); if(cur) $("appBarTitle").textContent=cur.textContent;
+}
 
 if(!configured){ show("viewSetup"); }
 else {
@@ -2315,11 +2325,11 @@ const TOUR=[
   { sel:"#btnNewLedger", title:"第一步：建立帳本", text:"可以從個人、家庭、孕期、寶寶、搬家範本開始，分類都能自己增減。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
-  { sel:'#viewHome .tabs a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
-  { sel:'#viewHome .tabs a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
-  { sel:'#viewHome .tabs a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
-  { sel:'#viewHome .tabs a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
-  { sel:'#viewHome .topbar a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
+  { sel:'#appNav a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
+  { sel:'#appNav a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
+  { sel:'#appNav a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
+  { sel:'#appNav a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
+  { sel:'#appNav a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
 let tourI=0;
 const tourTarget = () => { const s=TOUR[tourI].sel; const t=s && document.querySelector(s); return t && t.offsetParent!==null ? t : null; };

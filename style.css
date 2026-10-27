@@ -589,3 +589,52 @@ button.pay-cell:hover{border-color:var(--accent)}
 .tag{width:38px;height:38px;max-width:none;padding:0;border-radius:12px;display:grid;place-items:center;font-size:19px;
   background:color-mix(in srgb,var(--tc,var(--out)) 15%,var(--sheet))}
 .tag.in{background:color-mix(in srgb,var(--tc,var(--in)) 15%,var(--sheet))}
+
+/* ---------- 共用導覽：電腦版左側選單、手機版上方標題列＋底部導覽列 ---------- */
+.appbar,.appnav{display:none}
+body.nav-on .appnav{display:flex}
+body.nav-on.bar-on .appbar{display:flex}
+/* 有共用導覽的頁面，不再顯示各頁原本的標題列和頁籤 */
+body.bar-on .view > .topbar{display:none}
+body.nav-on .page > .tabs{display:none}
+.appnav svg,.appbar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.appnav a{text-decoration:none;color:var(--muted)}
+.appnav a[aria-current="page"]{color:var(--accent);font-weight:700}
+.appbar{align-items:center;gap:12px;padding:10px 16px;position:sticky;top:0;z-index:5;
+  background:linear-gradient(120deg,var(--hero-a),var(--hero-b));color:var(--on-hero);box-shadow:0 4px 16px rgba(20,40,32,.15)}
+.appbar-brand{display:flex;align-items:center;gap:8px;color:inherit;text-decoration:none;font-family:var(--f-display);font-weight:900;font-size:21px;letter-spacing:.06em}
+.appbar-brand .brand-logo{background:#fff;padding:2px}
+.appbar-title{display:none;font-family:var(--f-display);font-weight:600;font-size:20px;color:inherit}
+.appbar-me{margin-left:auto;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:inherit;
+  background:color-mix(in srgb,var(--on-hero) 16%,transparent)}
+.appnav-brand{display:none}
+
+@media (max-width:820px){
+  .appnav{position:fixed;left:0;right:0;bottom:0;z-index:7;display:none;justify-content:space-around;
+    background:color-mix(in srgb,var(--sheet) 94%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border-top:1px solid var(--rule);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+  body.nav-on .appnav{display:flex}
+  .appnav .appnav-brand{display:none}
+  .appnav a:not(.appnav-brand){flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;padding:5px 0;border-radius:12px;min-width:0}
+  .appnav a span{white-space:nowrap}
+  .appnav a[href="#repay"] span{font-size:0}
+  .appnav a[href="#repay"] span::after{content:"還款";font-size:11px}
+  .appnav a[aria-current="page"]{background:var(--accent-soft)}
+  body.nav-on .page{padding-bottom:150px}
+  body.nav-on .fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
+  body.nav-on .toast{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
+  /* 手機版：設定放在右上角，底部只留 5 個 */
+  body.nav5 .appnav a[href="#settings"]{display:none}
+}
+@media (min-width:821px){
+  body.nav-on{padding-left:224px}
+  .appnav{position:fixed;left:0;top:0;bottom:0;width:224px;z-index:7;flex-direction:column;gap:4px;padding:18px 14px;
+    background:var(--sheet);border-right:1px solid var(--rule)}
+  .appnav-brand{display:flex!important;align-items:center;gap:9px;font-family:var(--f-display);font-weight:900;font-size:22px;letter-spacing:.06em;color:var(--ink)!important;padding:4px 10px 18px}
+  .appnav a:not(.appnav-brand){display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;font-size:15px}
+  .appnav a:not(.appnav-brand):hover{background:var(--paper);color:var(--ink)}
+  .appnav a[aria-current="page"]{background:var(--accent-soft)}
+  .appbar{padding:14px max(16px,calc((100% - 1120px)/2 + 16px))}
+  .appbar-brand{display:none}
+  .appbar-title{display:block}
+}

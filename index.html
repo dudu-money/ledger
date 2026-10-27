@@ -35,6 +35,17 @@
 </head>
 <body>
 
+<!-- 共用導覽：電腦版左側選單、手機版底部導覽列（登入後才顯示） -->
+<header class="appbar" id="appBar">
+  <a class="appbar-brand" href="#"><img class="brand-logo" src="icon.svg" alt="">記帳本</a>
+  <h1 class="appbar-title" id="appBarTitle">帳本</h1>
+  <a class="appbar-me" href="#settings" id="appBarMe" aria-label="設定"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="4"/><path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg></a>
+</header>
+<nav class="appnav" id="appNav" aria-label="主要頁面">
+  <a class="appnav-brand" href="#"><img class="brand-logo" src="icon.svg" alt="">記帳本</a>
+  <a href="#" data-nav="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 7.5h6M9 11h4"/></svg><span>帳本</span></a><a href="#repay" data-nav="#repay"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg><span>還款與分期</span></a><a href="#invest" data-nav="#invest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M5 15l4.5-4.5 3 3L19 7"/><path d="M15 7h4v4"/></svg><span>資產</span></a><a href="#lists" data-nav="#lists"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 1.8-2M4 12l1 1 1.8-2M4 18l1 1 1.8-2"/></svg><span>清單</span></a><a href="#cal" data-nav="#cal"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>行事曆</span></a><a href="#settings" data-nav="#settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg><span>設定</span></a>
+</nav>
+
 <!-- 尚未設定 Firebase -->
 <section class="view center" id="viewSetup" hidden>
   <div class="panel narrow">
