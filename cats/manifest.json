@@ -86,7 +86,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "tux": [
    "face",
@@ -95,7 +97,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "cow": [
    "face",
