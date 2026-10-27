@@ -312,6 +312,8 @@ function renderHome(){
   }
   mine.forEach(l=>box.appendChild(ledgerCard(l)));
   if(S.ledgersReady && mine.length) box.appendChild(newLedgerCard());
+  /* 有帳本時只留卡片後面的虛線「新增帳本」，還沒有帳本時才顯示上面的按鈕 */
+  $("btnNewLedger").hidden = S.ledgersReady && mine.length>0;
   $("sharedWrap").hidden = !shared.length;
   const sb=$("sharedLedgers"); sb.textContent="";
   shared.forEach(l=>sb.appendChild(ledgerCard(l)));
@@ -2489,7 +2491,7 @@ function refreshTips(){
 /* 歡迎導覽 */
 const TOUR=[
   { sel:null, title:"歡迎使用記帳本", text:"花 30 秒認識一下怎麼用。隨時可以按「略過教學」，之後也能在「設定」重新看一次。" },
-  { sel:"#btnNewLedger", title:"第一步：建立帳本", text:"跟著三個步驟走：取名字（可以從個人、家庭、孕期、寶寶、搬家範本開始）、挑顏色和一隻喜歡的貓咪當帳本頭像、整理分類。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
+  { sel:"#btnNewLedger:not([hidden]), #viewHome .lcard-new", title:"第一步：建立帳本", text:"跟著三個步驟走：取名字（可以從個人、家庭、孕期、寶寶、搬家範本開始）、挑顏色和一隻喜歡的貓咪當帳本頭像、整理分類。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
   { sel:'#appNav a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
