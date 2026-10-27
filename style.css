@@ -662,8 +662,3 @@ body.nav-on .page > .tabs{display:none}
 .step-nav{justify-content:flex-end}
 .step-nav [hidden]{display:none}
 .lcard-new{min-height:64px}
-/* 清單卡片：依名稱的圖示方塊＋完成進度條 */
-.li-tile{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:26px;flex:none;background:color-mix(in srgb,var(--c) 16%,var(--sheet))}
-.li-body{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
-.li-bar{height:6px;border-radius:4px;background:color-mix(in srgb,var(--c) 14%,var(--sheet));overflow:hidden;margin-top:3px}
-.li-bar i{display:block;height:100%;background:var(--c);border-radius:4px}
