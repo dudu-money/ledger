@@ -684,7 +684,7 @@ body.nav-on .page > .tabs{display:none}
 .mc-img{width:132px;height:132px;object-fit:contain;flex:none;filter:drop-shadow(0 6px 10px rgba(40,30,20,.18))}
 .mc-name{font-family:var(--f-display);font-weight:700;font-size:22px;word-break:break-all}
 .nav-cheer{display:none}
-@media (min-width:821px) and (min-height:560px){
+@media (min-width:821px) and (min-height:500px){
   .nav-cheer{display:flex;flex-direction:column;align-items:center;margin-top:auto;padding:8px 6px 0;text-align:center}
   .nav-cheer-img{width:132px;height:132px;object-fit:contain;filter:drop-shadow(0 5px 8px rgba(40,30,20,.15))}
   .nav-cheer-text{margin:2px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
@@ -702,7 +702,7 @@ body.nav-on .page > .tabs{display:none}
 /* 橫的插畫（hero、nav）：高度固定、寬度跟著圖；缺圖退回方形的開心也能放 */
 .cat-hero{padding:10px 8px 6px 20px;min-height:150px}
 .cat-hero-img{width:auto;max-width:55%;height:clamp(120px,30vw,190px)}
-@media (min-width:821px) and (min-height:560px){ .nav-cheer-img{width:auto;max-width:190px;height:auto;max-height:min(132px,calc(100vh - 470px))} }
+@media (min-width:821px) and (min-height:500px){ .nav-cheer-img{width:auto;max-width:190px;height:auto;max-height:min(132px,calc(100vh - 420px))} }
 
 /* 首頁橫幅：貓咪旁邊的一句話 */
 .cat-hero-art{position:relative;display:flex;justify-content:flex-end;flex:0 1 auto;min-width:0;max-width:58%}
