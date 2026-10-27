@@ -3090,13 +3090,21 @@ function renderLists(){
   mine.forEach(x=>g.appendChild(listCard(x)));
   $("sharedListsWrap").hidden=!shared.length; const sg=$("sharedLists"); sg.textContent=""; shared.forEach(x=>sg.appendChild(listCard(x)));
 }
+/* 清單圖示：依名稱自動挑 */
+const LIST_ICONS = [[/待產|產檢|月子/,"👜"],[/寶寶|嬰|奶|育兒/,"🍼"],[/想買|購物|願望|採買/,"🛍️"],[/搬家|家具|家電|裝潢/,"📦"],[/旅|行李|出國|露營/,"🧳"],[/禮|送/,"🎁"],[/婚/,"💍"]];
+const listIcon = name => { const n=String(name||""); const hit=LIST_ICONS.find(([re])=>re.test(n)); return hit ? hit[1] : "📋"; };
 function listCard(x){
-  const b=el("button","lcard"); b.type="button"; b.onclick=()=>{ location.hash="#list/"+x.id; };
-  const n=el("div","name"); const d=el("span","dot"); d.style.background=x.color||COLORS[0]; n.append(d, document.createTextNode(x.name)); b.appendChild(n);
+  const b=el("button","lcard lc-row li-card"); b.type="button"; b.onclick=()=>{ location.hash="#list/"+x.id; };
+  b.style.setProperty("--c", x.color||COLORS[0]);
+  const body=el("div","li-body");
+  const n=el("div","name"); n.append(document.createTextNode(x.name)); body.appendChild(n);
   const st=x.stats||{};
-  b.appendChild(el("div","meta", typeof st.left==="number" ? `還有 ${st.left} 項` + (st.need?`・還需準備 ${money(st.need)}`:"") + (st.done?`・已完成 ${st.done} 項`:"") : "點進去新增項目"));
+  body.appendChild(el("div","meta", typeof st.left==="number" ? `還有 ${st.left} 項` + (st.need?`・還需準備 ${money(st.need)}`:"") + (st.done?`・已完成 ${st.done} 項`:"") : "點進去新增項目"));
   const others=(x.members||[]).length-1;
-  b.appendChild(el("div","meta", x.ownerUid===S.user.uid ? (others>0?`與 ${others} 人共用`:"只有你看得到") : `${x.ownerEmail} 分享・${listRole(x)}`));
+  body.appendChild(el("div","meta", x.ownerUid===S.user.uid ? (others>0?`與 ${others} 人共用`:"只有你看得到") : `${x.ownerEmail} 分享・${listRole(x)}`));
+  const tot=(Number(st.done)||0)+(Number(st.left)||0);
+  if(tot>0){ const bar=el("div","li-bar"); const i=el("i"); i.style.width=Math.round((Number(st.done)||0)/tot*100)+"%"; bar.appendChild(i); body.appendChild(bar); }
+  b.append(el("span","li-tile",listIcon(x.name)), body);
   return b;
 }
 
