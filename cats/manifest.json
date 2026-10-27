@@ -1,0 +1,132 @@
+{
+ "note": "每種貓有哪些圖：cats/{品種}/{情境}.webp。新增圖片後在這裡加上情境代號。",
+ "default": "orangewhite",
+ "scenes": {
+  "face": "頭像",
+  "happy": "開心",
+  "sleep": "睡覺",
+  "content": "滿足",
+  "box": "調皮",
+  "money": "記帳中",
+  "cheer": "加油"
+ },
+ "breeds": {
+  "orange": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "orangewhite": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "tabby": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "calico": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "tortie": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "black": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "white": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "tux": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "cow": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "siamese": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "ragdoll": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "blue": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ],
+  "fold": [
+   "face",
+   "happy",
+   "sleep",
+   "content",
+   "box",
+   "money",
+   "cheer"
+  ]
+ }
+}

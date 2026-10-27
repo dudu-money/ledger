@@ -662,3 +662,39 @@ body.nav-on .page > .tabs{display:none}
 .step-nav{justify-content:flex-end}
 .step-nav [hidden]{display:none}
 .lcard-new{min-height:64px}
+
+/* ---------- 我的貓咪：代表貓出現的地方 ---------- */
+.appbar-me{overflow:hidden}
+.appbar-cat{width:36px;height:36px;object-fit:contain;transform:translateY(2px)}
+.cat-hero{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 6px;padding:14px 12px 10px 20px;border-radius:20px;
+  background:linear-gradient(120deg,var(--accent-soft),color-mix(in srgb,var(--accent-soft) 35%,var(--sheet)));box-shadow:var(--card-shadow,none)}
+.cat-hero-text{min-width:0}
+.cat-hero-name{margin:0 0 4px;color:var(--accent);font-weight:700;font-size:14px}
+.cat-hero-hi{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(18px,4.8vw,24px);line-height:1.4;color:var(--ink)}
+.cat-hero-img{width:clamp(108px,28vw,150px);height:clamp(108px,28vw,150px);object-fit:contain;flex:none;filter:drop-shadow(0 6px 10px rgba(40,30,20,.18))}
+.cat-empty .cat-empty-img{display:block;width:150px;height:150px;object-fit:contain;margin:-6px auto 4px;filter:drop-shadow(0 5px 8px rgba(40,30,20,.15))}
+.toast.with-cat{width:max-content;display:flex;align-items:center;gap:8px;padding:4px 16px 4px 6px}
+.toast-cat{width:46px;height:46px;object-fit:contain;flex:none}
+.cat-done{text-align:center}
+@media (min-width:561px){ .cat-done{width:min(380px,calc(100vw - 24px))} }
+.cat-done-img{display:block;width:170px;height:170px;object-fit:contain;margin:0 auto -4px;filter:drop-shadow(0 6px 10px rgba(40,30,20,.18))}
+.cat-done .h2{margin:0}
+.cat-done p{margin:0}
+.mc-preview{display:flex;align-items:center;gap:16px;padding:6px 0}
+.mc-img{width:132px;height:132px;object-fit:contain;flex:none;filter:drop-shadow(0 6px 10px rgba(40,30,20,.18))}
+.mc-name{font-family:var(--f-display);font-weight:700;font-size:22px;word-break:break-all}
+.nav-cheer{display:none}
+@media (min-width:821px) and (min-height:700px){
+  .nav-cheer{display:flex;flex-direction:column;align-items:center;margin-top:auto;padding:8px 6px 0;text-align:center}
+  .nav-cheer-img{width:132px;height:132px;object-fit:contain;filter:drop-shadow(0 5px 8px rgba(40,30,20,.15))}
+  .nav-cheer-text{margin:2px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+  .nav-cheer-name{display:block;font-size:12px}
+}
+
+/* 電腦版：上方橫幅整條橫跨，「記帳本」在橫幅左邊，左側選單從橫幅下面開始 */
+@media (min-width:821px){
+  body.nav-on.bar-on .appbar{box-sizing:border-box;height:64px;margin-left:-224px;padding:0 24px 0 0;z-index:8}
+  body.nav-on.bar-on .appbar-brand{display:flex;box-sizing:border-box;width:224px;padding-left:24px;flex:none;font-size:22px}
+  body.nav-on.bar-on .appnav{top:64px;padding-top:14px}
+  body.nav-on.bar-on .appnav-brand{display:none!important}
+}
