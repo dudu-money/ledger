@@ -35,6 +35,28 @@ const CAT_ICONS = [
 const catIcon = (name, type) => { const n=String(name||""); for(const [re,ic] of CAT_ICONS) if(re.test(n)) return ic; return type==="in" ? "💰" : "🏷️"; };
 const CAT_COLORS = ["#e07a3f","#3f7fe0","#9a5fd0","#d0458a","#2fa38a","#d4a017","#5b8c3a","#c2554b","#4a9fb5","#8a6d5a"];
 const catColor = name => { let h=0; for(const ch of String(name||"")) h=(h*31+ch.codePointAt(0))>>>0; return CAT_COLORS[h % CAT_COLORS.length]; };
+/* 貓咪：帳本頭像（ledgers.cat）。圖放在 cats/{key}/face.webp，缺圖時退回橘貓 */
+const CATS = [["orange","橘貓"],["orangewhite","橘白"],["tabby","虎斑"],["calico","三花"],["tortie","玳瑁"],["black","黑貓"],["white","白貓"],
+  ["tux","賓士"],["cow","乳牛貓"],["siamese","暹羅"],["ragdoll","布偶"],["blue","藍貓"],["fold","折耳"]];
+const CAT_KEYS = CATS.map(c=>c[0]);
+const CAT_DEFAULT = "orange";
+/* 舊帳本沒選過貓：用帳本 id 固定挑一隻（只顯示，不寫回資料庫） */
+const ledgerCat = l => { if(l && CAT_KEYS.includes(l.cat)) return l.cat;
+  let h=0; for(const ch of String(l&&l.id||"")) h=(h*31+ch.codePointAt(0))>>>0; return CAT_KEYS[h % CAT_KEYS.length]; };
+function catImg(key, cls){
+  const k = CAT_KEYS.includes(key) ? key : CAT_DEFAULT;
+  const i=el("img", cls||"cat-av"); i.alt=""; i.decoding="async"; i.src=`cats/${k}/face.webp`;
+  i.onerror=()=>{ i.onerror=null; if(k!==CAT_DEFAULT) i.src=`cats/${CAT_DEFAULT}/face.webp`; else i.style.visibility="hidden"; };
+  return i;
+}
+function catPicker(boxId, current, onPick, disabled){
+  const box=$(boxId); box.textContent=""; const btns=[];
+  CATS.forEach(([k,n])=>{ const b=el("button","cat-pick"); b.type="button"; b.dataset.k=k; b.disabled=!!disabled;
+    b.setAttribute("aria-pressed", k===current); b.setAttribute("aria-label",n);
+    b.append(catImg(k,"cat-av"), el("span",null,n));
+    b.onclick=()=>{ onPick(k); btns.forEach(x=>x.setAttribute("aria-pressed", x===b)); };
+    btns.push(b); box.appendChild(b); });
+}
 
 /* ================= 小工具 ================= */
 const $ = id => document.getElementById(id);
@@ -85,7 +107,7 @@ const S = {
   entries:[], unsubEntries:null, entriesReady:false,
   catView:"out", catFilter:null, stFilter:"all",
   eType:"out", eCat:null, editing:null, eStatus:"paid",
-  newTpl:"個人", newColor:COLORS[0], newCats:{out:[],in:[]}, newCatType:"out",
+  newTpl:"個人", newColor:COLORS[0], newCat:"orange", newStep:1, newCats:{out:[],in:[]}, newCatType:"out",
   sColor:COLORS[0], sCatType:"out",
   loans:[], unsubLoans:null, loansReady:false, rYM:thisYM(), editingLoan:null, payLoan:null,
   prefs:null, unsubPrefs:null, startApplied:false,
@@ -255,19 +277,27 @@ function renderHome(){
     box.appendChild(e);
   }
   mine.forEach(l=>box.appendChild(ledgerCard(l)));
+  if(S.ledgersReady && mine.length) box.appendChild(newLedgerCard());
   $("sharedWrap").hidden = !shared.length;
   const sb=$("sharedLedgers"); sb.textContent="";
   shared.forEach(l=>sb.appendChild(ledgerCard(l)));
 }
 function ledgerCard(l){
   const b=el("button","lcard"); b.type="button"; b.onclick=()=>{ location.hash="#l/"+l.id; };
-  const n=el("div","name"); const d=el("span","dot"); d.style.background=l.color||COLORS[0]; n.append(d, document.createTextNode(l.name));
+  b.style.setProperty("--lc", l.color||COLORS[0]);
+  const body=el("div","lc-body");
+  const n=el("div","name"); n.append(document.createTextNode(l.name));
   if(isProj(l)) n.appendChild(el("span","badge","專案"));
   const others=(l.members||[]).length-1;
   const meta=el("div","meta", isOwner(l) ? (others>0?`與 ${others} 人共用`:"只有你看得到") : `${l.ownerEmail} 分享・${roleText(l)}`);
   const extra = isProj(l) ? (l.projectBudget?`總預算 ${money(l.projectBudget)}`:"專案模式") : (l.budget?`每月預算 ${money(l.budget)}`:"");
   const cats=el("div","meta", `${(l.categories||[]).length} 個分類` + (extra?`・${extra}`:""));
-  b.append(n, meta, cats); return b;
+  body.append(n, meta, cats);
+  b.append(catImg(ledgerCat(l),"cat-av lc-cat"), body); return b;
+}
+function newLedgerCard(){
+  const b=el("button","lcard lcard-new"); b.type="button"; b.onclick=()=>$("btnNewLedger").click();
+  b.append(el("span","plus","＋"), el("span",null,"新增帳本")); return b;
 }
 
 /* ================= 顏色選擇（預設色＋自訂） ================= */
@@ -322,22 +352,37 @@ function renderNewDialog(){
   });
   renderNewCats();
   swatches("nColors", S.newColor, c=>{ S.newColor=c; });
+  catPicker("nCats", S.newCat, k=>{ S.newCat=k; });
 }
+/* 三個步驟：1 名稱與範本、2 顏色與貓咪、3 分類與專案模式 */
+function newStep(n){
+  if(n>1 && !$("nName").value.trim()){ n=1; msg("nMsg","請輸入帳本名稱。","err"); $("nName").focus(); }
+  else msg("nMsg","");
+  S.newStep=n;
+  [1,2,3].forEach(i=>{ $("nStep"+i).hidden = i!==n; });
+  [...$("nSteps").children].forEach((li,i)=>{ li.classList.toggle("on", i+1===n); li.classList.toggle("done", i+1<n); });
+  $("nPrev").hidden = n===1; $("nNext").hidden = n===3; $("nCreate").hidden = n!==3;
+}
+$("nPrev").onclick=()=>newStep(S.newStep-1);
+$("nNext").onclick=()=>newStep(S.newStep+1);
+$("nName").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); newStep(2); } });
 $("btnNewLedger").onclick = () => {
   S.newCatType="out"; $("nNewCat").value=""; S.newColor=COLORS[S.ledgers.size % COLORS.length]; $("nName").value=""; msg("nMsg","");
-  pickTemplate("個人"); renderNewDialog(); $("dlgNew").showModal();
+  S.newCat=CAT_KEYS[S.ledgers.size % CAT_KEYS.length];
+  pickTemplate("個人"); renderNewDialog(); newStep(1); $("dlgNew").showModal(); $("nName").focus();
 };
 $("formNew").addEventListener("submit", async e => {
   if(e.submitter && e.submitter.value==="cancel") return;
   e.preventDefault();
+  if(S.newStep!==3){ newStep(S.newStep+1); return; }
   const name=$("nName").value.trim();
-  if(!name){ msg("nMsg","請輸入帳本名稱。","err"); return; }
+  if(!name){ newStep(1); return; }
   if(!S.newCats.out.length && !S.newCats.in.length){ msg("nMsg","請至少保留一個分類。","err"); return; }
   const categories=[...S.newCats.out.map(n=>({id:rid(),name:n,type:"out"})), ...S.newCats.in.map(n=>({id:rid(),name:n,type:"in"}))];
   $("nCreate").disabled=true;
   try{
     const ref=await addDoc(collection(db,"ledgers"), {
-      name, color:S.newColor, ownerUid:S.user.uid, ownerEmail:S.email,
+      name, color:S.newColor, cat:S.newCat, ownerUid:S.user.uid, ownerEmail:S.email,
       editors:[], viewers:[], members:[S.email], categories, budget:0,
       mode: $("nProject").checked ? "project" : "normal", projectBudget:0, weekStart:"",
       createdAt:serverTimestamp(), updatedAt:serverTimestamp()
@@ -365,7 +410,8 @@ function initLedgerView(){
 function renderLedgerHead(){
   const l=L(); if(!l) return;
   initLedgerView();
-  $("lName").textContent=l.name; $("lDot").style.background=l.color||COLORS[0];
+  $("lName").textContent=l.name; const lc=ledgerCat(l);
+  if($("lCat").dataset.k!==lc){ $("lCat").replaceWith(Object.assign(catImg(lc,"cat-av l-cat"),{id:"lCat"})); $("lCat").dataset.k=lc; }
   $("lRole").textContent=roleText(l); document.title=l.name+"｜記帳本";
   $("btnAdd").hidden=!canEdit(l);
   renderLedgerTips(l);
@@ -1066,7 +1112,7 @@ function renderSettings(resetInputs){
   const l=L(); if(!l) return;
   const owner=isOwner(l), editor=canEdit(l);
   if(resetInputs){
-    $("sName").value=l.name; $("sBudget").value=l.budget||0; S.sColor=l.color||COLORS[0];
+    $("sName").value=l.name; $("sBudget").value=l.budget||0; S.sColor=l.color||COLORS[0]; S.sCat=ledgerCat(l);
     $("sProject").checked=isProj(l); $("sPBudget").value=l.projectBudget||0; $("sWeek").value=l.weekStart||""; $("sInstAt").value=instAtBuy(l)?"buy":"bill";
     ["sBasicMsg","sCatMsg","sShareMsg","sDangerMsg"].forEach(id=>msg(id,"")); $("sDelConfirm").value=""; $("sEmail").value="";
   }
@@ -1077,6 +1123,7 @@ function renderSettings(resetInputs){
   $("sProject").disabled=!owner; $("sWeek").disabled=!owner; $("sInstAt").disabled=!owner; $("sPBudget").disabled=!editor;
   $("sProjBox").hidden=!$("sProject").checked;
   if(resetInputs || !$("sColors").childElementCount) swatches("sColors", S.sColor, c=>{ S.sColor=c; }, !owner);
+  if(resetInputs || !$("sCats").childElementCount) catPicker("sCats", S.sCat, k=>{ S.sCat=k; }, !owner);
   $("sCats").hidden=!editor;
   $("scOut").setAttribute("aria-pressed", S.sCatType==="out"); $("scIn").setAttribute("aria-pressed", S.sCatType==="in");
   const box=$("sCatList"); box.textContent="";
@@ -1113,7 +1160,7 @@ $("sSaveBasic").onclick=async()=>{
   upd.budget=Math.max(0,Math.round(Number($("sBudget").value)||0));
   upd.projectBudget=Math.max(0,Math.round(Number($("sPBudget").value)||0));
   if(isOwner(l)){ const n=$("sName").value.trim(); if(!n){ msg("sBasicMsg","帳本名稱不能空白。","err"); return; }
-    upd.name=n; upd.color=S.sColor; upd.mode=$("sProject").checked?"project":"normal"; upd.weekStart=$("sWeek").value||""; upd.instAt=$("sInstAt").value==="buy"?"buy":""; }
+    upd.name=n; upd.color=S.sColor; upd.cat=S.sCat; upd.mode=$("sProject").checked?"project":"normal"; upd.weekStart=$("sWeek").value||""; upd.instAt=$("sInstAt").value==="buy"?"buy":""; }
   try{ await updateDoc(doc(db,"ledgers",l.id), upd); msg("sBasicMsg","已儲存。","ok");
     if(isOwner(l) && (upd.mode==="project")!==isProj(l)){ S.period.mode = upd.mode==="project" ? "all" : "month"; S.catFilter=null; watchEntries(); }
     else if(isOwner(l) && (upd.instAt==="buy")!==instAtBuy(l)){ l.instAt=upd.instAt; watchEntries(); } }
@@ -2216,7 +2263,7 @@ $("bkRestore").onclick=async()=>{
     const d=new Date(), tag=`（還原 ${d.getMonth()+1}/${d.getDate()}）`; let nE=0;
     for(const lg of picks){
       const x=lg.data;
-      const ref=await addDoc(collection(db,"ledgers"), { name:(x.name+tag).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20),
+      const ref=await addDoc(collection(db,"ledgers"), { name:(x.name+tag).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20), ...(CAT_KEYS.includes(x.cat)?{cat:x.cat}:{}),
         ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email],
         categories:Array.isArray(x.categories)?x.categories.slice(0,200):[], budget:Number(x.budget)||0,
         mode:x.mode==="project"?"project":"normal", projectBudget:Number(x.projectBudget)||0, weekStart:String(x.weekStart||"").slice(0,10), ...(x.instAt==="buy"?{instAt:"buy"}:{}),
@@ -2322,7 +2369,7 @@ function refreshTips(){
 /* 歡迎導覽 */
 const TOUR=[
   { sel:null, title:"歡迎使用記帳本", text:"花 30 秒認識一下怎麼用。隨時可以按「略過教學」，之後也能在「設定」重新看一次。" },
-  { sel:"#btnNewLedger", title:"第一步：建立帳本", text:"可以從個人、家庭、孕期、寶寶、搬家範本開始，分類都能自己增減。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
+  { sel:"#btnNewLedger", title:"第一步：建立帳本", text:"跟著三個步驟走：取名字（可以從個人、家庭、孕期、寶寶、搬家範本開始）、挑顏色和一隻喜歡的貓咪當帳本頭像、整理分類。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
   { sel:'#appNav a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },

@@ -464,7 +464,7 @@
   <header class="topbar">
     <button class="icon-btn" id="btnBack" type="button" aria-label="回到帳本列表">‹</button>
     <div class="ledger-title">
-      <span class="dot" id="lDot"></span>
+      <img class="cat-av l-cat" id="lCat" alt="">
       <h1 id="lName">帳本</h1>
       <span class="badge" id="lRole"></span>
     </div>
@@ -659,22 +659,34 @@
 <dialog id="dlgNew" aria-labelledby="nTitle">
   <form method="dialog" id="formNew" class="stack" autocomplete="off">
     <div class="between"><h2 class="h2" id="nTitle">新增帳本</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
-    <div class="field"><span class="label">從範本開始</span><div class="chips" id="nTemplates"></div></div>
-    <div class="field"><span class="label">分類（可以直接增減，之後在設定裡也能改）</span>
-      <div class="seg sm" role="group" aria-label="分類類型">
-        <button type="button" id="ncOut" aria-pressed="true">支出分類</button>
-        <button type="button" id="ncIn" aria-pressed="false">收入分類</button>
-      </div>
-      <div class="chips" id="nCatList"></div>
-      <div class="row">
-        <input id="nNewCat" type="text" maxlength="40" placeholder="輸入新分類，按 Enter 或「新增」" aria-label="新增分類名稱" class="grow">
-        <button class="btn" type="button" id="nAddCat">新增</button>
-      </div>
+    <ol class="steps" id="nSteps" aria-label="步驟"><li>名稱</li><li>顏色與貓咪</li><li>分類</li></ol>
+    <div class="stack" id="nStep1">
+      <div class="field"><span class="label">從範本開始</span><div class="chips" id="nTemplates"></div></div>
+      <label class="field"><span class="label">帳本名稱</span><input id="nName" type="text" maxlength="40" placeholder="例如：寶寶開銷"></label>
     </div>
-    <label class="check"><input type="checkbox" id="nProject"> 專案模式 <span class="small muted">— 適合孕期、搬家這類有總預算的帳：每筆可填預算、完成狀態、優先度，並顯示完成率</span></label>
-    <label class="field"><span class="label">帳本名稱</span><input id="nName" type="text" maxlength="40" required placeholder="例如：寶寶開銷"></label>
-    <div class="field"><span class="label">顏色</span><div class="swatches" id="nColors"></div></div>
-    <button class="btn primary" type="submit" value="create" id="nCreate">建立帳本</button>
+    <div class="stack" id="nStep2" hidden>
+      <div class="field"><span class="label">顏色</span><div class="swatches" id="nColors"></div></div>
+      <div class="field"><span class="label">帳本的貓咪</span><div class="cat-grid" id="nCats"></div></div>
+    </div>
+    <div class="stack" id="nStep3" hidden>
+      <div class="field"><span class="label">分類（可以直接增減，之後在設定裡也能改）</span>
+        <div class="seg sm" role="group" aria-label="分類類型">
+          <button type="button" id="ncOut" aria-pressed="true">支出分類</button>
+          <button type="button" id="ncIn" aria-pressed="false">收入分類</button>
+        </div>
+        <div class="chips" id="nCatList"></div>
+        <div class="row">
+          <input id="nNewCat" type="text" maxlength="40" placeholder="輸入新分類，按 Enter 或「新增」" aria-label="新增分類名稱" class="grow">
+          <button class="btn" type="button" id="nAddCat">新增</button>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="nProject"> 專案模式 <span class="small muted">— 適合孕期、搬家這類有總預算的帳：每筆可填預算、完成狀態、優先度，並顯示完成率</span></label>
+    </div>
+    <div class="row step-nav">
+      <button class="btn" type="button" id="nPrev">上一步</button>
+      <button class="btn primary" type="button" id="nNext">下一步</button>
+      <button class="btn primary" type="submit" value="create" id="nCreate">建立帳本</button>
+    </div>
     <p class="msg" id="nMsg" role="status"></p>
   </form>
 </dialog>
@@ -688,6 +700,7 @@
       <h3 class="h3">基本資料</h3>
       <label class="field"><span class="label">帳本名稱</span><input id="sName" type="text" maxlength="40"></label>
       <div class="field"><span class="label">顏色</span><div class="swatches" id="sColors"></div></div>
+      <div class="field"><span class="label">帳本的貓咪</span><div class="cat-grid" id="sCats"></div></div>
       <label class="check" id="sProjectWrap"><input type="checkbox" id="sProject"> 專案模式</label>
       <div class="stack" id="sProjBox">
         <label class="field"><span class="label">專案總預算（0 表示不設定）</span><input id="sPBudget" type="number" inputmode="numeric" min="0" step="1"></label>

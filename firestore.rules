@@ -22,7 +22,7 @@ service cloud.firestore {
     // ---- 帳本格式 ----
     function validLedger(d) {
       return d.keys().hasOnly(['name','color','ownerUid','ownerEmail','editors','viewers','members',
-                               'categories','budget','mode','projectBudget','weekStart','split','instAt','createdAt','updatedAt'])
+                               'categories','budget','mode','projectBudget','weekStart','split','instAt','cat','createdAt','updatedAt'])
         && d.name is string && d.name.size() > 0 && d.name.size() <= 40
         && d.color is string && d.color.size() <= 20
         && d.editors is list && d.editors.size() <= 50
@@ -35,6 +35,7 @@ service cloud.firestore {
         && (!('weekStart' in d) || (d.weekStart is string && d.weekStart.size() <= 10))
         && (!('split' in d) || (d.split is map && d.split.size() <= 3))
         && (!('instAt' in d) || d.instAt in ['','bill','buy'])
+        && (!('cat' in d) || (d.cat is string && d.cat.size() <= 20))
         // 成員名單 = 擁有者 + 可編輯 + 僅檢視，不能多也不能少
         && d.ownerEmail in d.members
         && d.members.hasAll(d.editors)
@@ -315,7 +316,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['defaultPay','defaultPayer','defaultCard','startPage','payers','cards','pays','lastBackup','tourDone','tips','inv','me','cardSet','xfer','updatedAt'])
+        && request.resource.data.keys().hasOnly(['defaultPay','defaultPayer','defaultCard','startPage','payers','cards','pays','lastBackup','tourDone','tips','inv','me','cardSet','xfer','myCat','catName','notiSeen','updatedAt'])
         && (!('tourDone' in request.resource.data) || request.resource.data.tourDone is bool)
         && (!('tips' in request.resource.data) || (request.resource.data.tips is list && request.resource.data.tips.size() <= 50))
         && (!('inv' in request.resource.data) || (request.resource.data.inv is map && request.resource.data.inv.size() <= 6))
@@ -323,6 +324,9 @@ service cloud.firestore {
         && (!('me' in request.resource.data) || (request.resource.data.me is string && request.resource.data.me.size() <= 20))
         && (!('cardSet' in request.resource.data) || (request.resource.data.cardSet is map && request.resource.data.cardSet.size() <= 50))
         && (!('xfer' in request.resource.data) || (request.resource.data.xfer is map && request.resource.data.xfer.size() <= 600))
+        && (!('myCat' in request.resource.data) || (request.resource.data.myCat is string && request.resource.data.myCat.size() <= 20))
+        && (!('catName' in request.resource.data) || (request.resource.data.catName is string && request.resource.data.catName.size() <= 20))
+        && (!('notiSeen' in request.resource.data) || request.resource.data.notiSeen is number)
         && request.resource.data.defaultPay is string && request.resource.data.defaultPay.size() <= 20
         && request.resource.data.defaultPayer is string && request.resource.data.defaultPayer.size() <= 20
         && request.resource.data.defaultCard is string && request.resource.data.defaultCard.size() <= 20
