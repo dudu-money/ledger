@@ -228,13 +228,15 @@ service cloud.firestore {
 
       function theCal() { return get(/databases/$(database)/documents/cals/$(cid)).data; }
       function validEvent(d) {
-        return d.keys().hasOnly(['title','date','end','time','place','note','createdBy','createdByEmail','createdAt','updatedAt'])
+        return d.keys().hasOnly(['title','date','end','time','place','note','kind','listId','createdBy','createdByEmail','createdAt','updatedAt'])
           && d.title is string && d.title.size() > 0 && d.title.size() <= 60
           && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
           && d.end is string && d.end.matches('^([0-9]{4}-[0-9]{2}-[0-9]{2})?$')
           && d.time is string && d.time.matches('^([0-9]{2}:[0-9]{2})?$')
           && d.place is string && d.place.size() <= 60
-          && d.note is string && d.note.size() <= 300;
+          && d.note is string && d.note.size() <= 300
+          && (!('kind' in d) || d.kind in ['personal','list','repay','money'])
+          && (!('listId' in d) || (d.listId is string && d.listId.size() <= 40));
       }
       match /events/{eid} {
         allow read: if isMember(theCal());
