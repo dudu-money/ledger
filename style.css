@@ -639,7 +639,7 @@ body.nav-on .page > .tabs{display:none}
 
 /* ---------- 貓咪頭像：去背圖＋柔和陰影，不加邊框 ---------- */
 .cat-av{display:block;width:64px;height:64px;object-fit:contain;flex:none;filter:drop-shadow(0 3px 5px rgba(40,30,20,.18))}
-.lcard{flex-direction:row;align-items:center;gap:14px;padding:14px 16px}
+.lcard.lc-row{flex-direction:row;align-items:center;gap:14px;padding:14px 16px}
 .lcard .lc-cat{width:72px;height:72px}
 .lc-body{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1;padding-left:10px;border-left:3px solid var(--lc,var(--accent))}
 .lcard-new{justify-content:center;gap:8px;box-shadow:none;border:2px dashed var(--rule);background:transparent;color:var(--muted);font-weight:600}

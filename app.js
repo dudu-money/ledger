@@ -283,7 +283,7 @@ function renderHome(){
   shared.forEach(l=>sb.appendChild(ledgerCard(l)));
 }
 function ledgerCard(l){
-  const b=el("button","lcard"); b.type="button"; b.onclick=()=>{ location.hash="#l/"+l.id; };
+  const b=el("button","lcard lc-row"); b.type="button"; b.onclick=()=>{ location.hash="#l/"+l.id; };
   b.style.setProperty("--lc", l.color||COLORS[0]);
   const body=el("div","lc-body");
   const n=el("div","name"); n.append(document.createTextNode(l.name));
@@ -296,7 +296,7 @@ function ledgerCard(l){
   b.append(catImg(ledgerCat(l),"cat-av lc-cat"), body); return b;
 }
 function newLedgerCard(){
-  const b=el("button","lcard lcard-new"); b.type="button"; b.onclick=()=>$("btnNewLedger").click();
+  const b=el("button","lcard lc-row lcard-new"); b.type="button"; b.onclick=()=>$("btnNewLedger").click();
   b.append(el("span","plus","＋"), el("span",null,"新增帳本")); return b;
 }
 
