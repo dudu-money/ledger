@@ -708,4 +708,4 @@ body.nav-on .page > .tabs{display:none}
 .cat-hero-art{position:relative;display:flex;justify-content:flex-end;flex:0 1 auto;min-width:0;max-width:58%}
 .cat-hero-art .cat-hero-img{max-width:100%}
 .cat-hero-say{position:absolute;left:4%;top:4%;z-index:1;transform:rotate(-8deg);white-space:nowrap;
-  font-family:var(--f-display);font-weight:700;font-size:clamp(13px,3.4vw,17px);color:var(--accent)}
+  font-size:clamp(13px,3.2vw,15px);color:var(--muted)}
