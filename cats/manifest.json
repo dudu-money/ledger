@@ -108,7 +108,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "siamese": [
    "face",
@@ -117,7 +119,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "ragdoll": [
    "face",
