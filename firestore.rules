@@ -1,0 +1,340 @@
+rules_version = '2';
+
+// 記帳本安全規則
+// 原則：帳本預設只有建立者看得到；建立者可以用 Email 分享給特定的人（可編輯／僅檢視）。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- 身分 ----
+    // 必須登入，而且 Email 已驗證（Google 登入會自動驗證；Email 註冊要點過驗證信）
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true;
+    }
+    function myEmail() { return request.auth.token.email.lower(); }
+
+    // ---- 帳本角色 ----
+    function isOwner(l)  { return signedIn() && l.ownerUid == request.auth.uid; }
+    function isEditor(l) { return isOwner(l) || (signedIn() && myEmail() in l.editors); }
+    function isMember(l) { return isOwner(l) || (signedIn() && myEmail() in l.members); }
+
+    // ---- 帳本格式 ----
+    function validLedger(d) {
+      return d.keys().hasOnly(['name','color','ownerUid','ownerEmail','editors','viewers','members',
+                               'categories','budget','mode','projectBudget','weekStart','split','instAt','createdAt','updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.color is string && d.color.size() <= 20
+        && d.editors is list && d.editors.size() <= 50
+        && d.viewers is list && d.viewers.size() <= 50
+        && d.members is list && d.members.size() <= 101
+        && d.categories is list && d.categories.size() <= 200
+        && d.budget is number && d.budget >= 0 && d.budget < 1000000000
+        && (!('mode' in d) || d.mode in ['normal','project'])
+        && (!('projectBudget' in d) || (d.projectBudget is number && d.projectBudget >= 0 && d.projectBudget < 1000000000))
+        && (!('weekStart' in d) || (d.weekStart is string && d.weekStart.size() <= 10))
+        && (!('split' in d) || (d.split is map && d.split.size() <= 3))
+        && (!('instAt' in d) || d.instAt in ['','bill','buy'])
+        // 成員名單 = 擁有者 + 可編輯 + 僅檢視，不能多也不能少
+        && d.ownerEmail in d.members
+        && d.members.hasAll(d.editors)
+        && d.members.hasAll(d.viewers)
+        && d.members.hasOnly(d.editors.concat(d.viewers).concat([d.ownerEmail]));
+    }
+    function unchanged(keys) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    match /ledgers/{lid} {
+      allow read: if isMember(resource.data);
+
+      allow create: if signedIn()
+        && validLedger(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail();
+
+      allow update: if validLedger(request.resource.data)
+        && unchanged(['ownerUid','ownerEmail','createdAt'])
+        && (
+          // 擁有者：可以改所有設定，包含分享
+          isOwner(resource.data)
+          // 可編輯的成員：只能改分類和預算
+          || (isEditor(resource.data) && onlyChanged(['categories','budget','projectBudget','split','updatedAt']))
+          // 任何成員：可以把自己移出這本帳（離開共用帳本）
+          || (isMember(resource.data)
+              && onlyChanged(['members','editors','viewers','updatedAt'])
+              && request.resource.data.members == resource.data.members.removeAll([myEmail()])
+              && request.resource.data.editors == resource.data.editors.removeAll([myEmail()])
+              && request.resource.data.viewers == resource.data.viewers.removeAll([myEmail()]))
+        );
+
+      allow delete: if isOwner(resource.data);
+
+      // ---- 收支紀錄 ----
+      function ledger() { return get(/databases/$(database)/documents/ledgers/$(lid)).data; }
+      function validEntry(d) {
+        return d.keys().hasOnly(['type','amount','categoryId','categoryName','date','note','pay',
+                                 'card','payer','paid','status','budget','priority','inst','split','rb','bill',
+                                 'createdBy','createdByEmail','createdAt','updatedAt'])
+          && d.type in ['out','in']
+          && d.amount is number && d.amount >= 0 && d.amount < 1000000000
+          && (!('card' in d) || (d.card is string && d.card.size() <= 20))
+          && (!('payer' in d) || (d.payer is string && d.payer.size() <= 20))
+          && (!('status' in d) || d.status in ['paid','pending'])
+          && (!('budget' in d) || (d.budget is number && d.budget >= 0 && d.budget < 1000000000))
+          && (!('priority' in d) || d.priority in ['','高','中','低'])
+          && (!('inst' in d) || (d.inst is map && d.inst.size() <= 8))
+          && (!('split' in d) || (d.split is map && d.split.size() <= 2))
+          && (!('rb' in d) || (d.rb is map && d.rb.size() <= 3))
+          && (!('paid' in d) || (d.paid is map && d.paid.size() <= 4))
+          && (!('bill' in d) || (d.bill is string && d.bill.matches('^([0-9]{4}-[0-9]{2})?$')))
+          && d.categoryId is string && d.categoryId.size() <= 40
+          && d.categoryName is string && d.categoryName.size() <= 40
+          && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && d.note is string && d.note.size() <= 100
+          && d.pay is string && d.pay.size() <= 20;
+      }
+
+      match /entries/{eid} {
+        allow read: if isMember(ledger());
+        allow create: if isEditor(ledger())
+          && validEntry(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdByEmail == myEmail();
+        allow update: if isEditor(ledger())
+          && validEntry(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdByEmail == resource.data.createdByEmail;
+        allow delete: if isEditor(ledger());
+      }
+
+      // ---- AA 結算紀錄 ----
+      match /settles/{sid} {
+        allow read: if isMember(ledger());
+        allow create: if isEditor(ledger())
+          && request.resource.data.keys().hasOnly(['from','to','amount','date','note','createdBy','createdByEmail','createdAt'])
+          && request.resource.data.from is string && request.resource.data.from.size() <= 20
+          && request.resource.data.to is string && request.resource.data.to.size() <= 20
+          && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount < 1000000000
+          && request.resource.data.date is string && request.resource.data.date.size() <= 10
+          && request.resource.data.createdBy == request.auth.uid;
+        allow delete: if isEditor(ledger());
+      }
+    }
+
+    // ---- 清單（待購、待產包、記事；和帳本一樣可以分享） ----
+    function validList(d) {
+      return d.keys().hasOnly(['name','color','ownerUid','ownerEmail','editors','viewers','members','memo','stats','sort','groups','createdAt','updatedAt'])
+        && (!('sort' in d) || d.sort in ['','manual'])
+        && (!('groups' in d) || (d.groups is list && d.groups.size() <= 50))
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.color is string && d.color.size() <= 20
+        && d.memo is string && d.memo.size() <= 5000
+        && (!('stats' in d) || (d.stats is map && d.stats.size() <= 3))
+        && d.editors is list && d.editors.size() <= 50
+        && d.viewers is list && d.viewers.size() <= 50
+        && d.members is list && d.members.size() <= 101
+        && d.ownerEmail in d.members
+        && d.members.hasAll(d.editors)
+        && d.members.hasAll(d.viewers)
+        && d.members.hasOnly(d.editors.concat(d.viewers).concat([d.ownerEmail]));
+    }
+    match /lists/{lsid} {
+      allow read: if isMember(resource.data);
+      allow create: if signedIn()
+        && validList(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail();
+      allow update: if validList(request.resource.data)
+        && unchanged(['ownerUid','ownerEmail','createdAt'])
+        && (
+          isOwner(resource.data)
+          // 可編輯的成員：只能改記事、摘要、排序方式和分組
+          || (isEditor(resource.data) && onlyChanged(['memo','stats','sort','groups','updatedAt']))
+          // 任何成員：可以把自己移出這個清單
+          || (isMember(resource.data)
+              && onlyChanged(['members','editors','viewers','updatedAt'])
+              && request.resource.data.members == resource.data.members.removeAll([myEmail()])
+              && request.resource.data.editors == resource.data.editors.removeAll([myEmail()])
+              && request.resource.data.viewers == resource.data.viewers.removeAll([myEmail()]))
+        );
+      allow delete: if isOwner(resource.data);
+
+      function theList() { return get(/databases/$(database)/documents/lists/$(lsid)).data; }
+      function validItem(d) {
+        return d.keys().hasOnly(['text','amount','priority','due','note','group','via','done','doneAt','spent','ledgerId','entryId','order',
+                                 'createdBy','createdByEmail','createdAt','updatedAt'])
+          && d.text is string && d.text.size() > 0 && d.text.size() <= 100
+          && d.amount is number && d.amount >= 0 && d.amount < 1000000000
+          && d.priority in ['','高','中','低']
+          && d.due is string && d.due.size() <= 10
+          && d.note is string && d.note.size() <= 200
+          && d.done is bool
+          && d.doneAt is string && d.doneAt.size() <= 10
+          && d.spent is number && d.spent >= 0 && d.spent < 1000000000
+          && d.ledgerId is string && d.ledgerId.size() <= 40
+          && d.entryId is string && d.entryId.size() <= 40
+          && d.order is number
+          && (!('group' in d) || (d.group is string && d.group.size() <= 20))
+          && (!('via' in d) || d.via in ['','gift','have']);
+      }
+      match /items/{iid} {
+        allow read: if isMember(theList());
+        allow create: if isEditor(theList())
+          && validItem(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update: if isEditor(theList())
+          && validItem(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isEditor(theList());
+      }
+    }
+
+    // ---- 行事曆（可以分享給家人） ----
+    function validCal(d) {
+      return d.keys().hasOnly(['name','color','ownerUid','ownerEmail','editors','viewers','members','createdAt','updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.color is string && d.color.size() <= 20
+        && d.editors is list && d.editors.size() <= 50
+        && d.viewers is list && d.viewers.size() <= 50
+        && d.members is list && d.members.size() <= 101
+        && d.ownerEmail in d.members
+        && d.members.hasAll(d.editors)
+        && d.members.hasAll(d.viewers)
+        && d.members.hasOnly(d.editors.concat(d.viewers).concat([d.ownerEmail]));
+    }
+    match /cals/{cid} {
+      allow read: if isMember(resource.data);
+      allow create: if signedIn()
+        && validCal(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail();
+      allow update: if validCal(request.resource.data)
+        && unchanged(['ownerUid','ownerEmail','createdAt'])
+        && (
+          isOwner(resource.data)
+          // 任何成員：可以把自己移出這本行事曆
+          || (isMember(resource.data)
+              && onlyChanged(['members','editors','viewers','updatedAt'])
+              && request.resource.data.members == resource.data.members.removeAll([myEmail()])
+              && request.resource.data.editors == resource.data.editors.removeAll([myEmail()])
+              && request.resource.data.viewers == resource.data.viewers.removeAll([myEmail()]))
+        );
+      allow delete: if isOwner(resource.data);
+
+      function theCal() { return get(/databases/$(database)/documents/cals/$(cid)).data; }
+      function validEvent(d) {
+        return d.keys().hasOnly(['title','date','end','time','place','note','createdBy','createdByEmail','createdAt','updatedAt'])
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 60
+          && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && d.end is string && d.end.matches('^([0-9]{4}-[0-9]{2}-[0-9]{2})?$')
+          && d.time is string && d.time.matches('^([0-9]{2}:[0-9]{2})?$')
+          && d.place is string && d.place.size() <= 60
+          && d.note is string && d.note.size() <= 300;
+      }
+      match /events/{eid} {
+        allow read: if isMember(theCal());
+        allow create: if isEditor(theCal())
+          && validEvent(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update: if isEditor(theCal())
+          && validEvent(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isEditor(theCal());
+      }
+    }
+
+    // ---- 貸款（只有自己看得到） ----
+    function validLoan(d) {
+      return d.keys().hasOnly(['ownerUid','type','name','bank','day','principal','monthly','totalPeriods',
+                               'periodsBase','paidBase','note','ledgerId','categoryId','categoryName',
+                               'payments','rate','adj','io','im','createdAt','updatedAt'])
+        && d.type is string && d.type.size() > 0 && d.type.size() <= 20
+        && d.name is string && d.name.size() <= 30
+        && d.bank is string && d.bank.size() <= 20
+        && d.note is string && d.note.size() <= 100
+        && d.principal is number && d.principal >= 0 && d.principal < 1000000000
+        && d.monthly is number && d.monthly >= 0
+        && d.totalPeriods is number && d.totalPeriods >= 0 && d.totalPeriods <= 1200
+        && d.periodsBase is number && d.periodsBase >= 0
+        && d.paidBase is number && d.paidBase >= 0
+        && d.day is number && d.day >= 0 && d.day <= 31
+        && d.payments is map && d.payments.size() <= 1200
+        && (!('rate' in d) || (d.rate is number && d.rate >= 0 && d.rate <= 100))
+        && (!('adj' in d) || (d.adj is map && d.adj.size() <= 4))
+        && (!('io' in d) || d.io is bool)
+        && (!('im' in d) || d.im in ['','day','month','monthFloor']);
+    }
+    match /loans/{loanId} {
+      allow read, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && validLoan(request.resource.data);
+      allow update: if signedIn() && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid && validLoan(request.resource.data);
+    }
+
+    // ---- 投資持股（只有自己看得到） ----
+    function validHolding(d) {
+      return d.keys().hasOnly(['ownerUid','sym','name','cur','kind','price','priceAt','trades','note','createdAt','updatedAt'])
+        && d.sym is string && d.sym.size() > 0 && d.sym.size() <= 12
+        && d.name is string && d.name.size() <= 30
+        && d.cur in ['TWD','USD']
+        && d.kind in ['stock','etf','bond']
+        && d.price is number && d.price >= 0 && d.price < 100000000
+        && d.priceAt is string && d.priceAt.size() <= 20
+        && d.note is string && d.note.size() <= 100
+        && d.trades is list && d.trades.size() <= 1000;
+    }
+    match /holdings/{hid} {
+      allow read, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && validHolding(request.resource.data);
+      allow update: if signedIn() && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid && validHolding(request.resource.data);
+    }
+
+    // ---- 資產快照（只有自己看得到） ----
+    function validSnap(d) {
+      return d.keys().hasOnly(['ownerUid','date','accounts','inv','loan','loans','note','createdAt','updatedAt'])
+        && d.date is string && d.date.size() == 10
+        && d.accounts is list && d.accounts.size() <= 30
+        && d.inv is number && d.inv >= 0
+        && d.loan is number && d.loan >= 0
+        && (!('loans' in d) || (d.loans is list && d.loans.size() <= 30))
+        && d.note is string && d.note.size() <= 60;
+    }
+    match /snaps/{sid} {
+      allow read, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && validSnap(request.resource.data);
+      allow update: if signedIn() && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid && validSnap(request.resource.data);
+    }
+
+    // ---- 個人設定（預設值、常用清單） ----
+    match /users/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['defaultPay','defaultPayer','defaultCard','startPage','payers','cards','pays','lastBackup','tourDone','tips','inv','me','cardSet','xfer','updatedAt'])
+        && (!('tourDone' in request.resource.data) || request.resource.data.tourDone is bool)
+        && (!('tips' in request.resource.data) || (request.resource.data.tips is list && request.resource.data.tips.size() <= 50))
+        && (!('inv' in request.resource.data) || (request.resource.data.inv is map && request.resource.data.inv.size() <= 6))
+        && (!('lastBackup' in request.resource.data) || request.resource.data.lastBackup is number)
+        && (!('me' in request.resource.data) || (request.resource.data.me is string && request.resource.data.me.size() <= 20))
+        && (!('cardSet' in request.resource.data) || (request.resource.data.cardSet is map && request.resource.data.cardSet.size() <= 50))
+        && (!('xfer' in request.resource.data) || (request.resource.data.xfer is map && request.resource.data.xfer.size() <= 600))
+        && request.resource.data.defaultPay is string && request.resource.data.defaultPay.size() <= 20
+        && request.resource.data.defaultPayer is string && request.resource.data.defaultPayer.size() <= 20
+        && request.resource.data.defaultCard is string && request.resource.data.defaultCard.size() <= 20
+        && request.resource.data.startPage is string && request.resource.data.startPage.size() <= 60
+        && request.resource.data.payers is list && request.resource.data.payers.size() <= 50
+        && request.resource.data.cards is list && request.resource.data.cards.size() <= 50
+        && request.resource.data.pays is list && request.resource.data.pays.size() <= 30;
+    }
+
+    // 其他路徑一律拒絕
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
