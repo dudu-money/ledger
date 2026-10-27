@@ -868,15 +868,17 @@ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;t
 :root[data-theme="dark"]{--ev-personal:#7fb0ff;--ev-list:#d4a47c;--ev-repay:#f0bf4c;--ev-money:#5fd0b4;--ev-mix:18%;--ev-ic:30%}
 /* 深色模式：行程列表用類型色實色底＋深色字，跟選中的類型按鈕同色 */
 @media (prefers-color-scheme:dark){
-:root:not([data-theme="light"]) .ev-kind[aria-pressed="true"]{color:#1a1d1b}
-:root:not([data-theme="light"]) .cal-item,:root:not([data-theme="light"]) .cal-item:hover{background:var(--c);color:#1a1d1b}
+:root:not([data-theme="light"]) .ev-kind[aria-pressed="true"]{color:#1a1d1b;background:var(--ev-solid);border-color:var(--ev-solid)}
+:root:not([data-theme="light"]) .ev-kind,:root:not([data-theme="light"]) .cal-item{--ev-solid:color-mix(in srgb,var(--c) 88%,var(--sheet))}
+:root:not([data-theme="light"]) .cal-item,:root:not([data-theme="light"]) .cal-item:hover{background:var(--ev-solid);color:#1a1d1b}
 :root:not([data-theme="light"]) .cal-item:hover{filter:brightness(1.06)}
 :root:not([data-theme="light"]) .cal-item .cal-m{color:rgba(26,29,27,.75)}
 :root:not([data-theme="light"]) .cal-item .cal-r{color:#1a1d1b}
 :root:not([data-theme="light"]) .cal-ic{background:rgba(255,255,255,.35)}
 }
-:root[data-theme="dark"] .ev-kind[aria-pressed="true"]{color:#1a1d1b}
-:root[data-theme="dark"] .cal-item,:root[data-theme="dark"] .cal-item:hover{background:var(--c);color:#1a1d1b}
+:root[data-theme="dark"] .ev-kind[aria-pressed="true"]{color:#1a1d1b;background:var(--ev-solid);border-color:var(--ev-solid)}
+:root[data-theme="dark"] .ev-kind,:root[data-theme="dark"] .cal-item{--ev-solid:color-mix(in srgb,var(--c) 88%,var(--sheet))}
+:root[data-theme="dark"] .cal-item,:root[data-theme="dark"] .cal-item:hover{background:var(--ev-solid);color:#1a1d1b}
 :root[data-theme="dark"] .cal-item:hover{filter:brightness(1.06)}
 :root[data-theme="dark"] .cal-item .cal-m{color:rgba(26,29,27,.75)}
 :root[data-theme="dark"] .cal-item .cal-r{color:#1a1d1b}
