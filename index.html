@@ -684,10 +684,14 @@
 
 <dialog id="dlgNew" aria-labelledby="nTitle">
   <form method="dialog" id="formNew" class="stack" autocomplete="off">
-    <div class="between"><h2 class="h2" id="nTitle">新增帳本</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
+    <div class="nw-head">
+      <img class="nw-cat" data-cat-scene="money" alt="">
+      <div class="nw-head-text"><h2 class="h2" id="nTitle">新增帳本</h2><p class="nw-sub" id="nSub">從範本開始，幫帳本取個名字</p></div>
+      <button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button>
+    </div>
     <ol class="steps" id="nSteps" aria-label="步驟"><li>名稱</li><li>顏色與貓咪</li><li>分類</li></ol>
     <div class="stack" id="nStep1">
-      <div class="field"><span class="label">從範本開始</span><div class="chips" id="nTemplates"></div></div>
+      <div class="field"><span class="label">從範本開始</span><div class="tpl-grid" id="nTemplates"></div></div>
       <label class="field"><span class="label">帳本名稱</span><input id="nName" type="text" maxlength="40" placeholder="例如：寶寶開銷"></label>
     </div>
     <div class="stack" id="nStep2" hidden>
@@ -708,6 +712,7 @@
       </div>
       <label class="check"><input type="checkbox" id="nProject"> 專案模式 <span class="small muted">— 適合孕期、搬家這類有總預算的帳：每筆可填預算、完成狀態、優先度，並顯示完成率</span></label>
     </div>
+    <div class="nw-preview" id="nPreview" aria-hidden="true"><span class="nw-pv-label">預覽</span><div class="nw-pv-card" id="nPvCard"><span id="nPvCat"></span><div class="nw-pv-body"><div class="nw-pv-name" id="nPvName"></div><div class="nw-pv-meta" id="nPvMeta"></div></div></div></div>
     <div class="row step-nav">
       <button class="btn" type="button" id="nPrev">上一步</button>
       <button class="btn primary" type="button" id="nNext">下一步</button>

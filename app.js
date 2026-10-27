@@ -365,6 +365,7 @@ function renderNewCats(){
   list.forEach((n,i)=>{ const b=el("button","chip rm"); b.type="button"; b.title="移除「"+n+"」";
     b.append(document.createTextNode(n), el("span","x","✕"));
     b.onclick=()=>{ list.splice(i,1); renderNewCats(); }; box.appendChild(b); });
+  renderNewPreview();
 }
 function addNewCat(){
   const n=$("nNewCat").value.trim(); if(!n) return;
@@ -383,16 +384,30 @@ function pickTemplate(k){
   $("nProject").checked = !!TEMPLATES[k].project;
   if(prevAuto) $("nName").value = k==="空白" ? "" : k+(TEMPLATES[k].project?"專案":"開銷");
 }
+/* 新增帳本：範本卡片的圖示和一句說明 */
+const TPL_INFO = { "個人":["👛","吃喝玩樂、日常花費"], "家庭":["🏠","房租水電、家用一起管"], "孕期":["🤰","產檢、待產，有總預算"],
+  "寶寶":["🍼","奶粉尿布、成長開銷"], "搬家":["📦","看屋到入住，有總預算"], "空白":["✏️","分類自己設計"] };
 function renderNewDialog(){
   const t=$("nTemplates"); t.textContent="";
   Object.keys(TEMPLATES).forEach(k=>{
-    const c=el("button","chip",k); c.type="button"; c.setAttribute("aria-pressed", k===S.newTpl);
+    const [ic,desc]=TPL_INFO[k]||["🏷️",""];
+    const c=el("button","tpl"); c.type="button"; c.setAttribute("aria-pressed", k===S.newTpl);
+    const n=el("span","tpl-n",k); if(TEMPLATES[k].project) n.appendChild(el("span","tpl-badge","專案"));
+    c.append(el("span","tpl-ic",ic), n, el("span","tpl-d",desc));
     c.onclick=()=>{ pickTemplate(k); renderNewDialog(); };
     t.appendChild(c);
   });
   renderNewCats();
-  swatches("nColors", S.newColor, c=>{ S.newColor=c; });
-  catPicker("nCats", S.newCat, k=>{ S.newCat=k; });
+  swatches("nColors", S.newColor, c=>{ S.newColor=c; renderNewPreview(); });
+  catPicker("nCats", S.newCat, k=>{ S.newCat=k; renderNewPreview(); });
+  renderNewPreview();
+}
+/* 預覽：建好後在首頁看起來的樣子 */
+function renderNewPreview(){
+  $("nPvCard").style.setProperty("--lc", S.newColor||COLORS[0]);
+  const box=$("nPvCat"); if(box.dataset.k!==S.newCat){ box.textContent=""; box.appendChild(catImg(S.newCat,"cat-av")); box.dataset.k=S.newCat; }
+  $("nPvName").textContent=$("nName").value.trim()||"新帳本";
+  $("nPvMeta").textContent=`${S.newCats.out.length+S.newCats.in.length} 個分類` + ($("nProject").checked?"・專案模式":"");
 }
 /* 三個步驟：1 名稱與範本、2 顏色與貓咪、3 分類與專案模式 */
 function newStep(n){
@@ -402,7 +417,11 @@ function newStep(n){
   [1,2,3].forEach(i=>{ $("nStep"+i).hidden = i!==n; });
   [...$("nSteps").children].forEach((li,i)=>{ li.classList.toggle("on", i+1===n); li.classList.toggle("done", i+1<n); });
   $("nPrev").hidden = n===1; $("nNext").hidden = n===3; $("nCreate").hidden = n!==3;
+  $("nSub").textContent = ["從範本開始，幫帳本取個名字","挑一個顏色和一隻貓咪當頭像","整理分類，之後在帳本設定也能改"][n-1];
+  renderNewPreview();
 }
+$("nName").addEventListener("input", renderNewPreview);
+$("nProject").addEventListener("change", renderNewPreview);
 $("nPrev").onclick=()=>newStep(S.newStep-1);
 $("nNext").onclick=()=>newStep(S.newStep+1);
 $("nName").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); newStep(2); } });
