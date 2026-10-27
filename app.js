@@ -50,8 +50,8 @@ function catImg(key, cls){
   return i;
 }
 /* 貓咪圖鑑：圖片一律是 cats/{品種}/{情境}.webp，cats/manifest.json 記每種貓有哪些圖。
-   情境：face 頭像、happy 開心、sleep 睡覺、content 滿足、box 調皮、money 記帳中、cheer 加油 */
-const CAT_SCENES = ["face","happy","sleep","content","box","money","cheer"];
+   情境：face 頭像、happy 開心、sleep 睡覺、content 滿足、box 調皮、money 記帳中、cheer 加油、hero 首頁橫幅、nav 電腦版左下角（後兩張是橫的） */
+const CAT_SCENES = ["face","happy","sleep","content","box","money","cheer","hero","nav"];
 const MY_CAT_DEFAULT = "orangewhite";
 let CAT_MANIFEST = null;
 fetch("cats/manifest.json").then(r=>r.ok?r.json():null).then(m=>{ if(m && m.breeds){ CAT_MANIFEST=m; paintMyCat(true); } }).catch(()=>{});

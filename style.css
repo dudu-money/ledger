@@ -698,3 +698,8 @@ body.nav-on .page > .tabs{display:none}
   body.nav-on.bar-on .appnav{top:64px;padding-top:14px}
   body.nav-on.bar-on .appnav-brand{display:none!important}
 }
+
+/* 橫的插畫（hero、nav）：高度固定、寬度跟著圖；缺圖退回方形的開心也能放 */
+.cat-hero{padding:10px 8px 6px 20px;min-height:150px}
+.cat-hero-img{width:auto;max-width:55%;height:clamp(120px,30vw,190px)}
+@media (min-width:821px) and (min-height:700px){ .nav-cheer-img{width:auto;max-width:190px;height:auto;max-height:132px} }

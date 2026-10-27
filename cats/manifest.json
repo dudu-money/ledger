@@ -8,7 +8,9 @@
   "content": "滿足",
   "box": "調皮",
   "money": "記帳中",
-  "cheer": "加油"
+  "cheer": "加油",
+  "hero": "首頁橫幅（橫的）",
+  "nav": "電腦版左下角（橫的）"
  },
  "breeds": {
   "orange": [
@@ -27,7 +29,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "tabby": [
    "face",
