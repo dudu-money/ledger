@@ -64,7 +64,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "black": [
    "face",
@@ -73,7 +75,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "white": [
    "face",
