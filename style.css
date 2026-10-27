@@ -763,3 +763,13 @@ body.nav-on .page > .tabs{display:none}
   #dlgBell{margin:72px 24px auto auto;width:400px}
 }
 .srch-bar input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+
+/* 首頁：虛線的新增帳本卡片（圈圈加號＋標題＋一行小字） */
+.lcard.lcard-new{align-items:center;justify-content:center;text-align:center;gap:4px;padding:14px 12px;color:var(--ink)}
+.lcn-plus svg{display:block;width:34px;height:34px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round}
+.lcn-title{font-weight:700;font-size:16px;margin-top:4px}
+.lcn-sub{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:400;color:var(--muted)}
+.lcn-paw svg{display:block;width:18px;height:18px}
+.lcn-paw .pad{fill:#f28fab}
+.lcn-paw .spot{fill:#6b4226}
+.lcard-new:hover .lcn-title{color:var(--accent)}

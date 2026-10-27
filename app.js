@@ -332,8 +332,12 @@ function ledgerCard(l){
   b.append(catImg(ledgerCat(l),"cat-av lc-cat"), body); return b;
 }
 function newLedgerCard(){
-  const b=el("button","lcard lc-row lcard-new"); b.type="button"; b.onclick=()=>$("btnNewLedger").click();
-  b.append(el("span","plus","＋"), el("span",null,"新增帳本")); return b;
+  const b=el("button","lcard lcard-new"); b.type="button"; b.onclick=()=>$("btnNewLedger").click();
+  const ic=el("span","lcn-plus"); ic.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7.5v9M7.5 12h9"/></svg>';
+  const sub=el("span","lcn-sub","建立屬於你的新帳本");
+  const paw=el("span","lcn-paw"); paw.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><g class="pad"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.5" cy="10.5" rx="2.1" ry="2.6"/><ellipse cx="9.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="14.5" cy="6.5" rx="2.1" ry="2.7"/><ellipse cx="18.5" cy="10.5" rx="2.1" ry="2.6"/></g><g class="spot"><ellipse cx="10.2" cy="15.2" rx="1.5" ry="1.2"/><circle cx="14" cy="17.6" r="1"/><circle cx="12.8" cy="14" r=".55"/><ellipse cx="14.9" cy="5.7" rx=".9" ry="1"/><circle cx="5" cy="11.4" r=".7"/></g></svg>';
+  sub.appendChild(paw);
+  b.append(ic, el("span","lcn-title","新增帳本"), sub); return b;
 }
 
 /* ================= 顏色選擇（預設色＋自訂） ================= */
