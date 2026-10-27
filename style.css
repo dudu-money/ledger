@@ -4,9 +4,9 @@
   --accent:#1d6b52; --accent-soft:#e2efe8; --on-accent:#ffffff;
   --out:#b23a2a; --out-soft:#f7e5e1; --in:#1d6b52; --warn:#a86a00;
   --shadow:0 10px 30px rgba(20,40,32,.14);
-  --f-display:"Noto Serif TC","Songti TC",serif;
-  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
-  --f-num:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --f-display:"Chiron GoRound TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-body:"Chiron GoRound TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"Nunito","Chiron GoRound TC",system-ui,sans-serif;
   color-scheme:light;
 }
 /* 深色：跟隨系統（沒有手動選淺色時），或手動選深色 */
