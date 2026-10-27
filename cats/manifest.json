@@ -42,7 +42,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ],
   "calico": [
    "face",
@@ -51,7 +53,8 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero"
   ],
   "tortie": [
    "face",
