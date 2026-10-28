@@ -937,6 +937,13 @@ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;t
 :root[data-theme="dark"] .cal-item .cal-m{color:rgba(26,29,27,.75)}
 :root[data-theme="dark"] .cal-item .cal-r{color:#1a1d1b}
 :root[data-theme="dark"] .cal-ic{background:rgba(255,255,255,.35)}
+/* 階段 4：行事曆的每日收支（測試中）、行程視窗打開關聯清單 */
+.cal-money{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+.cal-test{margin:8px 2px 0}
+.ev-list-row{display:flex;gap:8px;align-items:center}
+.ev-list-row select{flex:1;min-width:0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cal-item .cal-money span{color:#1a1d1b}}
+:root[data-theme="dark"] .cal-item .cal-money span{color:#1a1d1b}
 /* 日期／月份／時間選單（電腦版，app.js 的 pk*） */
 @media (pointer:fine){
   input[type=date],input[type=time],input[type=month]{cursor:pointer}

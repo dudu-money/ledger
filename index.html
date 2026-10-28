@@ -258,6 +258,7 @@
       <section class="panel cal-side">
         <div class="between"><h3 class="h3" id="calDayTitle">今天</h3><button class="btn sm" id="cNow" type="button">今天</button></div>
         <div id="calDay" class="cal-day-list"></div>
+        <p class="small muted cal-test" id="calMoneyTest" hidden></p>
         <button class="btn primary cal-add" id="cAdd" type="button">＋ 新增行程／提醒</button>
       </section>
     </div>
@@ -1123,7 +1124,7 @@
     <div class="between"><h2 class="h2" id="evTitle">新增行程／提醒</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
     <div class="field"><span class="label">類型</span><div class="ev-kinds" id="evKinds" role="group" aria-label="類型"></div></div>
     <label class="field"><span class="label">標題</span><input id="evName" type="text" maxlength="60" required placeholder="例如：產檢、採購奶瓶、信用卡繳款"></label>
-    <label class="field" id="evListWrap" hidden><span class="label">關聯清單（選填）</span><select id="evList"></select></label>
+    <div class="field" id="evListWrap" hidden><label class="label" for="evList">關聯清單（選填）</label><div class="ev-list-row"><select id="evList"></select><button type="button" class="btn sm" id="evListGo" hidden>打開清單</button></div></div>
     <div class="grid2">
       <label class="field"><span class="label">日期</span><input id="evDate" type="date" required></label>
       <label class="field"><span class="label">時間（選填）</span><input id="evTime" type="time"></label>
