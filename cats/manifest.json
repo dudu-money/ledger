@@ -164,7 +164,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "siamese": [
    "face",
@@ -175,7 +181,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "ragdoll": [
    "face",
@@ -186,7 +198,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "blue": [
    "face",
@@ -197,7 +215,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "fold": [
    "face",
@@ -208,7 +232,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ]
  }
 }
