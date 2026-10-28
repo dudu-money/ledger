@@ -152,7 +152,9 @@
    "content",
    "box",
    "money",
-   "cheer"
+   "cheer",
+   "hero",
+   "nav"
   ]
  }
 }
