@@ -218,7 +218,7 @@ function route(){
   if(location.hash==="#repay"){ show("viewRepay"); renderRepay(); return; }
   if(location.hash==="#invest"){ show("viewInvest"); renderInvest(); return; }
   if(location.hash==="#lists"){ show("viewLists"); renderLists(); return; }
-  if(location.hash==="#cal"){ show("viewCal"); S.calCardsFor=""; S.calAutoFor=""; S.calMoneyFor=""; syncCalEvents(); renderCal(); return; }
+  if(location.hash==="#cal"){ show("viewCal"); S.calCardsFor=""; S.calAutoFor=""; syncCalEvents(); renderCal(); return; }
   if(location.hash==="#settings"){ show("viewSettings"); renderGlobalSettings(); return; }
   show("viewHome"); renderHome();
 }
@@ -2524,7 +2524,7 @@ const TOUR=[
   { sel:'#appNav a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
   { sel:'#appNav a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
   { sel:'#appNav a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，分成採購清單和待辦清單兩種，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
-  { sel:'#appNav a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記，每天的收支合計也看得到。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
+  { sel:'#appNav a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
   { sel:"#btnSearch", title:"搜尋與提醒", text:"上方的搜尋可以一次找帳本、紀錄（備註、分類、卡片、金額都可以）、清單項目和行程，電腦上按 Ctrl＋K 也能打開。旁邊的鈴鐺會集中提醒：7 天內要繳的貸款和信用卡、快到期的清單項目、今明兩天的行程，還有該備份的時候，紅點是還沒看過的提醒。" },
   { sel:'#appNav a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。在「我的貓咪」挑一隻代表貓、幫牠取名字，首頁和記完一筆時都會由牠陪你。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
 ];
@@ -3760,7 +3760,7 @@ $("lsLeave").onclick=async()=>{
 /* ================= 行事曆 ================= */
 /* 自己新增的家庭行程放在可以分享的行事曆（cals/{id}/events）；
    繳費日、清單截止日是從貸款、信用卡設定、清單自動帶入，只有自己看得到，不另外存。 */
-S.cals=new Map(); S.calEvents=new Map(); S.calUnsubs=new Map(); S.calAutoItems=[]; S.calAutoFor=""; S.calMoney=null; S.calMoneyFor="";
+S.cals=new Map(); S.calEvents=new Map(); S.calUnsubs=new Map(); S.calAutoItems=[]; S.calAutoFor="";
 S.calYM=thisYM(); S.calSel=todayStr();
 const calHide = () => { try{ return new Set(JSON.parse(store.get("ledger.calHide")||"[]")); }catch(e){ return new Set(); } };
 const setCalHide = s => store.set("ledger.calHide", JSON.stringify([...s]));
@@ -3813,22 +3813,6 @@ async function loadCalCards(){
     S.calCards={ym, t:{mine:tot(mine), xfer:tot(xfer)}}; if(location.hash==="#cal") renderCal();
   }catch(e){ S.calCardsFor=""; }
 }
-/* 每日收支（測試中）：讀每本帳本這個月的紀錄，記下讀了幾筆、花多久 */
-async function loadCalMoney(){
-  const ym=S.calYM, key=ym+"|"+[...S.ledgers.keys()].sort().join(",");
-  if(calHide().has("money") || S.calMoneyFor===key) return; S.calMoneyFor=key;
-  const a=`${ym}-01`, b=`${ym}-${pad(dim(ym))}`, days=new Map(), t0=performance.now(); let reads=0;
-  for(const l of S.ledgers.values()){
-    try{ const snap=await getDocs(query(collection(db,"ledgers",l.id,"entries"), where("date",">=",a), where("date","<=",b)));
-      reads+=snap.size;
-      snap.docs.forEach(d=>{ const e=d.data(); if(!e.date || !e.amount) return;
-        if(!days.has(e.date)) days.set(e.date, new Map()); const m=days.get(e.date);
-        if(!m.has(l.id)) m.set(l.id, {i:0, o:0, n:0}); const r=m.get(l.id);
-        if(e.type==="in") r.i+=e.amount; else r.o+=own(e); r.n++; }); }catch(e){}
-  }
-  if(S.calMoneyFor!==key) return;
-  S.calMoney={ym, days, reads, ms:Math.round(performance.now()-t0), n:S.ledgers.size}; if(location.hash==="#cal") renderCal();
-}
 /* 這個月自動帶入的日子 */
 function calAutoEvents(ym){
   const out=[], day=d=>`${ym}-${pad(Math.min(d, dim(ym)))}`;
@@ -3846,9 +3830,6 @@ function calAutoEvents(ym){
     out.push({ auto:"card", date:day(c.p), title: other ? `轉帳給${c.o}繳 ${card} 卡費` : `${card} 卡費繳款截止`, sub: x ? `已轉 ${fmt(x.a)}` : `${fmt(amt)}`, done:!!x, go:"#repay" }); });
   S.calAutoItems.forEach(i=>out.push({ auto:"list", date:i.due, title: listKind(i.list)==="buy" ? `準備 ${i.text}` : i.text, list:i.list, amt: i.done ? (i.spent||0) : (i.amount||0),
     sub:i.list.name+(i.amount?`・約 ${fmt(i.amount)}`:""), done:!!i.done, go:"#list/"+i.list.id }));
-  const mo=S.calMoney && S.calMoney.ym===ym && !calHide().has("money") ? S.calMoney.days : null;
-  if(mo) mo.forEach((m,d)=>m.forEach((r,lid)=>{ const l=S.ledgers.get(lid); if(!l || (!r.i && !r.o)) return;
-    out.push({ auto:"money", date:d, title:l.name, i:r.i, o:r.o, n:r.n, done:false, go:"#l/"+lid }); }));
   return out;
 }
 /* 把行程攤到每一天（多天行程每天都顯示） */
@@ -3858,22 +3839,22 @@ function calByDay(ym){
   S.calEvents.forEach((list,cid)=>{ if(hide.has(cid) || !S.cals.has(cid)) return;
     list.forEach(e=>{ const end = e.end && e.end>e.date ? e.end : e.date; let d=e.date, n=0;
       while(d<=end && n<62){ add(d, e); d=addDays(d,1); n++; } }); });
-  calAutoEvents(ym).forEach(e=>{ if(!hide.has(e.auto==="money" ? "money" : "auto")) add(e.date, e); });
-  m.forEach(l=>l.sort((x,y)=>(x.auto?1:0)-(y.auto?1:0) || (x.auto==="money"?1:0)-(y.auto==="money"?1:0) || (x.time||"99").localeCompare(y.time||"99") || x.title.localeCompare(y.title,"zh-Hant")));
+  if(!hide.has("auto")) calAutoEvents(ym).forEach(e=>add(e.date, e));
+  m.forEach(l=>l.sort((x,y)=>(x.auto?1:0)-(y.auto?1:0) || (x.time||"99").localeCompare(y.time||"99") || x.title.localeCompare(y.title,"zh-Hant")));
   return m;
 }
 const addDays=(d,k)=>{ const t=new Date(d+"T00:00"); t.setDate(t.getDate()+k); return `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`; };
 /* 行程類型：決定顏色和圖示。自動帶入的繳款日算「還款」、清單截止日算「清單待辦」；舊行程沒有 kind 就是個人行程 */
 const EV_KINDS = { personal:["個人行程","var(--ev-personal)","📅"], list:["清單待辦","var(--ev-list)","🛒"], repay:["還款提醒","var(--ev-repay)","💳"], money:["收支提醒","var(--ev-money)","💰"] };
-const calKind = e => e.auto ? (e.auto==="list" ? "list" : e.auto==="money" ? "money" : "repay") : (EV_KINDS[e.kind] ? e.kind : "personal");
+const calKind = e => e.auto ? (e.auto==="list" ? "list" : "repay") : (EV_KINDS[e.kind] ? e.kind : "personal");
 const calColor = e => EV_KINDS[calKind(e)][1];
-const calIcon = e => e.auto==="loan" ? "🏦" : e.auto==="card" ? "💳" : e.auto==="list" ? "📝" : e.auto==="money" ? "📒" : EV_KINDS[calKind(e)][2];
+const calIcon = e => e.auto==="loan" ? "🏦" : e.auto==="card" ? "💳" : e.auto==="list" ? "📝" : EV_KINDS[calKind(e)][2];
 const WD=["日","一","二","三","四","五","六"];
 function renderCal(){
-  tipsFor("tipCal", [["cal4","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入；清單裡已完成的項目會打勾，各帳本當天的收入和支出也會列在那天下面（可以在下方「每日收支」關掉）。點月曆上的日子，旁邊會列出那天的事；按「＋ 新增行程／提醒」可以選個人行程、清單待辦、還款提醒或收支提醒，顏色會跟著類型。行事曆可以分享給家人一起看、一起編輯。7 天內要繳的錢、快到期的清單項目和今明兩天的行程，也會出現在上方的鈴鐺裡。"]]);
+  tipsFor("tipCal", [["cal4","繳費日（貸款、信用卡繳款截止日）和清單的截止日會自動出現在這裡，不用另外輸入；清單裡已完成的項目也會列出來並打勾。點月曆上的日子，旁邊會列出那天的事；按「＋ 新增行程／提醒」可以選個人行程、清單待辦、還款提醒或收支提醒，顏色會跟著類型。行事曆可以分享給家人一起看、一起編輯。7 天內要繳的錢、快到期的清單項目和今明兩天的行程，也會出現在上方的鈴鐺裡。"]]);
   const ym=S.calYM; $("cTitle").textContent=ymLabel(ym);
   if(S.calSel.slice(0,7)!==ym) S.calSel = ym===thisYM() ? todayStr() : `${ym}-01`;
-  loadCalListItems(); loadCalCards(); loadCalMoney();
+  loadCalListItems(); loadCalCards();
   // 篩選與行事曆
   const hide=calHide(), fb=$("calFilters"); fb.textContent="";
   const chip=(label, color, id, extra)=>{ const w=el("span","cal-chip"+(hide.has(id)?" off":""));
@@ -3884,7 +3865,6 @@ function renderCal(){
     const st=el("button","cal-chip-set","設定"); st.type="button"; st.setAttribute("aria-label",`${c.name} 的設定`); st.onclick=()=>openCalSet(c.id);
     chip(c.name + (c.ownerUid!==S.user.uid ? `（${c.ownerEmail.split("@")[0]} 分享）` : (c.members||[]).length>1 ? `（${c.members.length} 人）` : ""), c.color||COLORS[0], c.id, st); });
   chip("繳費日和截止日", EV_KINDS.repay[1], "auto");
-  if(S.ledgers.size) chip("每日收支", EV_KINDS.money[1], "money");
   const nb=el("button","chip add", S.cals.size ? "＋ 新行事曆" : "＋ 建立家庭行事曆"); nb.type="button"; nb.onclick=()=>createCal(); fb.appendChild(nb);
   // 月曆
   const byDay=calByDay(ym), g=$("calGrid"); g.textContent="";
@@ -3896,7 +3876,7 @@ function renderCal(){
     const c=el("button","cal-cell"+(ds===today?" today":"")+(ds===S.calSel?" sel":"")); c.type="button";
     c.setAttribute("aria-label", `${Number(ym.slice(5))} 月 ${d} 日${evs.length?`，${evs.length} 項`:""}`);
     c.appendChild(el("span","cal-d",String(d)));
-    const kinds=Object.keys(EV_KINDS).filter(k=>evs.some(e=>calKind(e)===k && !e.done && e.auto!=="money"));
+    const kinds=Object.keys(EV_KINDS).filter(k=>evs.some(e=>calKind(e)===k && !e.done));
     if(kinds.length){ const dots=el("span","cal-dots"); kinds.forEach(k=>{ const i=el("i"); i.style.background=EV_KINDS[k][1]; dots.appendChild(i); }); c.appendChild(dots); }
     c.onclick=()=>{ S.calSel=ds; renderCal(); };
     g.appendChild(c);
@@ -3908,17 +3888,15 @@ function renderCal(){
   const dayBox=$("calDay"); dayBox.textContent="";
   if(!dEv.length){ const e=el("div","cal-day-empty"); e.appendChild(myCatImg("sleep","cal-day-cat")); e.appendChild(el("p",null,"這天沒有行程，可以放鬆一下。")); dayBox.appendChild(e); }
   dEv.forEach(e=>dayBox.appendChild(calItem(e)));
-  const cm=S.calMoney; $("calMoneyTest").hidden = !(cm && cm.ym===ym && !hide.has("money"));
-  if(cm && cm.ym===ym) $("calMoneyTest").textContent=`每日收支測試中：這個月從 ${cm.n} 本帳本讀了 ${cm.reads} 筆紀錄，花 ${(cm.ms/1000).toFixed(1)} 秒。`;
   // 顏色說明
   const lg=$("calLegend"); lg.textContent="";
   Object.values(EV_KINDS).forEach(([label,color])=>{ const t=el("span","cal-lg"); const i=el("i"); i.style.background=color; t.append(i, document.createTextNode(label)); lg.appendChild(t); });
   // 這個月
   const mb=$("calMonth"); mb.textContent="";
-  const days=[...byDay.keys()].filter(d=>byDay.get(d).some(e=>e.auto!=="money")).sort();
+  const days=[...byDay.keys()].sort();
   if(!days.length) mb.appendChild(el("p","small muted", S.cals.size ? "這個月還沒有行程。" : "按「＋ 新增行程」就會自動建立一本「家庭行事曆」，之後可以在「設定」分享給家人。"));
   days.forEach(d=>{ const h=el("div","cal-date"+(d===today?" today":""), `${Number(d.slice(5,7))}/${Number(d.slice(8))}（${WD[new Date(d+"T00:00").getDay()]}）`); mb.appendChild(h);
-    byDay.get(d).filter(e=>e.auto!=="money").forEach(e=>mb.appendChild(calRow(e, true))); });
+    byDay.get(d).forEach(e=>mb.appendChild(calRow(e, true))); });
 }
 /* 右邊「這天」的一項：類型圖示、標題、說明，右邊放時間或金額 */
 function calItem(e){
@@ -3927,7 +3905,6 @@ function calItem(e){
   const main=el("div","cal-main"); main.appendChild(el("div","cal-t", e.title));
   const meta=[];
   if(e.auto==="list") meta.push(`清單：${e.list.name}`, e.done ? "已完成" : "截止日");
-  else if(e.auto==="money") meta.push(`當天收支・${e.n} 筆`);
   else if(e.auto) meta.push(e.done ? "這期已處理" : "自動帶入的繳款日");
   else {
     const lst=e.listId && S.lists.get(e.listId); if(lst) meta.push(`來自清單：${lst.name}`);
@@ -3938,9 +3915,8 @@ function calItem(e){
   }
   if(meta.length) main.appendChild(el("div","cal-m", meta.join("・")));
   r.appendChild(main);
-  if(e.auto==="money"){ const m=el("span","cal-r cal-money"); if(e.i) m.appendChild(el("span","c-in","+"+fmt(e.i))); if(e.o) m.appendChild(el("span","c-out","−"+fmt(e.o))); r.appendChild(m); }
-  else { const right = e.auto ? (e.auto==="list" ? (e.amt ? (e.done?"":"約 ")+fmt(e.amt) : "") : e.sub) : (e.time||"");
-    if(right) r.appendChild(el("span","cal-r", right)); }
+  const right = e.auto ? (e.auto==="list" ? (e.amt ? (e.done?"":"約 ")+fmt(e.amt) : "") : e.sub) : (e.time||"");
+  if(right) r.appendChild(el("span","cal-r", right));
   if(e.done) r.appendChild(el("span","cal-ok","✓"));
   r.onclick=()=>{ if(e.auto) location.hash=e.go; else openEvent(e); };
   return r;
