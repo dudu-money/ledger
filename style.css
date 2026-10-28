@@ -941,5 +941,21 @@ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;t
 .lst-empty{font-size:13px;color:var(--muted)}
 .lst-card.finished .lst-need{color:var(--in);font-weight:600}
 .lst-none{grid-column:1/-1}
+.lst-filter button{white-space:nowrap}
+.lst-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.lst-foot>div{min-width:0}
+/* 清單類型標籤：採購橘、待辦藍 */
+:root{--lk-buy-bg:#fde3d3;--lk-buy:#b0561a;--lk-todo-bg:#dfe8fb;--lk-todo:#2f5fa8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--lk-buy-bg:#4a2c1a;--lk-buy:#ffb987;--lk-todo-bg:#1d2b45;--lk-todo:#9cc0ff}}
+:root[data-theme="dark"]{--lk-buy-bg:#4a2c1a;--lk-buy:#ffb987;--lk-todo-bg:#1d2b45;--lk-todo:#9cc0ff}
+.lst-kind{flex:none;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.lst-kind.k-buy{background:var(--lk-buy-bg);color:var(--lk-buy)}
+.lst-kind.k-todo{background:var(--lk-todo-bg);color:var(--lk-todo)}
+#lsOwnerBox .kind-field{margin:14px 0}
+.kind-seg{align-self:flex-start}
+.kind-seg button{white-space:nowrap;padding:6px 14px}
+.kind-seg button[data-k="buy"][aria-pressed="true"]{background:var(--lk-buy-bg);color:var(--lk-buy);font-weight:600}
+.kind-seg button[data-k="todo"][aria-pressed="true"]{background:var(--lk-todo-bg);color:var(--lk-todo);font-weight:600}
+@media (max-width:560px){ .lst-filter .lf-long{display:none} }
 #myLists,#sharedLists{grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr))}
 @media (max-width:560px){ .lst-card{gap:8px;padding:12px 14px 14px} .lst-cat{width:60px;height:60px} }

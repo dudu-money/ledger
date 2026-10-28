@@ -286,6 +286,8 @@
       <button type="button" data-f="all" aria-pressed="true">全部</button>
       <button type="button" data-f="doing" aria-pressed="false">進行中</button>
       <button type="button" data-f="done" aria-pressed="false">已完成</button>
+      <button type="button" data-f="buy" aria-pressed="false">採購<span class="lf-long">清單</span></button>
+      <button type="button" data-f="todo" aria-pressed="false">待辦<span class="lf-long">清單</span></button>
     </div>
     <div class="ledger-grid" id="myLists"></div>
     <div id="sharedListsWrap" hidden>
@@ -995,6 +997,10 @@
     <div class="between"><h2 class="h2" id="nlTitle">新增清單</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉">✕</button></div>
     <div class="field"><span class="label">從範本開始</span><div class="chips" id="nlTemplates"></div></div>
     <label class="field"><span class="label">清單名稱</span><input id="nlName" type="text" maxlength="40" required placeholder="例如：待產包"></label>
+    <div class="field kind-field"><span class="label">類型</span>
+      <div class="seg sm kind-seg" role="group" aria-label="清單類型" id="nlKind">
+        <button type="button" data-k="buy" aria-pressed="false">採購清單</button><button type="button" data-k="todo" aria-pressed="true">待辦清單</button>
+      </div><span class="small muted">採購會算還要準備多少錢，待辦用來列要做的事。</span></div>
     <label class="check" id="nlSeedWrap"><input type="checkbox" id="nlSeed" checked> <span id="nlSeedText">帶入常見項目（之後可以刪改）</span></label>
     <div class="field"><span class="label">顏色</span><div class="swatches" id="nlColors"></div></div>
     <button class="btn primary" type="submit" value="save" id="nlCreate">建立</button>
@@ -1143,6 +1149,10 @@
     <div class="between"><h2 class="h2" id="lsTitle">清單設定</h2><button class="icon-btn" value="cancel" formnovalidate aria-label="關閉" id="lsClose">✕</button></div>
     <div id="lsOwnerBox">
       <label class="field"><span class="label">清單名稱</span><input id="lsName" type="text" maxlength="40"></label>
+      <div class="field kind-field"><span class="label">類型</span>
+      <div class="seg sm kind-seg" role="group" aria-label="清單類型" id="lsKind">
+        <button type="button" data-k="buy" aria-pressed="false">採購清單</button><button type="button" data-k="todo" aria-pressed="true">待辦清單</button>
+      </div><span class="small muted">採購會算還要準備多少錢，待辦用來列要做的事。</span></div>
       <div class="field"><span class="label">顏色</span><div class="swatches" id="lsColors"></div></div>
       <div class="field"><span class="label">分享給家人</span>
         <div class="row wrap"><input id="lsEmail" type="email" placeholder="對方登入用的 Email" class="grow" aria-label="Email">

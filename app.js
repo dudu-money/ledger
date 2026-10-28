@@ -2436,7 +2436,7 @@ $("bkRestore").onclick=async()=>{
     if(doLists){ const d=new Date(), tg=`（還原 ${d.getMonth()+1}/${d.getDate()}）`;
       for(const ls of (BK.lists||[])){ const x=ls.data||{};
         const ref=await addDoc(collection(db,"lists"), { name:(String(x.name||"清單")+tg).slice(0,40), color:String(x.color||COLORS[0]).slice(0,20), ownerUid:S.user.uid, ownerEmail:S.email,
-          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), ...(x.sort==="manual"?{sort:"manual"}:{}), ...(Array.isArray(x.groups)?{groups:x.groups.map(g=>String(g).slice(0,20)).filter(Boolean).slice(0,50)}:{}), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
+          editors:[], viewers:[], members:[S.email], memo:String(x.memo||"").slice(0,5000), ...(x.kind in LIST_KINDS?{kind:x.kind}:{}), ...(x.sort==="manual"?{sort:"manual"}:{}), ...(Array.isArray(x.groups)?{groups:x.groups.map(g=>String(g).slice(0,20)).filter(Boolean).slice(0,50)}:{}), createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
         const its=ls.items||[];
         for(let k=0;k<its.length;k+=400){ const b=writeBatch(db);
           its.slice(k,k+400).forEach((it,j)=>b.set(doc(collection(db,"lists",ref.id,"items")), { text:String(it.text||"項目").slice(0,100), amount:Number(it.amount)||0,
@@ -2523,7 +2523,7 @@ const TOUR=[
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
   { sel:'#appNav a[href="#repay"]', title:"還款與分期", text:"貸款和信用卡分期都在這裡：這個月要繳哪些、還剩幾期一目了然，每月按一下「標記已繳」就好。銀行貸款填上年利率，會自動拆本金和利息；不知道利率可以一鍵推算，學貸緩繳也能記。跟銀行 APP 對不起來時可以「校正剩餘本金」，銀行寫含利息的剩餘費用也能照著對，看不到已繳期數也能幫你推算；最後一期金額不同也會自動算好。信用卡帳單會依持卡人分開，刷別人名下的卡也能算出這期要轉多少、記下轉了沒。" },
   { sel:'#appNav a[href="#invest"]', title:"資產", text:"每個月填一次各戶頭有多少錢，就能看到淨資產的變化（會自動算進投資、扣掉每筆貸款），還會比較每個戶頭比上次多或少多少。下面是股票、ETF：買進、賣出、股息各記一筆，會自動算持有股數、平均成本和賺賠。只有你自己看得到。" },
-  { sel:'#appNav a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
+  { sel:'#appNav a[href="#lists"]', title:"清單", text:"待產包、寶寶用品、想買的東西都可以列在這裡，分成採購清單和待辦清單兩種，每項可以填預估金額、分組、截止日。打勾時可以順便記一筆支出到帳本，親友送的、家裡已有的也能直接勾掉。清單可以分享給家人一起勾。" },
   { sel:'#appNav a[href="#cal"]', title:"行事曆", text:"貸款和信用卡的繳費日、清單的截止日會自動排進月曆，不用另外記。產檢、打預防針、聚餐這類家庭行程也可以加進來，行事曆能分享給家人一起看、一起編輯。" },
   { sel:"#btnSearch", title:"搜尋與提醒", text:"上方的搜尋可以一次找帳本、紀錄（備註、分類、卡片、金額都可以）、清單項目和行程，電腦上按 Ctrl＋K 也能打開。旁邊的鈴鐺會集中提醒：7 天內要繳的貸款和信用卡、快到期的清單項目、今明兩天的行程，還有該備份的時候，紅點是還沒看過的提醒。" },
   { sel:'#appNav a[href="#settings"]', title:"設定", text:"換顏色、設定預設付款人和信用卡、設定每張卡的持卡人、結帳日和繳款日、備份到 Google 雲端硬碟都在這裡。在「我的貓咪」挑一隻代表貓、幫牠取名字，首頁和記完一筆時都會由牠陪你。帳本要分享給家人，則是點進帳本後的「帳本設定」。" }
@@ -3196,12 +3196,12 @@ $("rbUndo").onclick=async()=>{
 /* ================= 清單（待購、待產包、備忘） ================= */
 /* lists/{id}：名稱、顏色、成員（和帳本一樣可以分享）、記事 memo；項目放在 lists/{id}/items */
 const LIST_TEMPLATES={
-  "待產包":{ color:"#b23a5a", items:[
+  "待產包":{ color:"#b23a5a", kind:"buy", items:[
     ["產褥墊","媽媽"],["免洗褲","媽媽"],["哺乳內衣","媽媽"],["溢乳墊","媽媽"],["月子帽／保暖外套","媽媽"],["束腹帶","媽媽"],["吸管保溫杯","媽媽"],["拖鞋","媽媽"],["盥洗用品","媽媽"],["媽媽手冊、健保卡、身分證","證件"],
     ["紗布衣","寶寶"],["包巾","寶寶"],["紗布巾","寶寶"],["新生兒尿布（NB）","寶寶"],["濕紙巾","寶寶"],["出院衣服","寶寶"],["嬰兒汽座（出院用）","寶寶"] ]},
-  "寶寶用品":{ color:"#2f5fa8", items:[
+  "寶寶用品":{ color:"#2f5fa8", kind:"buy", items:[
     ["奶瓶","餵奶"],["奶嘴","餵奶"],["奶瓶消毒鍋","餵奶"],["溫奶器","餵奶"],["嬰兒床","睡覺"],["床包／防水墊","睡覺"],["澡盆","洗澡"],["嬰兒沐浴乳","洗澡"],["指甲剪","護理"],["耳溫槍","護理"],["推車","外出"],["揹巾","外出"] ]},
-  "待購清單":{ color:"#1d6b52", items:[] },
+  "待購清單":{ color:"#1d6b52", kind:"buy", items:[] },
   "空白":{ color:"#4f6470", items:[] }
 };
 const PRIO_RANK={"高":0,"中":1,"低":2,"":3};
@@ -3230,7 +3230,7 @@ const canEditList = x => x && (x.ownerUid===S.user.uid || (x.editors||[]).includ
 
 /* 清單列表 */
 function renderLists(){
-  tipsFor("tipLists", [["lists","把手機備忘錄裡的清單搬過來：待產包、寶寶用品、想買的東西都可以。每項可以填預估金額，上方會算還要準備多少錢；打勾時可以順便記一筆支出到帳本。清單也能分享給家人一起勾。"]]);
+  tipsFor("tipLists", [["lists","把手機備忘錄裡的清單搬過來：待產包、寶寶用品、想買的東西都可以。每項可以填預估金額，上方會算還要準備多少錢；打勾時可以順便記一筆支出到帳本。清單也能分享給家人一起勾。"],["listKind","清單分成「採購清單」和「待辦清單」兩種，卡片右下角會標出來，上方可以只看其中一種；類型在「⋯」清單設定裡可以改。"]]);
   const mine=[], shared=[];
   [...S.lists.values()].sort((a,b)=>(a.name||"").localeCompare(b.name||"","zh-Hant")).forEach(x=>(x.ownerUid===S.user.uid?mine:shared).push(x));
   const g=$("myLists"); g.textContent="";
@@ -3242,7 +3242,7 @@ function renderLists(){
   const mineF=mine.filter(listPass).sort(byDone), sharedF=shared.filter(listPass).sort(byDone);
   document.querySelectorAll("#listFilter button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.f===f));
   $("listFilter").hidden = !S.listsReady || (!mine.length && !shared.length);
-  if(S.listsReady && mine.length && !mineF.length) g.appendChild(el("p","small muted lst-none", f==="done" ? "還沒有全部完成的清單。" : "清單都完成了！"));
+  if(S.listsReady && mine.length && !mineF.length) g.appendChild(el("p","small muted lst-none", f==="done" ? "還沒有全部完成的清單。" : f in LIST_KINDS ? `還沒有${LIST_KINDS[f]}。` : "清單都完成了！"));
   mineF.forEach(x=>g.appendChild(listCard(x)));
   $("sharedListsWrap").hidden=!sharedF.length; const sg=$("sharedLists"); sg.textContent=""; sharedF.forEach(x=>sg.appendChild(listCard(x)));
 }
@@ -3257,11 +3257,17 @@ function listScene(x){
   if(/買|購|用品|採買|添購/.test(n)) return "shopping";
   return "todo";
 }
+/* 清單類型：採購（要花錢買的）／待辦（要做的事）。舊清單沒設定過的，從金額和情境猜，只顯示、不寫回 */
+const LIST_KINDS = { buy:"採購清單", todo:"待辦清單" };
+function listKind(x){
+  if(x.kind in LIST_KINDS) return x.kind;
+  return ((x.stats||{}).need>0 || ["maternity","shopping"].includes(listScene(x))) ? "buy" : "todo";
+}
 const listProg = x => { const st=x.stats||{}, left=st.left||0, done=st.done||0, total=left+done;
   return { left, done, total, need:st.need||0, pct: total ? Math.round(done/total*100) : 0, finished: total>0 && left===0 }; };
 function listCard(x){
-  const p=listProg(x), b=el("div","lcard lst-card"+(p.finished?" finished":""));
-  b.tabIndex=0; b.setAttribute("role","link"); b.setAttribute("aria-label",`${x.name}，完成 ${p.done}／${p.total} 項`);
+  const p=listProg(x), k=listKind(x), b=el("div","lcard lst-card"+(p.finished?" finished":""));
+  b.tabIndex=0; b.setAttribute("role","link"); b.setAttribute("aria-label",`${x.name}，${LIST_KINDS[k]}，完成 ${p.done}／${p.total} 項`);
   b.style.setProperty("--lc", x.color||COLORS[0]);
   const go=()=>{ location.hash="#list/"+x.id; };
   b.onclick=go; b.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); go(); } };
@@ -3274,18 +3280,24 @@ function listCard(x){
   more.onclick=e=>{ e.stopPropagation(); S.openListSet=x.id; go(); };
   top.append(myCatImg(p.finished?"listdone":listScene(x),"lst-cat"), body, more);
   b.appendChild(top);
-  if(!p.total){ b.appendChild(el("div","lst-empty","還沒有項目，點進去新增")); return b; }
+  const foot=txt=>{ const r=el("div","lst-foot"); r.append(txt, el("span","lst-kind k-"+k, LIST_KINDS[k])); return r; };
+  if(!p.total){ b.appendChild(foot(el("div","lst-empty","還沒有項目，點進去新增"))); return b; }
   const row=el("div","lst-row");
   row.append(el("span","lst-count",`已完成 ${p.done}／${p.total} 項`), el("span","lst-pct",`${p.pct}%`));
   const bar=el("div","lst-bar"); const f=el("span"); f.style.width=p.pct+"%"; bar.appendChild(f);
   b.append(row, bar);
-  b.appendChild(el("div","lst-need", p.finished ? "全部完成了！" : (p.need ? `還需準備 ${money(p.need)}` : `還有 ${p.left} 項`)));
+  b.appendChild(foot(el("div","lst-need", p.finished ? "全部完成了！" : (p.need ? `還需準備 ${money(p.need)}` : `還有 ${p.left} 項`))));
   return b;
 }
-/* 清單篩選：全部／進行中／已完成（只記在這台裝置） */
-const listFilter = () => { const v=store.get("ledger.listFilter"); return ["all","doing","done"].includes(v) ? v : "all"; };
+/* 清單篩選：全部／進行中／已完成／採購／待辦（只記在這台裝置） */
+const listFilter = () => { const v=store.get("ledger.listFilter"); return ["all","doing","done","buy","todo"].includes(v) ? v : "all"; };
 document.querySelectorAll("#listFilter button").forEach(b=>b.onclick=()=>{ store.set("ledger.listFilter", b.dataset.f); renderLists(); });
-const listPass = x => { const f=listFilter(), p=listProg(x); return f==="all" || (f==="done" ? p.finished : !p.finished); };
+const listPass = x => { const f=listFilter(); if(f==="all") return true;
+  if(f in LIST_KINDS) return listKind(x)===f;
+  const p=listProg(x); return f==="done" ? p.finished : !p.finished; };
+function kindSeg(id, v){ document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===v)); }
+const kindOf = id => document.querySelector(`#${id} button[aria-pressed="true"]`)?.dataset.k || "todo";
+["nlKind","lsKind"].forEach(id=>document.querySelectorAll(`#${id} button`).forEach(b=>b.onclick=()=>kindSeg(id, b.dataset.k)));
 
 /* 新增清單 */
 let nlColor=COLORS[0];
@@ -3298,7 +3310,7 @@ $("btnNewList").onclick=()=>{
 function pickListTpl(k){
   const t=LIST_TEMPLATES[k]; S.nlTpl=k;
   document.querySelectorAll("#nlTemplates .chip").forEach(c=>c.setAttribute("aria-pressed", c.textContent===k));
-  $("nlName").value = k==="空白" ? "" : k; nlColor=t.color;
+  $("nlName").value = k==="空白" ? "" : k; nlColor=t.color; kindSeg("nlKind", t.kind||"todo");
   $("nlSeedWrap").hidden=!t.items.length; $("nlSeedText").textContent=`帶入 ${t.items.length} 個常見項目（之後可以刪改）`;
   swatches("nlColors", nlColor, c=>{ nlColor=c; });
 }
@@ -3308,7 +3320,7 @@ $("formNewList").addEventListener("submit", async ev=>{
   const name=$("nlName").value.trim().slice(0,40); if(!name){ msg("nlMsg","請輸入清單名稱。","err"); return; }
   $("nlCreate").disabled=true;
   try{
-    const ref=await addDoc(collection(db,"lists"), { name, color:nlColor, ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email], memo:"",
+    const ref=await addDoc(collection(db,"lists"), { name, color:nlColor, kind:kindOf("nlKind"), ownerUid:S.user.uid, ownerEmail:S.email, editors:[], viewers:[], members:[S.email], memo:"",
       createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
     const t=LIST_TEMPLATES[S.nlTpl];
     if(t && t.items.length && $("nlSeed").checked && !$("nlSeedWrap").hidden){
@@ -3646,7 +3658,7 @@ $("liSetBtn").onclick=()=>{ renderListSet(true); $("dlgListSet").showModal(); };
 function renderListSet(reset){
   const x=LI(); if(!x) return; const owner=x.ownerUid===S.user.uid;
   $("lsOwnerBox").hidden=!owner; $("lsDelete").hidden=!owner; $("lsLeave").hidden=owner;
-  if(reset){ msg("lsMsg",""); $("lsName").value=x.name; lsColor=x.color||COLORS[0]; swatches("lsColors", lsColor, c=>{ lsColor=c; });
+  if(reset){ msg("lsMsg",""); $("lsName").value=x.name; lsColor=x.color||COLORS[0]; swatches("lsColors", lsColor, c=>{ lsColor=c; }); kindSeg("lsKind", listKind(x));
     $("lsDelete").dataset.armed=""; $("lsDelete").textContent="刪除這個清單"; $("lsLeave").dataset.armed=""; $("lsLeave").textContent="離開這個清單"; }
   if(!owner) return;
   const mb=$("lsMembers"); mb.textContent="";
@@ -3680,8 +3692,9 @@ $("lsDone").onclick=async()=>{
   const x=LI(); if(!x){ $("dlgListSet").close(); return; }
   if(x.ownerUid===S.user.uid){
     const name=$("lsName").value.trim().slice(0,40); if(!name){ msg("lsMsg","請輸入名稱。","err"); return; }
-    if(name!==x.name || lsColor!==(x.color||COLORS[0])){
-      try{ await updateDoc(doc(db,"lists",x.id), { name, color:lsColor, updatedAt:serverTimestamp() }); toast(`已儲存「${name}」`); }
+    const kind=kindOf("lsKind");
+    if(name!==x.name || lsColor!==(x.color||COLORS[0]) || kind!==x.kind){
+      try{ await updateDoc(doc(db,"lists",x.id), { name, color:lsColor, kind, updatedAt:serverTimestamp() }); toast(`已儲存「${name}」`); }
       catch(e){ msg("lsMsg","儲存失敗："+errText(e),"err"); return; } } }
   $("dlgListSet").close();
 };
