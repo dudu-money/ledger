@@ -167,7 +167,7 @@ service cloud.firestore {
 
       function theList() { return get(/databases/$(database)/documents/lists/$(lsid)).data; }
       function validItem(d) {
-        return d.keys().hasOnly(['text','amount','priority','due','note','group','via','done','doneAt','spent','ledgerId','entryId','order',
+        return d.keys().hasOnly(['text','amount','priority','due','note','group','via','done','doneAt','spent','ledgerId','entryId','order','qty',
                                  'createdBy','createdByEmail','createdAt','updatedAt'])
           && d.text is string && d.text.size() > 0 && d.text.size() <= 100
           && d.amount is number && d.amount >= 0 && d.amount < 1000000000
@@ -181,7 +181,8 @@ service cloud.firestore {
           && d.entryId is string && d.entryId.size() <= 40
           && d.order is number
           && (!('group' in d) || (d.group is string && d.group.size() <= 20))
-          && (!('via' in d) || d.via in ['','gift','have']);
+          && (!('via' in d) || d.via in ['','gift','have'])
+          && (!('qty' in d) || (d.qty is int && d.qty >= 1 && d.qty <= 9999));
       }
       match /items/{iid} {
         allow read: if isMember(theList());
