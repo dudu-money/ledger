@@ -128,8 +128,9 @@ service cloud.firestore {
 
     // ---- 清單（待購、待產包、記事；和帳本一樣可以分享） ----
     function validList(d) {
-      return d.keys().hasOnly(['name','color','ownerUid','ownerEmail','editors','viewers','members','memo','stats','sort','groups','createdAt','updatedAt'])
+      return d.keys().hasOnly(['name','color','ownerUid','ownerEmail','editors','viewers','members','memo','stats','sort','groups','kind','createdAt','updatedAt'])
         && (!('sort' in d) || d.sort in ['','manual'])
+        && (!('kind' in d) || d.kind in ['buy','todo'])
         && (!('groups' in d) || (d.groups is list && d.groups.size() <= 50))
         && d.name is string && d.name.size() > 0 && d.name.size() <= 40
         && d.color is string && d.color.size() <= 20
