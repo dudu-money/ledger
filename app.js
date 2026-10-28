@@ -3348,7 +3348,7 @@ $("liFab").onclick=()=>{ const f=$("liAddForm"); f.classList.add("open"); f.scro
 function renderListHead(){
   const x=LI(); if(!x){ $("liName").textContent=S.listsReady?"找不到這個清單":"讀取中…"; return; }
   document.title=x.name+"・記帳本";
-  $("liName").textContent=x.name; $("liDot").style.background=x.color||COLORS[0]; $("liRole").textContent=listRole(x);
+  $("liName").textContent=x.name; $("liDot").style.background=x.color||COLORS[0]; document.querySelector("#viewList .li-sum").style.setProperty("--lc", x.color||COLORS[0]); $("liRole").textContent=listRole(x);
   const ed=canEditList(x); $("liAddForm").hidden=!ed; $("liMemo").readOnly=!ed; $("liFab").hidden=!ed;
   if(S.memoFor!==x.id || document.activeElement!==$("liMemo")){ if(S.memoFor!==x.id || !S.memoDirty){ $("liMemo").value=x.memo||""; S.memoFor=x.id; } }
 }
