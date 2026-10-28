@@ -2440,7 +2440,7 @@ $("bkRestore").onclick=async()=>{
         const its=ls.items||[];
         for(let k=0;k<its.length;k+=400){ const b=writeBatch(db);
           its.slice(k,k+400).forEach((it,j)=>b.set(doc(collection(db,"lists",ref.id,"items")), { text:String(it.text||"項目").slice(0,100), amount:Number(it.amount)||0,
-            priority:["","高","中","低"].includes(it.priority)?it.priority:"", due:String(it.due||"").slice(0,10), note:String(it.note||"").slice(0,200), group:String(it.group||"").slice(0,20),
+            priority:["","高","中","低"].includes(it.priority)?it.priority:"", due:String(it.due||"").slice(0,10), note:String(it.note||"").slice(0,200), group:String(it.group||"").slice(0,20), ...(Number(it.qty)>1?{qty:Math.min(9999,Math.round(Number(it.qty)))}:{}),
             via:it.via==="gift"?"gift":"", done:!!it.done, doneAt:String(it.doneAt||"").slice(0,10), spent:Number(it.spent)||0, ledgerId:"", entryId:"", order:Number(it.order)||k+j,
             createdBy:S.user.uid, createdByEmail:S.email, createdAt:serverTimestamp(), updatedAt:serverTimestamp() }));
           await b.commit(); }
@@ -3338,21 +3338,25 @@ const newItem=(text,amount,note,order,group)=>({ text:String(text).slice(0,100),
 /* 單一清單 */
 function openList(id){
   S.listId=id; show("viewList");
-  if(S.itemsFor!==id){ S.itemsFor=id; watchItems(id); $("liMemo").value=""; S.memoFor=null; S.addGroup=""; S.newGroupOpen=false; }
+  if(S.itemsFor!==id){ S.itemsFor=id; watchItems(id); $("liMemo").value=""; S.memoFor=null; S.addGroup=""; S.newGroupOpen=false; $("liAddForm").classList.remove("open"); }
   renderListHead(); renderListItems();
   if(S.openListSet===id && LI()){ S.openListSet=null; $("liSetBtn").click(); }
 }
 $("liBack").onclick=()=>{ location.hash="#lists"; };
+/* 手機：底部「＋ 新增項目」打開上方同一個快速新增 */
+$("liFab").onclick=()=>{ const f=$("liAddForm"); f.classList.add("open"); f.scrollIntoView({behavior:"smooth",block:"center"}); setTimeout(()=>$("liAddText").focus({preventScroll:true}),250); };
 function renderListHead(){
   const x=LI(); if(!x){ $("liName").textContent=S.listsReady?"找不到這個清單":"讀取中…"; return; }
   document.title=x.name+"・記帳本";
   $("liName").textContent=x.name; $("liDot").style.background=x.color||COLORS[0]; $("liRole").textContent=listRole(x);
-  const ed=canEditList(x); $("liAddForm").hidden=!ed; $("liMemo").readOnly=!ed;
+  const ed=canEditList(x); $("liAddForm").hidden=!ed; $("liMemo").readOnly=!ed; $("liFab").hidden=!ed;
   if(S.memoFor!==x.id || document.activeElement!==$("liMemo")){ if(S.memoFor!==x.id || !S.memoDirty){ $("liMemo").value=x.memo||""; S.memoFor=x.id; } }
 }
 function sortItems(a,b){ return (PRIO_RANK[a.priority||""]-PRIO_RANK[b.priority||""]) || ((a.due||"9999")<(b.due||"9999")?-1:(a.due||"9999")>(b.due||"9999")?1:0) || ((a.order||0)-(b.order||0)); }
 /* 分組：照每組第一個項目的先後排；沒分組的放最上面 */
 /* 分組：清單裡存的分組（照設定的順序）在前，品項上有、但清單還沒存的舊分組接在後面 */
+const itemFilter = () => { const v=store.get("ledger.itemFilter"); return ["all","todo","done"].includes(v) ? v : "all"; };
+document.querySelectorAll("#liFilter button").forEach(b=>b.onclick=()=>{ store.set("ledger.itemFilter", b.dataset.f); renderListItems(); });
 const listGroups = () => { const x=LI(), base=(x && Array.isArray(x.groups) ? x.groups : []).filter(Boolean);
   const first=new Map(); S.listItems.forEach(i=>{ const g=i.group||""; if(g && !base.includes(g) && (!first.has(g) || (i.order||0)<first.get(g))) first.set(g,i.order||0); });
   return [...base, ...[...first.entries()].sort((a,b)=>a[1]-b[1]).map(e=>e[0])]; };
@@ -3386,32 +3390,40 @@ function renderListItems(){
   const buy=listKind(x)==="buy";
   $("liReorder").hidden=!ed || !manual; $("liReorder").textContent=S.reorder?"完成":"調整順序"; $("liReorder").classList.toggle("primary",!!S.reorder);
   $("liSortHint").textContent = S.reorder ? "用 ↑ ↓ 移動項目，排好按「完成」。順序會同步給一起用這份清單的人。" : (buy ? "點項目可以修改；打勾代表買好了" : "點項目可以修改；打勾代表完成");
-  const todo=S.listItems.filter(i=>!i.done).sort(manual?((a,b)=>(a.order||0)-(b.order||0)):sortItems), done=S.listItems.filter(i=>i.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||""));
+  const byOrder=manual?((a,b)=>(a.order||0)-(b.order||0)):sortItems;
+  const todo=S.listItems.filter(i=>!i.done).sort(byOrder), done=S.listItems.filter(i=>i.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||""));
+  // 打勾後留在原位：上方切換全部／未完成／已完成（只記在這台裝置）
+  const flt=itemFilter(); document.querySelectorAll("#liFilter button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.f===flt));
+  const shown=S.listItems.filter(i=>flt==="all" || (flt==="done" ? i.done : !i.done)).sort(byOrder);
   const need=todo.reduce((t,i)=>t+(i.amount||0),0), spent=done.reduce((t,i)=>t+(i.spent||0),0), noAmt=todo.filter(i=>!i.amount).length;
   // 待辦清單：金額收起來（修改視窗裡還能填「花費」），摘要改看最近的截止日
-  $("liAddAmt").hidden=!buy; $("liNeedBox").hidden=!buy; $("liNextBox").hidden=buy;
+  $("liAddAmt").hidden=!buy; $("liAddQty").hidden=!buy; $("liNeedBox").hidden=!buy; $("liNextBox").hidden=buy;
   $("liItemsTitle").textContent = buy ? "要買的東西" : "待辦項目";
   if(!buy){ const nx=todo.filter(i=>i.due).sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:0)[0];
     $("liNext").textContent = nx ? nx.due.slice(5).replace("-","/") : "沒有設定"; $("liNext").classList.toggle("c-out", !!nx && nx.due<todayStr());
     $("liNextWhat").textContent = nx ? nx.text : ""; }
   $("liLeftN").textContent=`${todo.length} 項`; $("liNeed").textContent=money(need); $("liDoneN").textContent=`${done.length} 項`;
-  $("liSpent").textContent = spent ? `實際花了 ${money(spent)}` : "";
+  $("liPct").textContent = S.listItems.length ? Math.round(done.length/S.listItems.length*100)+"%" : "0%";
+  const ct=$("liCat"), sc=(todo.length||!done.length) ? listScene(x) : "listdone";
+  if(ct.dataset.s!==sc){ ct.textContent=""; ct.appendChild(myCatImg(sc,"li-cat-img")); ct.dataset.s=sc; }
+  $("liSpent").textContent = spent ? `花了 ${money(spent)}` : "";
   if(noAmt && todo.length) $("liNeed").title=`有 ${noAmt} 項沒填金額`;
   $("liMeter").firstElementChild.style.width = S.listItems.length ? (done.length/S.listItems.length*100)+"%" : "0";
   const box=$("liItems"); box.textContent="";
   if(!S.itemsReady) box.appendChild(el("p","small muted","讀取中…"));
-  else if(!todo.length) box.appendChild(el("p","small muted", done.length ? "全部完成了！" : "還沒有項目，在上面輸入就能加入。"));
+  else if(!S.listItems.length) box.appendChild(el("p","small muted","還沒有項目，在上面輸入就能加入。"));
+  else if(!shown.length) box.appendChild(el("p","small muted", flt==="todo" ? "全部完成了！" : "還沒有完成的項目。"));
   const gs=listGroups();
   const mv=(its,k)=>S.reorder && ed ? { up: k>0 ? ()=>swapOrder(x, its[k], its[k-1]) : null, down: k<its.length-1 ? ()=>swapOrder(x, its[k], its[k+1]) : null } : null;
-  if(!gs.length) todo.forEach((i,k)=>box.appendChild(itemRow(x,i,ed,false,mv(todo,k))));
+  if(!gs.length) shown.forEach((i,k)=>box.appendChild(itemRow(x,i,ed,false,mv(shown,k))));
   else ["",...gs].forEach(g=>{
-    const its=todo.filter(i=>(i.group||"")===g); if(!its.length) return;
-    if(g){ const h=el("div","li-ghead"); const nd=its.reduce((t,i)=>t+(i.amount||0),0);
-      h.append(el("span",null,g), el("span","small muted",`${its.length} 項`+(nd&&buy?`・${money(nd)}`:""))); box.appendChild(h); }
+    const its=shown.filter(i=>(i.group||"")===g); if(!its.length) return;
+    if(g){ const h=el("div","li-ghead"); const left=its.filter(i=>!i.done), nd=left.reduce((t,i)=>t+(i.amount||0),0);
+      const cnt = flt==="all" ? `${its.length-left.length}／${its.length} 項` : `${its.length} 項`;
+      h.append(el("span",null,g), el("span","small muted",cnt+(nd&&buy&&flt!=="done"?`・${money(nd)}`:""))); box.appendChild(h); }
     its.forEach((i,k)=>box.appendChild(itemRow(x,i,ed,true,mv(its,k))));
   });
-  $("liDoneWrap").hidden=!done.length; $("liDoneSum").textContent=`已完成 ${done.length} 項` + (spent?`・實際花了 ${money(spent)}`:"");
-  const db2=$("liDone"); db2.textContent=""; done.forEach(i=>db2.appendChild(itemRow(x,i,ed)));
+  $("liDoneWrap").hidden=true;
   // 把摘要存回清單，列表頁就能直接顯示（只有可編輯的人會寫）
   const st={left:todo.length, need, done:done.length};
   if(ed && S.itemsReady && JSON.stringify(st)!==JSON.stringify(x.stats||{})){
@@ -3445,7 +3457,9 @@ function itemRow(x,i,ed,grouped,mv){
   const cb=el("input"); cb.type="checkbox"; cb.checked=!!i.done; cb.disabled=!ed; cb.setAttribute("aria-label",(i.done?"改回未完成：":"完成：")+i.text);
   // 待辦清單沒填花費的項目：直接打勾完成，不問要不要記帳
   cb.onclick=ev=>{ ev.preventDefault(); if(i.done) undoItem(x,i); else if(listKind(x)!=="buy" && !i.amount) quickDone(x,i); else openBuy(x,i); };
-  const main=el("div","li-main"); main.appendChild(el("div","li-text",i.text));
+  const main=el("div","li-main"), tx=el("div","li-text",i.text);
+  if((i.qty||1)>1) tx.appendChild(el("span","li-qty",`×${i.qty}`));
+  main.appendChild(tx);
   const meta=[]; if(i.group && !grouped) meta.push(i.group); if(i.priority) meta.push(`優先 ${i.priority}`); if(i.due) meta.push(`${i.due.slice(5).replace("-","/")} 前`); if(i.note) meta.push(i.note);
   if(i.amount && !i.done && listKind(x)!=="buy") meta.push(`花費 ${money(i.amount)}`);
   if(i.done){ if(i.via==="gift") meta.push("親友送禮"); else if(i.via==="have") meta.push("已有物品"); if(i.spent) meta.push(`實際 ${fmt(i.spent)}`); if(i.ledgerId){ const lg=S.ledgers.get(i.ledgerId); meta.push(lg?`已記到「${lg.name}」`:"已記帳"); } }
@@ -3464,9 +3478,9 @@ function itemRow(x,i,ed,grouped,mv){
 $("liAddForm").addEventListener("submit", async ev=>{
   ev.preventDefault(); const x=LI(); if(!x) return;
   const t=$("liAddText").value.trim(); if(!t){ $("liAddText").focus(); return; }
-  const a=Math.round(Number($("liAddAmt").value)||0);
-  $("liAddText").value=""; $("liAddAmt").value=""; $("liAddText").focus();
-  try{ await addDoc(collection(db,"lists",x.id,"items"), newItem(t,a,"",Date.now(),S.addGroup||"")); }
+  const a=Math.round(Number($("liAddAmt").value)||0), q=Math.min(9999,Math.max(1,Math.round(Number($("liAddQty").value)||1)));
+  $("liAddText").value=""; $("liAddAmt").value=""; $("liAddQty").value=""; $("liAddText").focus();
+  try{ await addDoc(collection(db,"lists",x.id,"items"), {...newItem(t,a,"",Date.now(),S.addGroup||""), ...(q>1?{qty:q}:{})}); }
   catch(e){ msg("liMsg","新增失敗："+errText(e),"err"); }
 });
 /* 記事：打字停下來 0.8 秒自動存 */
@@ -3482,7 +3496,7 @@ function openItem(i){
   S.itEdit=i; msg("itMsg","");
   const buy=listKind(LI()||{})==="buy";
   $("itAmtLabel").textContent = buy ? "預估金額" : "花費（選填）"; $("itAmt").placeholder = buy ? "不確定可留空" : "要花錢的事才需要填";
-  $("itText").value=i.text; $("itAmt").value=i.amount||""; $("itDue").value=i.due||""; $("itNote").value=i.note||"";
+  $("itText").value=i.text; $("itAmt").value=i.amount||""; $("itQty").value=(i.qty||1)>1?i.qty:""; $("itDue").value=i.due||""; $("itNote").value=i.note||"";
   const sel=$("itGroup"); sel.textContent="";
   [["","不分組"], ...listGroups().map(g=>[g,g]), ["__new","＋ 新增分組…"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; sel.appendChild(o); });
   sel.value=i.group||""; $("itGroupNew").value=""; $("itGroupNewWrap").hidden=true;
@@ -3544,7 +3558,7 @@ $("formItem").addEventListener("submit", async ev=>{
   if(grp==="__new"){ grp=$("itGroupNew").value.trim().slice(0,20); if(!grp){ msg("itMsg","請填新分組名稱。","err"); $("itGroupNew").focus(); return; } }
   try{ if(grp) grp=await addGroup(LI(), grp);
     await updateDoc(doc(db,"lists",S.listId,"items",S.itEdit.id), { text:t.slice(0,100), amount:Math.max(0,Math.round(Number($("itAmt").value)||0)),
-      due:$("itDue").value||"", priority:S.itPrio, note:$("itNote").value.trim().slice(0,200), group:grp, updatedAt:serverTimestamp() });
+      qty:Math.min(9999,Math.max(1,Math.round(Number($("itQty").value)||1))), due:$("itDue").value||"", priority:S.itPrio, note:$("itNote").value.trim().slice(0,200), group:grp, updatedAt:serverTimestamp() });
     $("dlgItem").close(); }
   catch(e){ msg("itMsg","儲存失敗："+errText(e),"err"); }
 });
@@ -3557,10 +3571,11 @@ $("itDelete").onclick=async()=>{
 /* 打勾：買好了，可以順便記帳 */
 function fillBuyCats(){
   const l=S.ledgers.get($("byLedger").value), sel=$("byCat"); sel.textContent=""; sel.disabled=!l; $("byPay").disabled=!l; $("byDate").disabled=!l;
-  if(!l){ sel.appendChild(el("option",null,"—")); $("byNote").textContent="只打勾完成，不記帳。"; return; }
+  document.querySelectorAll("#formBuy .by-rec").forEach(f=>f.hidden=!l);
+  if(!l){ sel.appendChild(el("option",null,"—")); $("byNote").textContent="只打勾完成，不記帳。"; renderBuySplit(); return; }
   const last=store.get("ledger.buyCat");
   (l.categories||[]).filter(c=>c.type==="out").forEach(c=>{ const o=el("option",null,c.name); o.value=c.id; o.selected=c.id===last; sel.appendChild(o); });
-  $("byNote").textContent=`會在「${l.name}」記一筆支出；之後取消打勾，那筆也會一起刪掉。`;
+  $("byNote").textContent=`會在「${l.name}」記一筆支出；之後取消打勾時，可以選要不要一起刪掉。`;
   renderBuySplit();
 }
 /* 買好了：記到有開 AA 的帳本時，可以選誰付的、怎麼分攤 */
@@ -3606,7 +3621,7 @@ $("byAmt").addEventListener("input", ()=>{ const l=S.ledgers.get($("byLedger").v
 $("byLedger").addEventListener("change", fillBuyCats);
 function openBuy(x,i){
   S.buyItem=i; msg("byMsg",""); S.byPayer=null; S.bySplit={m:"d", r:{}};
-  $("byWhat").textContent=`${i.text}` + (i.amount?`（預估 ${money(i.amount)}）`:"");
+  $("byWhat").textContent=`${i.text}` + ((i.qty||1)>1?` ×${i.qty}`:"") + (i.amount?`（預估 ${money(i.amount)}）`:"");
   $("byAmt").value=i.amount||"";
   const sel=$("byLedger"); sel.textContent=""; const none=el("option",null,"不記帳，只打勾"); none.value=""; sel.appendChild(none);
   [...S.ledgers.values()].filter(canEdit).forEach(l=>{ const o=el("option",null,l.name); o.value=l.id; sel.appendChild(o); });
@@ -3658,10 +3673,20 @@ async function markVia(via, label){
 }
 $("byGift").onclick=()=>markVia("gift","親友送禮");
 $("byHave").onclick=()=>markVia("have","已有物品");
-async function undoItem(x,i){
+/* 取消完成：有記到帳本的，先問那筆要不要一起刪；選保留就只改回未完成 */
+function undoItem(x,i){
+  if(!(i.ledgerId && i.entryId)){ undoItemDo(x,i,false); return; }
+  const lg=S.ledgers.get(i.ledgerId);
+  $("unWhat").textContent=`「${i.text}」完成時有記到${lg?`「${lg.name}」`:"帳本"}${i.spent?`（${money(i.spent)}）`:""}。帳本裡那筆要一起刪掉嗎？`;
+  const d=$("dlgUndo"); d.returnValue="";
+  d.onclose=()=>{ d.onclose=null; if(d.returnValue==="del") undoItemDo(x,i,true); else if(d.returnValue==="keep") undoItemDo(x,i,false); };
+  d.showModal();
+}
+async function undoItemDo(x,i,delEntry){
   try{
     let note="";
-    if(i.ledgerId && i.entryId){ try{ await deleteDoc(doc(db,"ledgers",i.ledgerId,"entries",i.entryId)); note="（帳本裡那筆也刪掉了）"; }catch(e){ note="（帳本裡那筆沒辦法刪，請自己到帳本刪除）"; } }
+    if(delEntry){ try{ await deleteDoc(doc(db,"ledgers",i.ledgerId,"entries",i.entryId)); note="（帳本裡那筆也刪掉了）"; }catch(e){ note="（帳本裡那筆沒辦法刪，請自己到帳本刪除）"; } }
+    else if(i.ledgerId) note="（帳本裡那筆保留）";
     await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:false, doneAt:"", spent:0, ledgerId:"", entryId:"", via:"", updatedAt:serverTimestamp() });
     toast("已改回未完成"+note);
   }catch(e){ toast("更新失敗："+errText(e)); }
