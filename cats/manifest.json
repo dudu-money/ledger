@@ -28,7 +28,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "orangewhite": [
    "face",
@@ -56,7 +62,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "calico": [
    "face",
