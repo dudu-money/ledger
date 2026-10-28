@@ -446,14 +446,34 @@ button.pay-cell:hover{border-color:var(--accent)}
 .li-sum .num{white-space:nowrap}
 .li-next-what,#liSpent{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 清單詳細頁：摘要小卡＋情境貓、篩選、數量、手機新增按鈕 */
-.li-sum{grid-template-columns:repeat(4,minmax(0,1fr))!important;align-items:stretch}
-.li-sum>div:not(.li-cat):not(.li-meter):not([hidden]){background:var(--paper);border-radius:12px;padding:10px 12px;min-width:0}
-/* 上方橫幅：大張情境貓，底色用清單顏色淡淡一層 */
-.li-cat{grid-column:1/-1;height:210px;margin:-6px -6px 2px;border-radius:16px;overflow:hidden;display:flex;justify-content:center;align-items:flex-end;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--lc,var(--accent)) var(--lc-a,8%),var(--sheet)) 0%,color-mix(in srgb,var(--lc,var(--accent)) var(--lc-b,18%),var(--sheet)) 100%)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .li-cat{--lc-a:14%;--lc-b:30%}}
-:root[data-theme="dark"] .li-cat{--lc-a:14%;--lc-b:30%}
-.li-cat-img{height:100%;width:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(40,30,20,.16))}
+/* 清單內頁上方：左邊名稱和進度、右邊大張情境貓；下面一排小數字 */
+.li-sum{display:flex!important;flex-direction:column;gap:12px}
+.li-hero{display:flex;align-items:stretch;gap:12px;min-height:190px;margin:-6px -6px 0;padding:0 0 0 24px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--lc,var(--accent)) var(--lc-a,8%),var(--sheet)) 0%,color-mix(in srgb,var(--lc,var(--accent)) var(--lc-b,18%),var(--sheet)) 100%)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .li-hero{--lc-a:14%;--lc-b:30%}}
+:root[data-theme="dark"] .li-hero{--lc-a:14%;--lc-b:30%}
+.li-hero-text{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:18px 0}
+.li-hero-name{font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.li-hero-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--muted);font-size:14px}
+.li-pct{font-family:var(--f-num);font-weight:700;font-size:22px;color:var(--lc,var(--accent))}
+.li-hero .li-meter{height:10px;background:color-mix(in srgb,var(--sheet) 70%,transparent)}
+.li-hero .li-meter i{background:var(--lc,var(--accent))}
+.li-cat{flex:none;width:44%;max-width:320px;display:flex;align-items:flex-end;justify-content:center}
+.li-cat-img{width:100%;height:auto;max-height:230px;object-fit:contain;object-position:bottom;filter:drop-shadow(0 6px 10px rgba(40,30,20,.16))}
+.li-stats{display:flex;flex-wrap:wrap;gap:6px 18px;padding:0 4px;font-size:14px}
+.li-stats>div{display:flex;align-items:baseline;gap:6px;min-width:0}
+.li-stats>div[hidden]{display:none}
+.li-stats .label{font-size:13px;margin:0}
+.li-stats .num{font-weight:700;font-size:16px;white-space:nowrap}
+@media (max-width:560px){
+  .li-hero{min-height:150px;padding-left:16px;margin:-4px -4px 0}
+  .li-hero-text{padding:14px 0;gap:6px}
+  .li-hero-name{font-size:20px}
+  .li-pct{font-size:18px}
+  .li-cat{width:46%}
+  .li-cat-img{max-height:170px}
+  .li-stats{gap:4px 14px}
+}
 .li-filter{align-self:flex-start;margin:8px 0 4px}
 .li-filter button{white-space:nowrap}
 .li-qty{margin-left:8px;font-size:13px;color:var(--muted);font-family:var(--f-num);font-weight:600}
@@ -465,14 +485,11 @@ button.pay-cell:hover{border-color:var(--accent)}
   #liAddForm:not(.open){display:none}
 }
 @media (max-width:560px){
-  .li-sum{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px}
-  .li-cat{height:170px;margin:-4px -4px 2px}
   .li-add{flex-wrap:wrap!important}
   .li-add #liAddText{flex:1 1 100%}
   .li-add #liAddQty,.li-add #liAddAmt{flex:1 1 0;width:auto}
   .li-add:has(#liAddAmt[hidden]){flex-wrap:nowrap!important}
   .li-add:has(#liAddAmt[hidden]) #liAddText{flex:1 1 auto}
-  .li-sum>div:not(.li-cat):not(.li-meter):not([hidden]){padding:8px 10px}
   #dlgItem .it-actions{position:sticky;bottom:0;z-index:2;background:var(--sheet);margin:0 -4px;padding:10px 4px calc(6px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--rule)}
 }
 @media (max-width:560px){ .li-sum .num.mid{font-size:16px} .li-sum .label{font-size:12px} }

@@ -3401,9 +3401,10 @@ function renderListItems(){
   $("liItemsTitle").textContent = buy ? "要買的東西" : "待辦項目";
   if(!buy){ const nx=todo.filter(i=>i.due).sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:0)[0];
     $("liNext").textContent = nx ? nx.due.slice(5).replace("-","/") : "沒有設定"; $("liNext").classList.toggle("c-out", !!nx && nx.due<todayStr());
-    $("liNextWhat").textContent = nx ? nx.text : ""; }
+    $("liNextWhat").textContent = nx ? "・"+nx.text : ""; }
   $("liLeftN").textContent=`${todo.length} 項`; $("liNeed").textContent=money(need); $("liDoneN").textContent=`${done.length} 項`;
   $("liPct").textContent = S.listItems.length ? Math.round(done.length/S.listItems.length*100)+"%" : "0%";
+  $("liHeroName").textContent=x.name; $("liHeroSub").textContent=`已完成 ${done.length}／${S.listItems.length} 項`;
   const ct=$("liCat"), sc=(todo.length||!done.length) ? listScene(x) : "listdone";
   if(ct.dataset.s!==sc){ ct.textContent=""; ct.appendChild(myCatImg(sc,"li-cat-img")); ct.dataset.s=sc; }
   $("liSpent").textContent = spent ? `花了 ${money(spent)}` : "";

@@ -310,13 +310,20 @@
   </header>
   <main class="page narrow-page">
     <section class="panel li-sum" aria-label="清單摘要">
-      <div class="li-cat" id="liCat" aria-hidden="true"></div>
-      <div><div class="label">待完成</div><div class="num mid" id="liLeftN">0 項</div></div>
-      <div><div class="label">完成度</div><div class="num mid" id="liPct">0%</div></div>
-      <div id="liNeedBox"><div class="label">還需準備</div><div class="num mid c-out" id="liNeed">NT$ 0</div></div>
-      <div id="liNextBox" hidden><div class="label">最近的截止日</div><div class="num mid" id="liNext">—</div><div class="small muted li-next-what" id="liNextWhat"></div></div>
-      <div><div class="label">已完成</div><div class="num mid" id="liDoneN">0 項</div><div class="small muted" id="liSpent"></div></div>
-      <div class="meter li-meter" id="liMeter"><i></i></div>
+      <div class="li-hero">
+        <div class="li-hero-text">
+          <div class="li-hero-name" id="liHeroName"></div>
+          <div class="li-hero-row"><span id="liHeroSub">已完成 0／0 項</span><span class="num li-pct" id="liPct">0%</span></div>
+          <div class="meter li-meter" id="liMeter"><i></i></div>
+        </div>
+        <div class="li-cat" id="liCat" aria-hidden="true"></div>
+      </div>
+      <div class="li-stats">
+        <div><span class="label">待完成</span><span class="num" id="liLeftN">0 項</span></div>
+        <div id="liNeedBox"><span class="label">還需準備</span><span class="num c-out" id="liNeed">NT$ 0</span></div>
+        <div id="liNextBox" hidden><span class="label">最近截止</span><span class="num" id="liNext">—</span><span class="small muted li-next-what" id="liNextWhat"></span></div>
+        <div><span class="label">已完成</span><span class="num" id="liDoneN">0 項</span><span class="small muted" id="liSpent"></span></div>
+      </div>
     </section>
     <form class="panel li-add-wrap" id="liAddForm" autocomplete="off">
       <div class="li-groups" id="liGroupPick"></div>
