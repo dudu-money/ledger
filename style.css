@@ -647,7 +647,6 @@ body.nav-on .page > .tabs{display:none}
 .appbar{align-items:center;gap:12px;padding:10px 16px;position:sticky;top:0;z-index:5;
   background:linear-gradient(120deg,var(--hero-a),var(--hero-b));color:var(--on-hero);box-shadow:0 4px 16px rgba(20,40,32,.15)}
 .appbar-brand{display:flex;align-items:center;gap:8px;color:inherit;text-decoration:none;font-family:var(--f-display);font-weight:900;font-size:21px;letter-spacing:.06em}
-.appbar-brand .brand-logo{background:#fff;padding:2px}
 .appbar-title{display:none;font-family:var(--f-display);font-weight:600;font-size:20px;color:inherit}
 .appbar-me{margin-left:auto;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:inherit;
   background:color-mix(in srgb,var(--on-hero) 16%,transparent)}
