@@ -928,6 +928,7 @@ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;t
 :root:not([data-theme="light"]) .cal-item:hover{filter:brightness(1.06)}
 :root:not([data-theme="light"]) .cal-item .cal-m{color:rgba(26,29,27,.75)}
 :root:not([data-theme="light"]) .cal-item .cal-r{color:#1a1d1b}
+:root:not([data-theme="light"]) .cal-item .cal-ok{color:#1a1d1b}
 :root:not([data-theme="light"]) .cal-ic{background:rgba(255,255,255,.35)}
 }
 :root[data-theme="dark"] .ev-kind[aria-pressed="true"]{color:#1a1d1b;background:var(--ev-solid);border-color:var(--ev-solid)}
@@ -936,6 +937,7 @@ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;t
 :root[data-theme="dark"] .cal-item:hover{filter:brightness(1.06)}
 :root[data-theme="dark"] .cal-item .cal-m{color:rgba(26,29,27,.75)}
 :root[data-theme="dark"] .cal-item .cal-r{color:#1a1d1b}
+:root[data-theme="dark"] .cal-item .cal-ok{color:#1a1d1b}
 :root[data-theme="dark"] .cal-ic{background:rgba(255,255,255,.35)}
 /* 行程視窗：打開關聯清單 */
 .ev-list-row{display:flex;gap:8px;align-items:center}
