@@ -1,4 +1,4 @@
-# 記帳本
+# 貓掌櫃（原名：記帳本）
 
 家庭用的記帳網頁，放在 GitHub Pages，資料存在 Firebase（Firestore ＋ Authentication，免費的 Spark 方案）。手機和電腦都能用，帳本、清單、行事曆可以用 Email 分享給家人朋友。
 

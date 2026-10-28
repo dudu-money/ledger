@@ -1,4 +1,4 @@
-// 記帳本 — 主程式
+// 貓掌櫃（原名記帳本）— 主程式
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
@@ -214,7 +214,7 @@ function route(){
   if(!lm){ S.listId=null; if(S.itemsFor){ stopItems(); S.itemsFor=null; } }
   if(m){ openLedger(m[1]); return; }
   if(lm){ S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); stopRb(); openList(lm[1]); return; }
-  S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); stopRb(); document.title="記帳本";
+  S.lid=null; S.viewInitFor=null; stopEntries(); stopAA(); stopRb(); document.title="貓掌櫃";
   if(location.hash==="#repay"){ show("viewRepay"); renderRepay(); return; }
   if(location.hash==="#invest"){ show("viewInvest"); renderInvest(); return; }
   if(location.hash==="#lists"){ show("viewLists"); renderLists(); return; }
@@ -484,7 +484,7 @@ function renderLedgerHead(){
   initLedgerView(); applyJump();
   $("lName").textContent=l.name; const lc=ledgerCat(l);
   if($("lCat").dataset.k!==lc){ $("lCat").replaceWith(Object.assign(catImg(lc,"cat-av l-cat"),{id:"lCat"})); $("lCat").dataset.k=lc; }
-  $("lRole").textContent=roleText(l); document.title=l.name+"｜記帳本";
+  $("lRole").textContent=roleText(l); document.title=l.name+"｜貓掌櫃";
   $("btnAdd").hidden=!canEdit(l);
   renderLedgerTips(l);
   ensureAA(l); ensureRb(l);
@@ -2131,7 +2131,7 @@ $("gsExportAll").onclick=async()=>{
       snap.docs.map(d=>d.data()).sort((x,y)=>x.date.localeCompare(y.date)).forEach(e=>rows.push([l.name, e.date, e.type==="in"?"收入":"支出", catName(l,e), e.amount, e.budget||"",
         isPending(e)?lb.pending:lb.paid, e.priority||"", e.pay, e.card||"", e.inst?`${e.inst.k}/${e.inst.n}`:"", e.payer||"", e.note, e.createdByEmail]));
     }
-    downloadCsv(`記帳本備份_${todayStr()}.csv`, rows); msg("gsExpMsg",`已匯出 ${rows.length-1} 筆紀錄。`,"ok");
+    downloadCsv(`貓掌櫃備份_${todayStr()}.csv`, rows); msg("gsExpMsg",`已匯出 ${rows.length-1} 筆紀錄。`,"ok");
   }catch(e){ msg("gsExpMsg","匯出失敗："+errText(e),"err"); }
 };
 $("gsExportLoans").onclick=()=>{
@@ -2275,11 +2275,12 @@ async function buildBackup(){
     ledgers.push({ id, data:cleanOut(data), entries:snap.docs.map(d=>({id:d.id, ...cleanOut(d.data())})), settles });
   }
   const {lastBackup, ...prefs}=P();
+  // app 是備份檔的格式代號，改名後維持「記帳本」，新舊備份都能互相還原
   return { app:"記帳本", version:1, exportedAt:new Date().toISOString(), email:S.email,
     ledgers, loans:S.loans.map(({id,...d})=>({id, ...cleanOut(d)})), holdings:S.holdings.map(({id,...d})=>({id, ...cleanOut(d)})), snaps:S.snaps.map(({id,...d})=>({id, ...cleanOut(d)})), lists:await backupLists(), cals:await backupCals(), prefs,
     myCats:[...S.myCats.values()].map(c=>({id:c.id, breed:c.breed, name:String(c.name||"")})) };
 }
-const bkName = () => { const d=new Date(); return `記帳本備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
+const bkName = () => { const d=new Date(); return `貓掌櫃備份_${todayStr()}_${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
 const bkCount = b => `${b.ledgers.length} 本帳、${b.ledgers.reduce((s,l)=>s+l.entries.length,0)} 筆紀錄、${b.loans.length} 筆貸款` + ((b.holdings||[]).length ? `、${b.holdings.length} 檔持股` : "") + ((b.lists||[]).length ? `、${b.lists.length} 個清單` : "");
 async function backupLists(){
   const out=[];
@@ -2370,13 +2371,13 @@ $("bkDriveList").onclick=async()=>{
 $("bkFile").addEventListener("change", async()=>{
   const f=$("bkFile").files[0]; if(!f) return;
   try{ showRestore(JSON.parse(await f.text())); msg("bkRMsg",""); }
-  catch(e){ msg("bkRMsg","這不是記帳本的備份檔，或檔案已損壞。","err"); }
+  catch(e){ msg("bkRMsg","這不是貓掌櫃（記帳本）的備份檔，或檔案已損壞。","err"); }
   $("bkFile").value="";
 });
 
 let BK=null;
 function showRestore(b){
-  if(!b || b.app!=="記帳本" || !Array.isArray(b.ledgers)) throw new Error("這不是記帳本的備份檔。");
+  if(!b || b.app!=="記帳本" || !Array.isArray(b.ledgers)) throw new Error("這不是貓掌櫃（記帳本）的備份檔。");
   BK=b; $("bkDriveFiles").hidden=true; $("bkPreview").hidden=false;
   $("bkInfo").textContent=`備份時間：${new Date(b.exportedAt).toLocaleString("zh-TW")}・來自 ${b.email||"—"}・${bkCount(b)}`;
   const d=new Date(), tag=`（還原 ${d.getMonth()+1}/${d.getDate()}）`, box=$("bkLedgers"); box.textContent="";
@@ -2517,7 +2518,7 @@ function refreshTips(){
 
 /* 歡迎導覽 */
 const TOUR=[
-  { sel:null, title:"歡迎使用記帳本", text:"花 30 秒認識一下怎麼用。隨時可以按「略過教學」，之後也能在「設定」重新看一次。" },
+  { sel:null, title:"歡迎使用貓掌櫃", text:"花 30 秒認識一下怎麼用。隨時可以按「略過教學」，之後也能在「設定」重新看一次。" },
   { sel:"#btnNewLedger:not([hidden]), #viewHome .lcard-new", title:"第一步：建立帳本", text:"跟著三個步驟走：取名字（可以從個人、家庭、孕期、寶寶、搬家範本開始）、挑顏色和一隻喜歡的貓咪當帳本頭像、整理分類。孕期、搬家這類有總預算的，會自動開啟專案模式。" },
   { sel:"#viewHome .lcard", title:"記一筆", text:"點進帳本後，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。",
     alt:"建好帳本後點進去，右下角的「＋ 記一筆」就能記帳，只有金額和分類必填。可以切換支出／收入；出差先幫公司付的錢勾「代墊」，請款前不算自己的支出。" },
@@ -3347,7 +3348,7 @@ $("liBack").onclick=()=>{ location.hash="#lists"; };
 $("liFab").onclick=()=>{ const f=$("liAddForm"); f.classList.add("open"); f.scrollIntoView({behavior:"smooth",block:"center"}); setTimeout(()=>$("liAddText").focus({preventScroll:true}),250); };
 function renderListHead(){
   const x=LI(); if(!x){ $("liName").textContent=S.listsReady?"找不到這個清單":"讀取中…"; return; }
-  document.title=x.name+"・記帳本";
+  document.title=x.name+"・貓掌櫃";
   $("liName").textContent=x.name; $("liDot").style.background=x.color||COLORS[0]; document.querySelector("#viewList .li-sum").style.setProperty("--lc", x.color||COLORS[0]); $("liRole").textContent=listRole(x);
   const ed=canEditList(x); $("liAddForm").hidden=!ed; $("liMemo").readOnly=!ed; $("liFab").hidden=!ed;
   if(S.memoFor!==x.id || document.activeElement!==$("liMemo")){ if(S.memoFor!==x.id || !S.memoDirty){ $("liMemo").value=x.memo||""; S.memoFor=x.id; } }

@@ -1,4 +1,4 @@
-/* 記帳本 — ruled ledger book: quiet paper, ink-green accent, figures in a mono face. */
+/* 貓掌櫃（記帳本）— ruled ledger book: quiet paper, ink-green accent, figures in a mono face. */
 :root{
   --paper:#f5f7f5; --sheet:#ffffff; --ink:#18231f; --muted:#5b6964; --rule:#dde5e1; --rule-strong:#c1cec8;
   --accent:#1d6b52; --accent-soft:#e2efe8; --on-accent:#ffffff;
@@ -734,7 +734,7 @@ body.nav-on .page > .tabs{display:none}
   .nav-cheer-name{display:block;font-size:12px}
 }
 
-/* 電腦版：上方橫幅整條橫跨，「記帳本」在橫幅左邊，左側選單從橫幅下面開始 */
+/* 電腦版：上方橫幅整條橫跨，「貓掌櫃」在橫幅左邊，左側選單從橫幅下面開始 */
 @media (min-width:821px){
   body.nav-on.bar-on .appbar{box-sizing:border-box;height:64px;margin-left:-224px;padding:0 24px 0 0;z-index:8}
   body.nav-on.bar-on .appbar-brand{display:flex;box-sizing:border-box;width:224px;padding-left:24px;flex:none;font-size:22px}
