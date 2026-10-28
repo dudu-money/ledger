@@ -57,9 +57,13 @@ let CAT_MANIFEST = null;
 fetch("cats/manifest.json").then(r=>r.ok?r.json():null).then(m=>{ if(m && m.breeds){ CAT_MANIFEST=m; paintMyCat(true); } }).catch(()=>{});
 const catHas = (k, scene) => !CAT_MANIFEST || (CAT_MANIFEST.breeds[k]||[]).includes(scene);
 /* 缺圖時：這隻的同情境 → 這隻的開心 → 預設貓的同情境 → 預設貓的開心 */
+/* 清單情境圖：這隻還沒畫的，先借預設貓（橘白）的同情境圖；都沒有才借意思相近的現有圖 */
+const SCENE_ALT = { maternity:"content", shopping:"box", travel:"happy", moving:"box", todo:"money", listdone:"cheer" };
 function catSrcs(k, scene){
-  const out=[];
-  for(const [b,s] of [[k,scene],[k,"happy"],[MY_CAT_DEFAULT,scene],[MY_CAT_DEFAULT,"happy"]])
+  const out=[], alt=SCENE_ALT[scene];
+  const order = alt ? [[k,scene],[MY_CAT_DEFAULT,scene],[k,alt],[k,"happy"],[MY_CAT_DEFAULT,"happy"]]
+                    : [[k,scene],[k,"happy"],[MY_CAT_DEFAULT,scene],[MY_CAT_DEFAULT,"happy"]];
+  for(const [b,s] of order)
     if(CAT_KEYS.includes(b) && catHas(b,s)){ const u=`cats/${b}/${s}.webp`; if(!out.includes(u)) out.push(u); }
   return out;
 }
@@ -3234,18 +3238,54 @@ function renderLists(){
   else if(!mine.length){ const nm=activeCat().name; const e=el("div","empty cat-empty"); e.appendChild(myCatImg("sleep","cat-empty-img"));
     e.appendChild(el("strong",null, nm ? `${nm}睡著了，按「新增清單」叫醒牠` : "還沒有清單"));
     e.appendChild(document.createTextNode("按「＋ 新增清單」，可以從待產包、寶寶用品範本開始，常見項目會先幫你列好。")); g.appendChild(e); }
-  mine.forEach(x=>g.appendChild(listCard(x)));
-  $("sharedListsWrap").hidden=!shared.length; const sg=$("sharedLists"); sg.textContent=""; shared.forEach(x=>sg.appendChild(listCard(x)));
+  const f=listFilter(), byDone=(a,b)=>listProg(a).finished-listProg(b).finished;
+  const mineF=mine.filter(listPass).sort(byDone), sharedF=shared.filter(listPass).sort(byDone);
+  document.querySelectorAll("#listFilter button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.f===f));
+  $("listFilter").hidden = !S.listsReady || (!mine.length && !shared.length);
+  if(S.listsReady && mine.length && !mineF.length) g.appendChild(el("p","small muted lst-none", f==="done" ? "還沒有全部完成的清單。" : "清單都完成了！"));
+  mineF.forEach(x=>g.appendChild(listCard(x)));
+  $("sharedListsWrap").hidden=!sharedF.length; const sg=$("sharedLists"); sg.textContent=""; sharedF.forEach(x=>sg.appendChild(listCard(x)));
 }
+/* 清單情境（決定卡片上的貓咪插畫）：沒設定過的從名稱猜，只顯示、不寫回資料庫 */
+const LIST_SCENES = [["maternity","待產包"],["shopping","採購"],["travel","旅行"],["moving","搬家"],["todo","待辦"]];
+function listScene(x){
+  if(LIST_SCENES.some(([k])=>k===x.scene)) return x.scene;
+  const n=x.name||"";
+  if(/待產|月子|生產/.test(n)) return "maternity";
+  if(/搬家|搬遷|新家/.test(n)) return "moving";
+  if(/旅|出國|露營|行李/.test(n)) return "travel";
+  if(/買|購|用品|採買|添購/.test(n)) return "shopping";
+  return "todo";
+}
+const listProg = x => { const st=x.stats||{}, left=st.left||0, done=st.done||0, total=left+done;
+  return { left, done, total, need:st.need||0, pct: total ? Math.round(done/total*100) : 0, finished: total>0 && left===0 }; };
 function listCard(x){
-  const b=el("button","lcard"); b.type="button"; b.onclick=()=>{ location.hash="#list/"+x.id; };
-  const n=el("div","name"); const d=el("span","dot"); d.style.background=x.color||COLORS[0]; n.append(d, document.createTextNode(x.name)); b.appendChild(n);
-  const st=x.stats||{};
-  b.appendChild(el("div","meta", typeof st.left==="number" ? `還有 ${st.left} 項` + (st.need?`・還需準備 ${money(st.need)}`:"") + (st.done?`・已完成 ${st.done} 項`:"") : "點進去新增項目"));
+  const p=listProg(x), b=el("div","lcard lst-card"+(p.finished?" finished":""));
+  b.tabIndex=0; b.setAttribute("role","link"); b.setAttribute("aria-label",`${x.name}，完成 ${p.done}／${p.total} 項`);
+  b.style.setProperty("--lc", x.color||COLORS[0]);
+  const go=()=>{ location.hash="#list/"+x.id; };
+  b.onclick=go; b.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); go(); } };
+  const top=el("div","lst-top");
+  const body=el("div","lst-body");
+  const n=el("div","lst-name",x.name); body.appendChild(n);
   const others=(x.members||[]).length-1;
-  b.appendChild(el("div","meta", x.ownerUid===S.user.uid ? (others>0?`與 ${others} 人共用`:"只有你看得到") : `${x.ownerEmail} 分享・${listRole(x)}`));
+  body.appendChild(el("div","lst-meta", x.ownerUid===S.user.uid ? (others>0?`與 ${others} 人共用`:"只有你看得到") : `${x.ownerEmail} 分享・${listRole(x)}`));
+  const more=el("button","lst-more","⋯"); more.type="button"; more.setAttribute("aria-label",`「${x.name}」的設定`);
+  more.onclick=e=>{ e.stopPropagation(); S.openListSet=x.id; go(); };
+  top.append(myCatImg(p.finished?"listdone":listScene(x),"lst-cat"), body, more);
+  b.appendChild(top);
+  if(!p.total){ b.appendChild(el("div","lst-empty","還沒有項目，點進去新增")); return b; }
+  const row=el("div","lst-row");
+  row.append(el("span","lst-count",`已完成 ${p.done}／${p.total} 項`), el("span","lst-pct",`${p.pct}%`));
+  const bar=el("div","lst-bar"); const f=el("span"); f.style.width=p.pct+"%"; bar.appendChild(f);
+  b.append(row, bar);
+  b.appendChild(el("div","lst-need", p.finished ? "全部完成了！" : (p.need ? `還需準備 ${money(p.need)}` : `還有 ${p.left} 項`)));
   return b;
 }
+/* 清單篩選：全部／進行中／已完成（只記在這台裝置） */
+const listFilter = () => { const v=store.get("ledger.listFilter"); return ["all","doing","done"].includes(v) ? v : "all"; };
+document.querySelectorAll("#listFilter button").forEach(b=>b.onclick=()=>{ store.set("ledger.listFilter", b.dataset.f); renderLists(); });
+const listPass = x => { const f=listFilter(), p=listProg(x); return f==="all" || (f==="done" ? p.finished : !p.finished); };
 
 /* 新增清單 */
 let nlColor=COLORS[0];
@@ -3288,6 +3328,7 @@ function openList(id){
   S.listId=id; show("viewList");
   if(S.itemsFor!==id){ S.itemsFor=id; watchItems(id); $("liMemo").value=""; S.memoFor=null; S.addGroup=""; S.newGroupOpen=false; }
   renderListHead(); renderListItems();
+  if(S.openListSet===id && LI()){ S.openListSet=null; $("liSetBtn").click(); }
 }
 $("liBack").onclick=()=>{ location.hash="#lists"; };
 function renderListHead(){

@@ -10,7 +10,13 @@
   "money": "記帳中",
   "cheer": "加油",
   "hero": "首頁橫幅（橫的）",
-  "nav": "電腦版左下角（橫的）"
+  "nav": "電腦版左下角（橫的）",
+  "maternity": "清單：待產包",
+  "shopping": "清單：採購",
+  "travel": "清單：旅行",
+  "moving": "清單：搬家",
+  "todo": "清單：待辦",
+  "listdone": "清單：全部完成"
  },
  "breeds": {
   "orange": [
@@ -33,7 +39,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "tabby": [
    "face",

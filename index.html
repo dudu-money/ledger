@@ -282,6 +282,11 @@
       <h2 class="h2">我的清單</h2>
       <button class="btn primary" id="btnNewList" type="button">＋ 新增清單</button>
     </div>
+    <div class="seg sm lst-filter" id="listFilter" role="group" aria-label="篩選清單" hidden>
+      <button type="button" data-f="all" aria-pressed="true">全部</button>
+      <button type="button" data-f="doing" aria-pressed="false">進行中</button>
+      <button type="button" data-f="done" aria-pressed="false">已完成</button>
+    </div>
     <div class="ledger-grid" id="myLists"></div>
     <div id="sharedListsWrap" hidden>
       <h2 class="h2">別人分享給我的</h2>
