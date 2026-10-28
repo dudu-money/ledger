@@ -113,7 +113,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "white": [
    "face",
@@ -124,7 +130,13 @@
    "money",
    "cheer",
    "hero",
-   "nav"
+   "nav",
+   "maternity",
+   "shopping",
+   "travel",
+   "moving",
+   "todo",
+   "listdone"
   ],
   "tux": [
    "face",
