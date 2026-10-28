@@ -4369,3 +4369,99 @@ $("btnBell").onclick=async()=>{
 };
 $("bellClose").onclick=()=>$("dlgBell").close();
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") bellSoon(); });
+
+/* ---- 日期／月份／時間選單（電腦版）：換掉瀏覽器內建的選單，跟系統風格一致；手機維持內建滾輪 ----
+   欄位還是原本的 input，值的格式不變（YYYY-MM-DD／YYYY-MM／HH:MM），選好後照樣觸發 input、change */
+const PK = { el:null, inp:null, ym:null };
+const pkFine = () => matchMedia("(pointer:fine)").matches;
+const pkClose = () => { if(PK.el){ PK.el.remove(); PK.el=null; PK.inp=null; } };
+const pkSet = v => { const i=PK.inp; if(!i) return; i.value=v; i.dispatchEvent(new Event("input",{bubbles:true})); i.dispatchEvent(new Event("change",{bubbles:true})); pkClose(); i.focus(); };
+const pkOk = (i,v) => (!i.min || v>=i.min) && (!i.max || v<=i.max);
+function pkPlace(){
+  const r=PK.inp.getBoundingClientRect(), p=PK.el, w=p.offsetWidth, h=p.offsetHeight;
+  let x=Math.min(r.left, innerWidth-w-8), y=r.bottom+6;
+  if(y+h>innerHeight-8 && r.top-h-6>8) y=r.top-h-6;
+  p.style.left=Math.max(8,x)+"px"; p.style.top=Math.max(8,Math.min(y,innerHeight-h-8))+"px";
+}
+function pkHead(title, prev, next){
+  const hd=el("div","pk-head"), a=el("button","pk-nav","‹"), b=el("button","pk-nav","›");
+  a.type=b.type="button"; a.setAttribute("aria-label","上一頁"); b.setAttribute("aria-label","下一頁");
+  a.onclick=prev; b.onclick=next; hd.append(a, el("strong","pk-title",title), b); return hd;
+}
+function pkFoot(clear, now, nowLabel){
+  const f=el("div","pk-foot"), c=el("button","pk-link","清除"), t=el("button","pk-link pk-now",nowLabel);
+  c.type=t.type="button"; c.onclick=clear; t.onclick=now;
+  if(PK.inp.required) c.hidden=true;
+  f.append(c,t); return f;
+}
+function pkDate(){
+  const i=PK.inp, p=PK.el, [y,m]=PK.ym, today=todayStr(); p.innerHTML="";
+  p.appendChild(pkHead(`${y} 年 ${m} 月`, ()=>{ PK.ym = m===1?[y-1,12]:[y,m-1]; pkDate(); }, ()=>{ PK.ym = m===12?[y+1,1]:[y,m+1]; pkDate(); }));
+  const g=el("div","pk-grid");
+  "日一二三四五六".split("").forEach((d,k)=>g.appendChild(el("span","pk-wd"+(k===0||k===6?" we":""),d)));
+  const first=new Date(y,m-1,1), start=new Date(y,m-1,1-first.getDay());
+  for(let k=0;k<42;k++){
+    const d=new Date(start); d.setDate(start.getDate()+k);
+    const v=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const b=el("button","pk-day"+(d.getMonth()!==m-1?" out":"")+(v===today?" today":"")+(v===i.value?" on":""), String(d.getDate()));
+    b.type="button"; b.dataset.v=v; if(!pkOk(i,v)) b.disabled=true; b.onclick=()=>pkSet(v); g.appendChild(b);
+  }
+  p.appendChild(g);
+  p.appendChild(pkFoot(()=>pkSet(""), ()=>pkSet(today), "今天"));
+}
+function pkMonth(){
+  const i=PK.inp, p=PK.el, y=PK.ym[0], cur=todayStr().slice(0,7); p.innerHTML="";
+  p.appendChild(pkHead(`${y} 年`, ()=>{ PK.ym=[y-1,1]; pkMonth(); }, ()=>{ PK.ym=[y+1,1]; pkMonth(); }));
+  const g=el("div","pk-months");
+  for(let k=1;k<=12;k++){ const v=`${y}-${pad(k)}`;
+    const b=el("button","pk-day"+(v===cur?" today":"")+(v===i.value?" on":""), `${k} 月`);
+    b.type="button"; if(!pkOk(i,v)) b.disabled=true; b.onclick=()=>pkSet(v); g.appendChild(b); }
+  p.appendChild(g);
+  p.appendChild(pkFoot(()=>pkSet(""), ()=>pkSet(cur), "這個月"));
+}
+function pkTime(){
+  const i=PK.inp, p=PK.el, [hh,mm]=(i.value||"").split(":"); p.innerHTML="";
+  let h=hh||"", mi=mm||"";
+  const wrap=el("div","pk-time"), hc=el("div","pk-col"), mc=el("div","pk-col");
+  const done=()=>{ if(h!=="" && mi!=="") pkSet(`${h}:${mi}`); };  // 先點時、再點分，點完分才關
+  for(let k=0;k<24;k++){ const v=pad(k), b=el("button","pk-t"+(v===h?" on":""),v); b.type="button";
+    b.onclick=()=>{ h=v; hc.querySelectorAll(".on").forEach(x=>x.classList.remove("on")); b.classList.add("on"); }; hc.appendChild(b); }
+  const mins=[...Array(12)].map((_,k)=>pad(k*5)); if(mi && !mins.includes(mi)) mins.push(mi), mins.sort();
+  mins.forEach(v=>{ const b=el("button","pk-t"+(v===mi?" on":""),v); b.type="button";
+    b.onclick=()=>{ mi=v; if(h===""){ mc.querySelectorAll(".on").forEach(x=>x.classList.remove("on")); b.classList.add("on"); return; } done(); }; mc.appendChild(b); });
+  wrap.append(el("div","pk-ch","時"), el("div","pk-ch","分"), hc, mc); p.appendChild(wrap);
+  const d=new Date(); p.appendChild(pkFoot(()=>pkSet(""), ()=>pkSet(`${pad(d.getHours())}:${pad(d.getMinutes())}`), "現在"));
+  requestAnimationFrame(()=>p.querySelectorAll(".pk-col").forEach(c=>{ const o=c.querySelector(".on"); if(o) c.scrollTop=o.offsetTop-c.clientHeight/2+o.offsetHeight/2; else if(c===hc) c.scrollTop=hc.children[9].offsetTop; }));
+}
+function pkOpen(i){
+  if(PK.inp===i){ pkClose(); return; }
+  pkClose();
+  const p=el("div","pk"); p.setAttribute("role","dialog"); p.setAttribute("aria-label", i.type==="time"?"選時間":i.type==="month"?"選月份":"選日期");
+  PK.el=p; PK.inp=i;
+  const base=(i.value || (i.type==="month"?todayStr().slice(0,7):todayStr())).split("-").map(Number);
+  PK.ym=[base[0], base[1]||1];
+  (i.closest("dialog")||document.body).appendChild(p);
+  if(i.type==="time") pkTime(); else if(i.type==="month") pkMonth(); else pkDate();
+  pkPlace();
+  const f=p.querySelector(".on")||p.querySelector(".today")||p.querySelector("button:not([hidden])"); if(f && i.type!=="time") f.focus({preventScroll:true});
+}
+const pkTarget = e => { const t=e.target; return t instanceof HTMLInputElement && ["date","time","month"].includes(t.type) && !t.disabled && !t.readOnly && pkFine() ? t : null; };
+document.addEventListener("mousedown", e=>{
+  const t=pkTarget(e); if(t){ e.preventDefault(); pkOpen(t); return; }
+  if(PK.el && !PK.el.contains(e.target)) pkClose();
+}, true);
+document.addEventListener("click", e=>{ if(pkTarget(e)) e.preventDefault(); }, true);
+document.addEventListener("keydown", e=>{
+  if(PK.el && e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); const i=PK.inp; pkClose(); i && i.focus(); return; }
+  const t=pkTarget(e); if(t && (e.key==="Enter" || e.key===" " || (e.altKey && e.key==="ArrowDown"))){ e.preventDefault(); pkOpen(t); return; }
+  if(PK.el && PK.inp && PK.inp.type==="date" && PK.el.contains(document.activeElement) && document.activeElement.dataset.v && /^Arrow/.test(e.key)){
+    e.preventDefault(); const step={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];
+    const d=new Date(document.activeElement.dataset.v+"T00:00"); d.setDate(d.getDate()+step);
+    const v=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    if(d.getMonth()+1!==PK.ym[1]){ PK.ym=[d.getFullYear(),d.getMonth()+1]; pkDate(); pkPlace(); }
+    const b=PK.el.querySelector(`[data-v="${v}"]`); b && b.focus();
+  }
+}, true);
+document.addEventListener("cancel", e=>{ if(PK.el){ e.preventDefault(); pkClose(); } }, true);
+document.addEventListener("close", ()=>pkClose(), true);
+addEventListener("resize", pkClose); document.addEventListener("scroll", e=>{ if(PK.el && !PK.el.contains(e.target)) pkClose(); }, true);

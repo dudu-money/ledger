@@ -97,13 +97,13 @@ code{font-family:var(--f-num);background:var(--accent-soft);padding:1px 5px;bord
 .link{border:0;background:none;color:var(--accent);padding:2px 0;font-size:14px}
 .icon-btn{border:1px solid var(--rule-strong);background:var(--sheet);border-radius:9px;width:38px;height:38px;display:grid;place-items:center;font-size:18px;flex:none}
 .icon-btn:hover{border-color:var(--accent)}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=time],input[type=search],select{
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=time],input[type=month],input[type=search],select{
   border:1px solid var(--rule-strong);background:var(--paper);border-radius:9px;padding:9px 11px;width:100%;min-width:0}
 .row input,.row select{width:auto}
 /* iPhone Safari：日期、時間欄位預設會比格子寬、空白時高度縮掉，統一成跟一般輸入框一樣 */
-input[type=date],input[type=time],select{min-height:calc(1.55em + 20px)}
-input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;max-width:100%;text-align:left;color:var(--ink)}
-input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value{text-align:left;margin:0;min-height:1.55em}
+input[type=date],input[type=time],input[type=month],select{min-height:calc(1.55em + 20px)}
+input[type=date],input[type=time],input[type=month]{-webkit-appearance:none;appearance:none;display:block;max-width:100%;text-align:left;color:var(--ink)}
+input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value,input[type=month]::-webkit-date-and-time-value{text-align:left;margin:0;min-height:1.55em}
 .row input.grow{width:100%}
 #search{width:200px;max-width:100%}
 .field{display:flex;flex-direction:column;gap:5px;min-width:0}
@@ -887,3 +887,37 @@ body.bar-on #viewLedger > .topbar,body.bar-on #viewList > .topbar{display:flex;t
 :root[data-theme="dark"] .cal-item .cal-m{color:rgba(26,29,27,.75)}
 :root[data-theme="dark"] .cal-item .cal-r{color:#1a1d1b}
 :root[data-theme="dark"] .cal-ic{background:rgba(255,255,255,.35)}
+/* 日期／月份／時間選單（電腦版，app.js 的 pk*） */
+@media (pointer:fine){
+  input[type=date],input[type=time],input[type=month]{cursor:pointer}
+  input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator,input[type=month]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.55}
+}
+.pk{position:fixed;z-index:1000;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:16px;box-shadow:0 12px 32px rgba(0,0,0,.18),0 2px 6px rgba(0,0,0,.08);padding:12px;width:292px;font-size:14px}
+.pk button{font:inherit;color:inherit;cursor:pointer}
+.pk-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
+.pk-title{font-size:16px;font-weight:700}
+.pk-nav{width:34px;height:34px;border-radius:10px;border:1px solid var(--rule-strong);background:var(--sheet);font-size:18px;line-height:1}
+.pk-nav:hover{background:var(--accent-soft)}
+.pk-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.pk-wd{text-align:center;font-size:12px;color:var(--muted);padding:4px 0}
+.pk-wd.we{color:var(--out)}
+.pk-day{height:36px;border:0;border-radius:10px;background:none;font-family:var(--f-num);font-size:14px}
+.pk-day:hover:not(:disabled){background:var(--accent-soft)}
+.pk-day.out{color:var(--muted);opacity:.55}
+.pk-day.today{box-shadow:inset 0 0 0 1.5px var(--accent);font-weight:700}
+.pk-day.on{background:var(--accent);color:#fff;font-weight:700}
+.pk-day:disabled{opacity:.25;cursor:default}
+.pk-day:focus-visible,.pk-t:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pk-months{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.pk-months .pk-day{height:42px;font-family:inherit}
+.pk-foot{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--rule)}
+.pk-foot .pk-now{margin-left:auto}
+.pk-link{border:0;background:none;color:var(--accent)!important;font-weight:600;padding:4px 8px;border-radius:8px}
+.pk-link:hover{background:var(--accent-soft)}
+.pk-time{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}
+.pk-ch{text-align:center;font-size:12px;color:var(--muted)}
+.pk-col{height:224px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:2px;scrollbar-width:thin}
+.pk-t{flex:none;height:34px;border:0;border-radius:9px;background:none;font-family:var(--f-num);font-size:15px}
+.pk-t:hover{background:var(--accent-soft)}
+.pk-t.on{background:var(--accent);color:#fff;font-weight:700}
+.pk:has(.pk-time){width:200px}
