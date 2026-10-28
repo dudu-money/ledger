@@ -449,9 +449,11 @@ button.pay-cell:hover{border-color:var(--accent)}
 /* 清單內頁上方：左邊名稱和進度、右邊大張情境貓；下面一排小數字 */
 .li-sum{display:flex!important;flex-direction:column;gap:12px}
 .li-hero{display:flex;align-items:stretch;gap:12px;min-height:190px;margin:-6px -6px 0;padding:0 0 0 24px;border-radius:16px;overflow:hidden;
-  background:linear-gradient(135deg,color-mix(in srgb,var(--lc,var(--accent)) var(--lc-a,8%),var(--sheet)) 0%,color-mix(in srgb,var(--lc,var(--accent)) var(--lc-b,18%),var(--sheet)) 100%)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .li-hero{--lc-a:14%;--lc-b:30%}}
-:root[data-theme="dark"] .li-hero{--lc-a:14%;--lc-b:30%}
+  background:linear-gradient(135deg,var(--lhero-a) 0%,var(--lhero-b) 100%)}
+/* 橫幅底色：跟水彩貓搭的奶油色，不跟清單顏色走 */
+:root{--lhero-a:#fbf5ec;--lhero-b:#f3e5cf}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--lhero-a:#2a251e;--lhero-b:#3a3024}}
+:root[data-theme="dark"]{--lhero-a:#2a251e;--lhero-b:#3a3024}
 .li-hero-text{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:18px 0}
 .li-hero-name{font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .li-hero-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--muted);font-size:14px}
