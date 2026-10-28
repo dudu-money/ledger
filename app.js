@@ -3286,7 +3286,7 @@ function listCard(x){
   row.append(el("span","lst-count",`已完成 ${p.done}／${p.total} 項`), el("span","lst-pct",`${p.pct}%`));
   const bar=el("div","lst-bar"); const f=el("span"); f.style.width=p.pct+"%"; bar.appendChild(f);
   b.append(row, bar);
-  b.appendChild(foot(el("div","lst-need", p.finished ? "全部完成了！" : (p.need ? `還需準備 ${money(p.need)}` : `還有 ${p.left} 項`))));
+  b.appendChild(foot(el("div","lst-need", p.finished ? "全部完成了！" : (p.need && k==="buy" ? `還需準備 ${money(p.need)}` : `還有 ${p.left} 項`))));
   return b;
 }
 /* 清單篩選：全部／進行中／已完成／採購／待辦（只記在這台裝置） */
@@ -3383,10 +3383,17 @@ function renderListItems(){
   if(ed && !(S.newGroupOpen && document.activeElement && document.activeElement.classList.contains("li-newgroup"))) renderGroupPick(x);
   const manual=x.sort==="manual";
   $("liSort").value=manual?"manual":""; $("liSort").disabled=!ed;
+  const buy=listKind(x)==="buy";
   $("liReorder").hidden=!ed || !manual; $("liReorder").textContent=S.reorder?"完成":"調整順序"; $("liReorder").classList.toggle("primary",!!S.reorder);
-  $("liSortHint").textContent = S.reorder ? "用 ↑ ↓ 移動項目，排好按「完成」。順序會同步給一起用這份清單的人。" : "點項目可以修改；打勾代表買好／完成";
+  $("liSortHint").textContent = S.reorder ? "用 ↑ ↓ 移動項目，排好按「完成」。順序會同步給一起用這份清單的人。" : (buy ? "點項目可以修改；打勾代表買好了" : "點項目可以修改；打勾代表完成");
   const todo=S.listItems.filter(i=>!i.done).sort(manual?((a,b)=>(a.order||0)-(b.order||0)):sortItems), done=S.listItems.filter(i=>i.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||""));
   const need=todo.reduce((t,i)=>t+(i.amount||0),0), spent=done.reduce((t,i)=>t+(i.spent||0),0), noAmt=todo.filter(i=>!i.amount).length;
+  // 待辦清單：金額收起來（修改視窗裡還能填「花費」），摘要改看最近的截止日
+  $("liAddAmt").hidden=!buy; $("liNeedBox").hidden=!buy; $("liNextBox").hidden=buy;
+  $("liItemsTitle").textContent = buy ? "要買的東西" : "待辦項目";
+  if(!buy){ const nx=todo.filter(i=>i.due).sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:0)[0];
+    $("liNext").textContent = nx ? nx.due.slice(5).replace("-","/") : "沒有設定"; $("liNext").classList.toggle("c-out", !!nx && nx.due<todayStr());
+    $("liNextWhat").textContent = nx ? nx.text : ""; }
   $("liLeftN").textContent=`${todo.length} 項`; $("liNeed").textContent=money(need); $("liDoneN").textContent=`${done.length} 項`;
   $("liSpent").textContent = spent ? `實際花了 ${money(spent)}` : "";
   if(noAmt && todo.length) $("liNeed").title=`有 ${noAmt} 項沒填金額`;
@@ -3400,7 +3407,7 @@ function renderListItems(){
   else ["",...gs].forEach(g=>{
     const its=todo.filter(i=>(i.group||"")===g); if(!its.length) return;
     if(g){ const h=el("div","li-ghead"); const nd=its.reduce((t,i)=>t+(i.amount||0),0);
-      h.append(el("span",null,g), el("span","small muted",`${its.length} 項`+(nd?`・${money(nd)}`:""))); box.appendChild(h); }
+      h.append(el("span",null,g), el("span","small muted",`${its.length} 項`+(nd&&buy?`・${money(nd)}`:""))); box.appendChild(h); }
     its.forEach((i,k)=>box.appendChild(itemRow(x,i,ed,true,mv(its,k))));
   });
   $("liDoneWrap").hidden=!done.length; $("liDoneSum").textContent=`已完成 ${done.length} 項` + (spent?`・實際花了 ${money(spent)}`:"");
@@ -3436,13 +3443,15 @@ $("liReorder").onclick=()=>{ S.reorder=!S.reorder; renderListItems(); };
 function itemRow(x,i,ed,grouped,mv){
   const r=el("div","li-row"+(i.done?" done":""));
   const cb=el("input"); cb.type="checkbox"; cb.checked=!!i.done; cb.disabled=!ed; cb.setAttribute("aria-label",(i.done?"改回未完成：":"完成：")+i.text);
-  cb.onclick=ev=>{ ev.preventDefault(); if(i.done) undoItem(x,i); else openBuy(x,i); };
+  // 待辦清單沒填花費的項目：直接打勾完成，不問要不要記帳
+  cb.onclick=ev=>{ ev.preventDefault(); if(i.done) undoItem(x,i); else if(listKind(x)!=="buy" && !i.amount) quickDone(x,i); else openBuy(x,i); };
   const main=el("div","li-main"); main.appendChild(el("div","li-text",i.text));
   const meta=[]; if(i.group && !grouped) meta.push(i.group); if(i.priority) meta.push(`優先 ${i.priority}`); if(i.due) meta.push(`${i.due.slice(5).replace("-","/")} 前`); if(i.note) meta.push(i.note);
+  if(i.amount && !i.done && listKind(x)!=="buy") meta.push(`花費 ${money(i.amount)}`);
   if(i.done){ if(i.via==="gift") meta.push("親友送禮"); else if(i.via==="have") meta.push("已有物品"); if(i.spent) meta.push(`實際 ${fmt(i.spent)}`); if(i.ledgerId){ const lg=S.ledgers.get(i.ledgerId); meta.push(lg?`已記到「${lg.name}」`:"已記帳"); } }
   if(meta.length) main.appendChild(el("div","li-meta",meta.join("・")));
   const right=el("div","li-right");
-  if(i.amount && !i.done) right.appendChild(el("span","num",fmt(i.amount)));
+  if(i.amount && !i.done && listKind(x)==="buy") right.appendChild(el("span","num",fmt(i.amount)));
   if(i.priority==="高" && !i.done) r.classList.add("hi");
   if(i.due && !i.done && i.due<todayStr()) r.classList.add("late");
   r.append(cb, main, right);
@@ -3471,6 +3480,8 @@ $("liMemo").addEventListener("input", ()=>{
 /* 修改項目 */
 function openItem(i){
   S.itEdit=i; msg("itMsg","");
+  const buy=listKind(LI()||{})==="buy";
+  $("itAmtLabel").textContent = buy ? "預估金額" : "花費（選填）"; $("itAmt").placeholder = buy ? "不確定可留空" : "要花錢的事才需要填";
   $("itText").value=i.text; $("itAmt").value=i.amount||""; $("itDue").value=i.due||""; $("itNote").value=i.note||"";
   const sel=$("itGroup"); sel.textContent="";
   [["","不分組"], ...listGroups().map(g=>[g,g]), ["__new","＋ 新增分組…"]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; sel.appendChild(o); });
@@ -3634,6 +3645,10 @@ $("formBuy").addEventListener("submit", async ev=>{
   }catch(e){ msg("byMsg","儲存失敗："+errText(e),"err"); }
   finally{ $("bySave").disabled=false; }
 });
+async function quickDone(x,i){
+  try{ await updateDoc(doc(db,"lists",x.id,"items",i.id), { done:true, doneAt:todayStr(), spent:0, ledgerId:"", entryId:"", via:"", updatedAt:serverTimestamp() }); toast("完成"); }
+  catch(e){ msg("liMsg","儲存失敗："+errText(e),"err"); }
+}
 /* 不用花錢就完成的：親友送禮、家裡已有 */
 async function markVia(via, label){
   const x=LI(), i=S.buyItem;

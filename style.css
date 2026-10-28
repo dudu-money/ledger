@@ -444,6 +444,7 @@ button.pay-cell:hover{border-color:var(--accent)}
 .li-add input{margin:0}
 @media (max-width:560px){ .li-sum .num.mid{font-size:18px} }
 .li-sum .num{white-space:nowrap}
+.li-next-what{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:560px){ .li-sum .num.mid{font-size:16px} .li-sum .label{font-size:12px} }
 .li-add-wrap{gap:10px}
 .li-groups{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
