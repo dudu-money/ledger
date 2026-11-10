@@ -3197,13 +3197,13 @@ $("rbUndo").onclick=async()=>{
 /* ================= 清單（待購、待產包、備忘） ================= */
 /* lists/{id}：名稱、顏色、成員（和帳本一樣可以分享）、記事 memo；項目放在 lists/{id}/items */
 const LIST_TEMPLATES={
+  "空白":{ color:"#4f6470", items:[] },
   "待產包":{ color:"#b23a5a", kind:"buy", items:[
     ["產褥墊","媽媽"],["免洗褲","媽媽"],["哺乳內衣","媽媽"],["溢乳墊","媽媽"],["月子帽／保暖外套","媽媽"],["束腹帶","媽媽"],["吸管保溫杯","媽媽"],["拖鞋","媽媽"],["盥洗用品","媽媽"],["媽媽手冊、健保卡、身分證","證件"],
     ["紗布衣","寶寶"],["包巾","寶寶"],["紗布巾","寶寶"],["新生兒尿布（NB）","寶寶"],["濕紙巾","寶寶"],["出院衣服","寶寶"],["嬰兒汽座（出院用）","寶寶"] ]},
   "寶寶用品":{ color:"#2f5fa8", kind:"buy", items:[
     ["奶瓶","餵奶"],["奶嘴","餵奶"],["奶瓶消毒鍋","餵奶"],["溫奶器","餵奶"],["嬰兒床","睡覺"],["床包／防水墊","睡覺"],["澡盆","洗澡"],["嬰兒沐浴乳","洗澡"],["指甲剪","護理"],["耳溫槍","護理"],["推車","外出"],["揹巾","外出"] ]},
-  "待購清單":{ color:"#1d6b52", kind:"buy", items:[] },
-  "空白":{ color:"#4f6470", items:[] }
+  "待購清單":{ color:"#1d6b52", kind:"buy", items:[] }
 };
 const PRIO_RANK={"高":0,"中":1,"低":2,"":3};
 const LI = () => S.lists.get(S.listId);
@@ -3306,7 +3306,8 @@ $("btnNewList").onclick=()=>{
   msg("nlMsg",""); $("nlName").value=""; $("nlSeed").checked=true;
   const box=$("nlTemplates"); box.textContent="";
   Object.keys(LIST_TEMPLATES).forEach(k=>{ const c=el("button","chip",k); c.type="button"; c.onclick=()=>pickListTpl(k); box.appendChild(c); });
-  pickListTpl("待產包"); $("dlgNewList").showModal();
+  /* 預設空白：只有自己點了待產包、寶寶用品範本才會帶入常見項目和分組 */
+  pickListTpl("空白"); $("dlgNewList").showModal();
 };
 function pickListTpl(k){
   const t=LIST_TEMPLATES[k]; S.nlTpl=k;
