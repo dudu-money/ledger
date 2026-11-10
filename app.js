@@ -647,7 +647,7 @@ function renderCats(l){
     [...rows.entries()].forEach(([id,r])=>{ B+=r.b;A+=r.a;N+=r.n;D+=r.d;
       const tr=el("tr"); tr.setAttribute("aria-selected", S.catFilter===id); tr.title="只看這個分類";
       tr.onclick=()=>{ S.catFilter=S.catFilter===id?null:id; renderCats(l); renderList(); };
-      const c1=el("td"); c1.appendChild(document.createTextNode(r.name)); const mm=el("div","mini-meter"); const mi=el("i"); mi.style.width=(r.d/r.n*100)+"%"; mm.appendChild(mi); c1.appendChild(mm);
+      const c1=el("td"); c1.append(el("span","cat-ic",catIcon(r.name,"out")), document.createTextNode(r.name)); const mm=el("div","mini-meter"); const mi=el("i"); mi.style.width=(r.d/r.n*100)+"%"; mm.appendChild(mi); c1.appendChild(mm);
       tr.append(c1, el("td","num",`${r.d}/${r.n}`), el("td","num",r.b?fmt(r.b):"—"), el("td","num",fmt(r.a)), el("td","num"+(r.b&&r.b-r.a<0?" c-out":""), r.b?fmt(r.b-r.a):"—"));
       tb.appendChild(tr); });
     const tf=el("tfoot"), fr=el("tr"); fr.append(el("td",null,"合計"), el("td","num",`${D}/${N}`), el("td","num",fmt(B)), el("td","num",fmt(A)), el("td","num"+(B-A<0?" c-out":""),fmt(B-A)));
